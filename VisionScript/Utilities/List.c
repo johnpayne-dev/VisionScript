@@ -29,7 +29,7 @@ static struct ListData ListData(list(void) list)
 	return data;
 }
 
-uint32_t ListCount(list(void) list)
+uint32_t ListLength(list(void) list)
 {
 	return *(uint32_t *)((uint8_t *)list - MetaSize / 2);
 }
@@ -85,22 +85,22 @@ void ListRemove(list(void) * list, int32_t index)
 
 void ListPush(list(void) * list, void * value)
 {
-	return ListInsert(list, value, ListCount(*list));
+	return ListInsert(list, value, ListLength(*list));
 }
 
 void ListPop(list(void) * list)
 {
-	if (ListCount(*list) == 0)
+	if (ListLength(*list) == 0)
 	{
 		//printf("Trying to pop from an empty list.\n");
 		exit(1);
 	}
-	return ListRemove(list, ListCount(*list) - 1);
+	return ListRemove(list, ListLength(*list) - 1);
 }
 
 void ListRemoveAll(list(void) * list, void * value)
 {
-	for (int i = 0; i < ListCount(*list); i++)
+	for (int i = 0; i < ListLength(*list); i++)
 	{
 		if (memcmp((uint8_t *)*list + i * ListElementSize(*list), value, ListElementSize(*list)) == 0)
 		{
@@ -112,7 +112,7 @@ void ListRemoveAll(list(void) * list, void * value)
 
 bool ListContains(list(void) list, void * value)
 {
-	for (int i = 0; i < ListCount(list); i++)
+	for (int i = 0; i < ListLength(list); i++)
 	{
 		if (memcmp((uint8_t *)list + i * ListElementSize(list), value, ListElementSize(list))) { return true; }
 	}

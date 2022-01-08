@@ -8,7 +8,7 @@
 
 list(void) ListCreate(uint32_t elementSize);
 
-uint32_t ListCount(list(void) list);
+uint32_t ListLength(list(void) list);
 
 uint32_t ListElementSize(list(void) list);
 

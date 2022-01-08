@@ -1,6 +1,8 @@
 #ifndef String_h
 #define String_h
 
+#include <stdint.h>
+
 typedef char * String;
 
 String StringCreate(char * chars);
