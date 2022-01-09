@@ -13,9 +13,10 @@ static void PrintTokens(list(TokenStatement) tokens)
 				case TokenTypeUnknown: tokenType = "Unknown"; break;
 				case TokenTypeKeyword: tokenType = "Keyword"; break;
 				case TokenTypeIdentifier: tokenType = "Identifier"; break;
-				case TokenTypeConstant: tokenType = "Constant"; break;
-				case TokenTypeSymbol: tokenType = "Symbol"; break;
-				case TokenTypeIndent: tokenType = "Indent"; break;
+				case TokenTypeNumber: tokenType = "Number"; break;
+				case TokenTypeBracket: tokenType = "Bracket"; break;
+				case TokenTypeOperator: tokenType = "Operator"; break;
+				case TokenTypeSeparator: tokenType = "Separator"; break;
 			}
 			printf("%i,%i %s\t%s\n", i, j, tokenType, tokens[i][j].value);
 		}
@@ -32,14 +33,12 @@ int main(int argc, const char * argv[])
 	printf("%s %s\n", argv[0], argv[1]);
 	
 	char * code =
-		"f(x,y) = <cos(x - y), sin(x + y)>\n"
+		"f(x,y) = (cos(x - y), sin(x + y))\n"
 		"s = 2*pi\n"
-		"\n"
-		"field:\n"
-		"	n = 40\n"
-		"	A = (s/n)*[[2*<i, j> - 1 for j = [0 ~ n]] for i = [0 ~ n]]\n"
-		"	B = A + (s/n)*f(A.x,A.y)\n"
-		"	render <(B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y>\n";
+		"n = 40\n"
+		"A = (s/n)*[[2*(i, j) - 1 for j = [0 ~ n]] for i = [0 ~ n]]\n"
+		"B = A + (s/n)*f(A.x,A.y)\n"
+		"render ((B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y)\n";
 	
 	list(TokenStatement) tokens = Tokenize(StringCreate(code));
 	PrintTokens(tokens);

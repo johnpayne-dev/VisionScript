@@ -7,7 +7,7 @@ static list(String) SplitCodeIntoStatements(String code)
 	int lastStatementStart = 0;
 	for (int i = 0; i < StringLength(code); i++)
 	{
-		if (i > 0 && code[i] == ';' && code[i + 1] != ':') { code[i] = '\n'; }
+		if (code[i] == ';') { code[i] = '\n'; }
 		if (code[i] == '\n')
 		{
 			if (i > 0 && code[i - 1] == '\\')
@@ -29,7 +29,7 @@ static bool IsCharacter(char c)
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-static bool IsNumber(char c)
+static bool IsDigit(char c)
 {
 	return c >= '0' && c <= '9';
 }
@@ -43,24 +43,48 @@ static bool IsIdentifier(String statement, int i, int * end)
 {
 	*end = i;
 	if (!IsCharacter(statement[i]) && statement[i] != '_') { return false; }
-	while (IsCharacter(statement[*end]) || IsNumber(statement[*end]) || statement[*end] == '_') { (*end)++; }
+	while (IsCharacter(statement[*end]) || IsDigit(statement[*end]) || statement[*end] == '_') { (*end)++; }
 	(*end)--;
 	return true;
 }
 
-static const char validSymbols[] = { '(', ')', '[', ']', '<', '>', '{', '}', ',', '=', '+', '-', '*', '/', '^', '%', '.', ':', '~' };
+static const char brackets[] = { '(', ')', '[', ']', '{', '}' };
 
-static bool IsSymbol(String statement, int i, int * end)
+static bool IsBracket(String statement, int i, int * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(validSymbols); j++)
+	for (int j = 0; j < sizeof(brackets); j++)
 	{
-		if (statement[i] == validSymbols[j]) { return true; }
+		if (statement[i] == brackets[j]) { return true; }
 	}
 	return false;
 }
 
-static const char * validKeywords[] = { "render" };
+static const char operators[] = { '+', '-', '*', '/', '%', '^', '!', '~', '.', '=', '<', '>' };
+
+static bool IsOperator(String statement, int i, int * end)
+{
+	*end = i;
+	for (int j = 0; j < sizeof(operators); j++)
+	{
+		if (statement[i] == operators[j]) { return true; }
+	}
+	return false;
+}
+
+static const char separators[] = { ',' };
+
+static bool IsSeparator(String statement, int i, int * end)
+{
+	*end = i;
+	for (int j = 0; j < sizeof(separators); j++)
+	{
+		if (statement[i] == separators[j]) { return true; }
+	}
+	return false;
+}
+
+static const char * validKeywords[] = { "render", "for" };
 
 static bool IsKeyword(String statement, int i, int * end)
 {
@@ -83,30 +107,14 @@ static bool IsKeyword(String statement, int i, int * end)
 	return false;
 }
 
-static bool IsConstant(String statement, int i, int * end)
+static bool IsNumber(String statement, int i, int * end)
 {
 	*end = i;
-	if (!IsNumber(statement[i]) && statement[i] != '.') { return false; }
-	while (IsNumber(statement[*end]) || statement[*end] == '.') { (*end)++; }
+	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; }
+	while (IsDigit(statement[*end]) || statement[*end] == '.') { (*end)++; }
 	(*end)--;
+	if (*end == i && statement[i] == '.') { return false; }
 	return true;
-}
-
-static bool IsIndent(String statement, int i, int * end, int indentSize)
-{
-	*end = i;
-	if (statement[i] == '\t') { return true; }
-	int j = 0;
-	while (statement[i + j] != ' ')
-	{
-		if (j == indentSize - 1)
-		{
-			*end = i + j;
-			return true;
-		}
-		j++;
-	}
-	return false;
 }
 
 list(TokenStatement) Tokenize(String code)
@@ -124,9 +132,10 @@ list(TokenStatement) Tokenize(String code)
 			TokenType tokenType = TokenTypeUnknown;
 			if (IsKeyword(statements[i], j, &end)) { tokenType = TokenTypeKeyword; }
 			else if (IsIdentifier(statements[i], j, &end)) { tokenType = TokenTypeIdentifier; }
-			else if (IsConstant(statements[i], j, &end)) { tokenType = TokenTypeConstant; }
-			else if (IsSymbol(statements[i], j, &end)) { tokenType = TokenTypeSymbol; }
-			else if (IsIndent(statements[i], j, &end, 4)) { tokenType = TokenTypeIndent;}
+			else if (IsNumber(statements[i], j, &end)) { tokenType = TokenTypeNumber; }
+			else if (IsBracket(statements[i], j, &end)) { tokenType = TokenTypeBracket; }
+			else if (IsOperator(statements[i], j, &end)) { tokenType = TokenTypeOperator; }
+			else if (IsSeparator(statements[i], j, &end)) { tokenType = TokenTypeSeparator; }
 			else if (IsWhitespace(statements[i][j])) { j++; continue; }
 			ListPush((void **)&statement, &(Token){ .type = tokenType, .value = StringSub(statements[i], j, end) });
 			j = end + 1;

@@ -9,9 +9,10 @@ typedef enum TokenType
 	TokenTypeUnknown,
 	TokenTypeKeyword,
 	TokenTypeIdentifier,
-	TokenTypeConstant,
-	TokenTypeSymbol,
-	TokenTypeIndent,
+	TokenTypeNumber,
+	TokenTypeBracket,
+	TokenTypeOperator,
+	TokenTypeSeparator,
 } TokenType;
 
 typedef struct Token
