@@ -72,6 +72,11 @@ void StringRemove(String * string, int32_t indexStart, int32_t indexEnd)
 	*string = realloc(*string, StringLength(*string) - (indexEnd - indexStart + 1));
 }
 
+bool StringEquals(String string, const char * chars)
+{
+	return strcmp(string, chars) == 0;
+}
+
 void StringDestroy(String string)
 {
 	free(string);

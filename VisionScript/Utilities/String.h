@@ -2,6 +2,7 @@
 #define String_h
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef char * String;
 
@@ -22,6 +23,8 @@ void StringSet(String * string, char * chars);
 void StringInsert(String * string, int32_t index, char * chars);
 
 void StringRemove(String * string, int32_t indexStart, int32_t indexEnd);
+
+bool StringEquals(String string, const char * chars);
 
 void StringDestroy(String string);
 
