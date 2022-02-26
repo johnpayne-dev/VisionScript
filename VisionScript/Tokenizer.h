@@ -12,7 +12,7 @@ typedef enum TokenType
 	TokenTypeNumber,
 	TokenTypeBracket,
 	TokenTypeOperator,
-	TokenTypeSeparator,
+	TokenTypeSymbol,
 } TokenType;
 
 typedef struct Token

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "Tokenizer.h"
+#include "Parser.h"
 
 static void PrintTokens(list(TokenStatement) tokens)
 {
@@ -16,7 +17,7 @@ static void PrintTokens(list(TokenStatement) tokens)
 				case TokenTypeNumber: tokenType = "Number"; break;
 				case TokenTypeBracket: tokenType = "Bracket"; break;
 				case TokenTypeOperator: tokenType = "Operator"; break;
-				case TokenTypeSeparator: tokenType = "Separator"; break;
+				case TokenTypeSymbol: tokenType = "Symbol"; break;
 			}
 			printf("%i,%i %s\t%s\n", i, j, tokenType, tokens[i][j].value);
 		}
@@ -36,9 +37,9 @@ int main(int argc, const char * argv[])
 		"f(x,y) = (cos(x - y), sin(x + y))\n"
 		"s = 2*pi\n"
 		"n = 40\n"
-		"A = (s/n)*[[2*(i, j) - 1 for j = [0 ~ n]] for i = [0 ~ n]]\n"
+		"A = (s/n)*[2*(i, j) - 1 for i = [0...n], j = [0...n]]\n"
 		"B = A + (s/n)*f(A.x,A.y)\n"
-		"render ((B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y)\n";
+		"parametric ((B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y)\n";
 	
 	list(TokenStatement) tokens = Tokenize(StringCreate(code));
 	PrintTokens(tokens);

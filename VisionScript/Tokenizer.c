@@ -7,10 +7,10 @@ static list(String) SplitCodeIntoStatements(String code)
 	int lastStatementStart = 0;
 	for (int i = 0; i < StringLength(code); i++)
 	{
-		if (code[i] == ';') { code[i] = '\n'; }
+		if (code[i] == ';') { code[i] = '\n'; } // semicolons are treated as newlines
 		if (code[i] == '\n')
 		{
-			if (i > 0 && code[i - 1] == '\\')
+			if (i > 0 && code[i - 1] == '\\') // backslashes ignore newlines
 			{
 				StringRemove(&code, i, i);
 				i--;
@@ -24,7 +24,7 @@ static list(String) SplitCodeIntoStatements(String code)
 	return statements;
 }
 
-static bool IsCharacter(char c)
+static bool IsLetter(char c)
 {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
@@ -42,13 +42,14 @@ static bool IsWhitespace(char c)
 static bool IsIdentifier(String statement, int i, int * end)
 {
 	*end = i;
-	if (!IsCharacter(statement[i]) && statement[i] != '_') { return false; }
-	while (IsCharacter(statement[*end]) || IsDigit(statement[*end]) || statement[*end] == '_') { (*end)++; }
+	if (!IsLetter(statement[i]) && statement[i] != '_') { return false; } // if first character isn't letter or underscore
+	while (IsLetter(statement[*end]) || IsDigit(statement[*end]) || statement[*end] == '_') { (*end)++; } // finds end of identifier
 	(*end)--;
 	return true;
 }
 
-static const char brackets[] = { '(', ')', '[', ']', '{', '}' };
+static const char brackets[] = { '(', ')', '[', ']' };
+// '{', '}'
 
 static bool IsBracket(String statement, int i, int * end)
 {
@@ -60,43 +61,53 @@ static bool IsBracket(String statement, int i, int * end)
 	return false;
 }
 
-static const char operators[] = { '+', '-', '*', '/', '%', '^', '!', '~', '.', '=', '<', '>' };
+static const char * operators[] = { "+", "-", "*", "/", "%", "^", "for", "...", "." };
+// "==", "~=", "<=", ">=", "<", ">"
 
 static bool IsOperator(String statement, int i, int * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(operators); j++)
+	for (int j = 0; j < sizeof(operators) / sizeof(operators[0]); j++)
 	{
-		if (statement[i] == operators[j]) { return true; }
+		int k = 0;
+		bool match = true;
+		for (k = 0; operators[j][k] != '\0'; k++) // compares each character of the operator with the statement
+		{
+			if (operators[j][k] != statement[i + k]) { match = false; break; }
+		}
+		if (match)
+		{
+			*end = i + k - 1;
+			return true;
+		}
 	}
 	return false;
 }
 
-static const char separators[] = { ',' };
+static const char symbols[] = { ',', '=' };
 
-static bool IsSeparator(String statement, int i, int * end)
+static bool IsSymbol(String statement, int i, int * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(separators); j++)
+	for (int j = 0; j < sizeof(symbols); j++)
 	{
-		if (statement[i] == separators[j]) { return true; }
+		if (statement[i] == symbols[j]) { return true; }
 	}
 	return false;
 }
 
-static const char * validKeywords[] = { "render", "for" };
+static const char * keywords[] = { "point", "parametric", "polygon" };
 
 static bool IsKeyword(String statement, int i, int * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(validKeywords) / sizeof(validKeywords[0]); j++)
+	for (int j = 0; j < sizeof(keywords) / sizeof(keywords[0]); j++)
 	{
 		int k = 0;
 		bool match = true;
-		while (validKeywords[j][k] != '\0' && statement[i + k] != '\0')
+		for (k = 0; keywords[j][k] != '\0'; k++) // compares each character of the keyword with the statement
 		{
-			if (validKeywords[j][k] != statement[i + k]) { match = false; break; }
-			k++;
+			if (keywords[j][k] != statement[i + k]) { match = false; break; }
 		}
 		if (match)
 		{
@@ -110,10 +121,14 @@ static bool IsKeyword(String statement, int i, int * end)
 static bool IsNumber(String statement, int i, int * end)
 {
 	*end = i;
-	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; }
-	while (IsDigit(statement[*end]) || statement[*end] == '.') { (*end)++; }
+	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; } // check if first character isn't number or '.'
+	while (IsDigit(statement[*end]) || statement[*end] == '.')
+	{
+		(*end)++;
+		if (statement[*end] == '.' && statement[*end + 1] == '.') { break; } // if there's two '.' in a row then assume it's the ... operator
+	}
 	(*end)--;
-	if (*end == i && statement[i] == '.') { return false; }
+	if (*end == i && statement[i] == '.') { return false; } // if the only character is '.' then it's not a number
 	return true;
 }
 
@@ -131,11 +146,11 @@ list(TokenStatement) Tokenize(String code)
 			int end = j;
 			TokenType tokenType = TokenTypeUnknown;
 			if (IsKeyword(statements[i], j, &end)) { tokenType = TokenTypeKeyword; }
-			else if (IsIdentifier(statements[i], j, &end)) { tokenType = TokenTypeIdentifier; }
 			else if (IsNumber(statements[i], j, &end)) { tokenType = TokenTypeNumber; }
-			else if (IsBracket(statements[i], j, &end)) { tokenType = TokenTypeBracket; }
 			else if (IsOperator(statements[i], j, &end)) { tokenType = TokenTypeOperator; }
-			else if (IsSeparator(statements[i], j, &end)) { tokenType = TokenTypeSeparator; }
+			else if (IsIdentifier(statements[i], j, &end)) { tokenType = TokenTypeIdentifier; }
+			else if (IsBracket(statements[i], j, &end)) { tokenType = TokenTypeBracket; }
+			else if (IsSymbol(statements[i], j, &end)) { tokenType = TokenTypeSymbol; }
 			else if (IsWhitespace(statements[i][j])) { j++; continue; }
 			ListPush((void **)&statement, &(Token){ .type = tokenType, .value = StringSub(statements[i], j, end) });
 			j = end + 1;
