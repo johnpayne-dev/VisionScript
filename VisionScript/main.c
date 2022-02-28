@@ -37,7 +37,7 @@ int main(int argc, const char * argv[])
 		"f(x,y) = (cos(x - y), sin(x + y))\n"
 		"s = 2*pi\n"
 		"n = 40\n"
-		"A = (s/n)*[[2*(i, j) - 1 for i = [0...n]] for j = [0...n]]\n"
+		"A = (s/n)*[2*(i, j) - 1 for i = [0...n] for j = [0...n]]\n"
 		"B = A + (s/n)*f(A.x,A.y)\n"
 		"parametric ((B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y)\n";
 	

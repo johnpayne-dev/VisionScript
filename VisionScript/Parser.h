@@ -34,7 +34,11 @@ typedef union Operon
 	list(struct Expression *) expressions;
 	String identifier;
 	float constant;
-	String forAssignment;
+	struct ForAssignment
+	{
+		String identifier;
+		struct Expression * expression;
+	} forAssignment;
 } Operon;
 
 typedef struct Expression
