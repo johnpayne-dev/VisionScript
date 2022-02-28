@@ -187,6 +187,7 @@ static SyntaxError ReadOperon(TokenStatement tokens, int32_t start, int32_t end,
 	if (type == OperonTypeForAssignment) { operon->forAssignment = StringCreate(tokens[start].value); }
 	if (type == OperonTypeArguments || type == OperonTypeArrayLiteral || type == OperonTypeVectorLiteral)
 	{
+		if (type == OperonTypeArrayLiteral || type == OperonTypeVectorLiteral) { start += 1; end -= 1; }
 		operon->expressions = ListCreate(sizeof(Expression *));
 		int32_t prevStart = start;
 		int32_t commaIndex = FindComma(tokens, start, end);
@@ -207,18 +208,27 @@ static SyntaxError ReadOperon(TokenStatement tokens, int32_t start, int32_t end,
 	return error;
 }
 
-static Operator OperatorType(String string)
+static Operator OperatorType(String string, int32_t precedence)
 {
+	if (precedence == 0) { return OperatorNone; }
 	if (StringEquals(string, "for")) { return OperatorFor; }
 	if (StringEquals(string, "...")) { return OperatorEllipsis; }
-	if (StringEquals(string, "+")) { return OperatorAdd; }
-	if (StringEquals(string, "-")) { return OperatorSubtract; }
+	if (StringEquals(string, "+"))
+	{
+		if (precedence == 6) { return OperatorAdd; }
+		else { return OperatorPositive; }
+	}
+	if (StringEquals(string, "-"))
+	{
+		if (precedence == 6) { return OperatorSubtract; }
+		else { return OperatorNegative; }
+	}
 	if (StringEquals(string, "*")) { return OperatorMultiply; }
 	if (StringEquals(string, "/")) { return OperatorDivide; }
 	if (StringEquals(string, "%")) { return OperatorModulo; }
 	if (StringEquals(string, "^")) { return OperatorPower; }
 	if (StringEquals(string, ".")) { return OperatorIndex; }
-	if (StringEquals(string, "(")) { return OperatorFunctionCall; }
+	if (StringEquals(string, "(") && precedence == 1) { return OperatorFunctionCall; }
 	return OperatorNone;
 }
 
@@ -227,84 +237,58 @@ static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t
 	if (end < start) { return SyntaxErrorMissingExpression; }
 	
 	SyntaxError error = SyntaxErrorNone;
-	int32_t op = -1;
+	int32_t opIndex = -1;
 	int32_t precedence = 7;
 	while (precedence > 0)
 	{
 		switch (precedence)
 		{
-			case 7: error = FindOperator(tokens, start, end, (const char *[]){ "for", "..." }, 2, &op); break;
-			case 6: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, &op); break;
-			case 5: error = FindOperator(tokens, start, end, (const char *[]){ "*", "/", "%" }, 3, &op); break;
-			case 4: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, &op); break;
-			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "^" }, 1, &op); break;
-			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, &op); break;
-			case 1: error = FindFunctionCall(tokens, start, end, &op); break;
+			case 7: error = FindOperator(tokens, start, end, (const char *[]){ "for", "..." }, 2, &opIndex); break;
+			case 6: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, &opIndex); break;
+			case 5: error = FindOperator(tokens, start, end, (const char *[]){ "*", "/", "%" }, 3, &opIndex); break;
+			case 4: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, &opIndex); break;
+			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "^" }, 1, &opIndex); break;
+			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, &opIndex); break;
+			case 1: error = FindFunctionCall(tokens, start, end, &opIndex); break;
 			default: break;
 		}
 		if (error != SyntaxErrorNone) { return error; }
-		if (op > -1) { break; }
+		if (opIndex > -1) { break; }
 		precedence--;
 	}
 	
 	*expression = malloc(sizeof(Expression));
-	if (op == -1)
+	Operator operator = OperatorType(tokens[opIndex].value, precedence);
+	if (operator == OperatorNone)
 	{
 		OperonType operonType = DetermineOperonType(tokens, start, end);
 		Operon operon = { 0 };
-		switch (operonType)
+		if (operonType == OperonTypeExpression)
 		{
-			case OperonTypeExpression:
-				if (tokens[start].value[0] != '(' || tokens[end].value[0] != ')') { return SyntaxErrorMissingOperator; }
-				error = ReadOperon(tokens, start + 1, end - 1, operonType, &operon);
-				break;
-			case OperonTypeIdentifier: error = ReadOperon(tokens, start, end, operonType, &operon); break;
-			case OperonTypeArguments: error = SyntaxErrorInvalidCommaPlacement; break;
-			case OperonTypeConstant: error = ReadOperon(tokens, start, end, operonType, &operon); break;
-			case OperonTypeArrayLiteral: error = ReadOperon(tokens, start + 1, end - 1, operonType, &operon); break;
-			case OperonTypeVectorLiteral: error = ReadOperon(tokens, start + 1, end - 1, operonType, &operon); break;
-			case OperonTypeForAssignment: error = SyntaxErrorInvalidAssignmentPlacement; break;
-			default: break;
+			if (tokens[start].value[0] != '(' || FindCorrespondingBracket(tokens, start, end, start) != end) { return SyntaxErrorMissingOperator; }
+			error = ReadOperon(tokens, start + 1, end - 1, operonType, &operon);
 		}
-		(*expression)->operator = OperatorNone;
+		else { error = ReadOperon(tokens, start, end, operonType, &operon); }
+		(*expression)->operator = operator;
 		(*expression)->operonTypes[0] = operonType;
 		(*expression)->operons[0] = operon;
 	}
 	else
 	{
-		if (tokens[op].value[0] == '(')
-		{
-			OperonType leftOperonType = DetermineOperonType(tokens, start, op - 1);
-			OperonType rightOperonType = DetermineOperonType(tokens, op + 1, end - 1);
-			Operon leftOperon = { 0 }, rightOperon = { 0 };
-			if (leftOperonType == OperonTypeIdentifier) { error = ReadOperon(tokens, start, op - 1, leftOperonType, &leftOperon); }
-			else { return SyntaxErrorInvalidFunctionCall; }
-			if (error != SyntaxErrorNone) { return error; }
-			if (rightOperonType == OperonTypeForAssignment) { return SyntaxErrorInvalidAssignmentPlacement; }
-			else { error = ReadOperon(tokens, op + 1, end - 1, rightOperonType, &rightOperon); }
-			(*expression)->operator = OperatorFunctionCall;
-			(*expression)->operonTypes[0] = leftOperonType;
-			(*expression)->operonTypes[1] = rightOperonType;
-			(*expression)->operons[0] = leftOperon;
-			(*expression)->operons[1] = rightOperon;
-		}
-		else
-		{
-			OperonType leftOperonType = DetermineOperonType(tokens, start, op - 1);
-			OperonType rightOperonType = DetermineOperonType(tokens, op + 1, end);
-			Operon leftOperon = { 0 }, rightOperon = { 0 };
-			if (leftOperonType == OperonTypeArguments || rightOperonType == OperonTypeArguments) { return SyntaxErrorInvalidCommaPlacement; }
-			if (leftOperonType == OperonTypeForAssignment || rightOperonType == OperonTypeForAssignment) { return SyntaxErrorInvalidAssignmentPlacement; }
-			error = ReadOperon(tokens, start, op - 1, leftOperonType, &leftOperon);
-			if (error != SyntaxErrorNone) { return error; }
-			error = ReadOperon(tokens, op + 1, end, rightOperonType, &rightOperon);
-			(*expression)->operator = OperatorType(tokens[op].value);
-			(*expression)->operonTypes[0] = leftOperonType;
-			(*expression)->operonTypes[1] = rightOperonType;
-			(*expression)->operons[0] = leftOperon;
-			(*expression)->operons[1] = rightOperon;
-		}
+		if (operator == OperatorFunctionCall) { end--; }
+		OperonType leftOperonType = DetermineOperonType(tokens, start, opIndex - 1);
+		OperonType rightOperonType = DetermineOperonType(tokens, opIndex + 1, end);
+		Operon leftOperon = { 0 }, rightOperon = { 0 };
 		
+		error = ReadOperon(tokens, start, opIndex - 1, leftOperonType, &leftOperon);
+		if (error != SyntaxErrorNone) { return error; }
+		error = ReadOperon(tokens, opIndex + 1, end, rightOperonType, &rightOperon);
+		
+		(*expression)->operator = operator;
+		(*expression)->operonTypes[0] = leftOperonType;
+		(*expression)->operonTypes[1] = rightOperonType;
+		(*expression)->operons[0] = leftOperon;
+		(*expression)->operons[1] = rightOperon;
 	}
 	
 	return error;
