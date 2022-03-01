@@ -1,85 +1,65 @@
 #include <string.h>
 #include <stdlib.h>
-#include <math.h>
 #include "List.h"
-
-static const uint32_t MetaSize = 2 * sizeof(uint32_t);
-
-list(void) ListCreate(uint32_t elementSize)
-{
-	uint32_t * list = malloc(MetaSize + 2 * elementSize);
-	list[0] = elementSize;
-	list[1] = 0;
-	return (uint8_t *)list + MetaSize;
-}
 
 struct ListData
 {
-	uint32_t ElementSize;
-	uint32_t * Count;
-	uint32_t Capacity;
+	uint32_t elementSize;
+	uint32_t capacity;
+	uint32_t length;
 };
 
-static struct ListData ListData(list(void) list)
+list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity)
 {
-	struct ListData data = { 0 };
-	data.ElementSize = *(uint32_t *)((uint8_t *)list - MetaSize);
-	data.Count = (uint32_t *)((uint8_t *)list - MetaSize / 2);
-	data.Capacity = pow(2.0, floor(log2(*data.Count)) + 1.0);
-	return data;
+	struct ListData * list = malloc(sizeof(struct ListData) + initialCapacity * elementSize);
+	list->elementSize = elementSize;
+	list->capacity = initialCapacity;
+	list->length = 0;
+	return list + 1;
 }
 
 uint32_t ListLength(list(void) list)
 {
-	return *(uint32_t *)((uint8_t *)list - MetaSize / 2);
+	return ((struct ListData *)list - 1)->length;
 }
 
 uint32_t ListElementSize(list(void) list)
 {
-	return *(uint32_t *)((uint8_t *)list - MetaSize);
+	return ((struct ListData *)list - 1)->elementSize;
 }
 
 uint32_t ListCapacity(list(void) list)
 {
-	return ListData(list).Capacity;
+	return ((struct ListData *)list - 1)->capacity;
 }
 
 void ListInsert(list(void) * list, void * element, int32_t index)
 {
-	struct ListData data = ListData(*list);
-	if (index < 0 || index > *data.Count)
+	struct ListData * data = (struct ListData *)*list - 1;
+	data->length++;
+	if (data->length == data->capacity)
 	{
-		//printf("Trying to add a value to a list, but the index is out of bounds.\n");
-		exit(1);
+		data->capacity *= 2;
+		data = realloc(data, sizeof(struct ListData) + data->capacity * data->elementSize);
+		*list = data + 1;
 	}
-	
-	(*data.Count)++;
-	if (*data.Count == data.Capacity)
-	{
-		*list = (uint8_t *)realloc((uint8_t *)*list - MetaSize, MetaSize + 2 * data.Capacity * data.ElementSize) + MetaSize;
-	}
-	data = ListData(*list);
-	memmove((uint8_t *)*list + (index + 1) * data.ElementSize, (uint8_t *)*list + index * data.ElementSize, (*data.Count - 1 - index) * data.ElementSize);
-	memcpy((uint8_t *)*list + index * data.ElementSize, element, data.ElementSize);
+	memmove(*list + (index + 1) * data->elementSize, *list + index * data->elementSize, (data->length - 1 - index) * data->elementSize);
+	memcpy(*list + index * data->elementSize, element, data->elementSize);
 }
 
 void ListRemove(list(void) * list, int32_t index)
 {
-	struct ListData data = ListData(*list);
-	if (index < 0 || index > *data.Count)
+	struct ListData * data = (struct ListData *)*list - 1;
+	for (uint32_t j = (index + 1) * data->elementSize; j < data->length * data->elementSize; j++)
 	{
-		//printf("Trying to remove a value from a list, but the index is out of bounds.\n");
-		exit(1);
+		((uint8_t *)*list)[j - data->elementSize] = ((uint8_t *)*list)[j];
 	}
-
-	for (int j = (index + 1) * (int)data.ElementSize; j < (*data.Count) * (int)data.ElementSize; j++)
+	data->length--;
+	if (data->length == data->capacity / 2 - 1)
 	{
-		((uint8_t *)*list)[j - data.ElementSize] = ((uint8_t *)*list)[j];
-	}
-	(*data.Count)--;
-	if (*data.Count == data.Capacity / 2 - 1)
-	{
-		*list = (uint8_t *)realloc((uint8_t *)*list - MetaSize, MetaSize + (data.Capacity / 2) * data.ElementSize) + MetaSize;
+		data->capacity /= 2;
+		data = realloc(data, sizeof(struct ListData) + data->capacity * data->elementSize);
+		*list = data + 1;
 	}
 }
 
@@ -90,19 +70,14 @@ void ListPush(list(void) * list, void * value)
 
 void ListPop(list(void) * list)
 {
-	if (ListLength(*list) == 0)
-	{
-		//printf("Trying to pop from an empty list.\n");
-		exit(1);
-	}
 	return ListRemove(list, ListLength(*list) - 1);
 }
 
 void ListRemoveAll(list(void) * list, void * value)
 {
-	for (int i = 0; i < ListLength(*list); i++)
+	for (uint32_t i = 0; i < ListLength(*list); i++)
 	{
-		if (memcmp((uint8_t *)*list + i * ListElementSize(*list), value, ListElementSize(*list)) == 0)
+		if (memcmp(*list + i * ListElementSize(*list), value, ListElementSize(*list)) == 0)
 		{
 			ListRemove(list, i);
 			i--;
@@ -112,21 +87,21 @@ void ListRemoveAll(list(void) * list, void * value)
 
 bool ListContains(list(void) list, void * value)
 {
-	for (int i = 0; i < ListLength(list); i++)
+	for (uint32_t i = 0; i < ListLength(list); i++)
 	{
-		if (memcmp((uint8_t *)list + i * ListElementSize(list), value, ListElementSize(list))) { return true; }
+		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list))) { return true; }
 	}
 	return false;
 }
 
 void ListClear(list(void) * list)
 {
-	list(void) newList = ListCreate(ListElementSize(*list));
+	list(void) newList = ListCreate(ListElementSize(*list), ListCapacity(*list));
 	ListDestroy(*list);
 	*list = newList;
 }
 
 void ListDestroy(list(void) list)
 {
-	free((uint8_t *)list - MetaSize);
+	free((struct ListData *)list - 1);
 }

@@ -5,8 +5,9 @@
 #include <stdbool.h>
 
 #define list(type) type*
+typedef void * List;
 
-list(void) ListCreate(uint32_t elementSize);
+list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity);
 
 uint32_t ListLength(list(void) list);
 

@@ -47,7 +47,7 @@ static SyntaxError ParseFunctionDeclaration(TokenStatement tokens, StatementDecl
 	if (argumentsEndIndex >= ListLength(tokens) - 1) { return SyntaxErrorInvalidFunctionDeclaration; }
 	if (tokens[argumentsEndIndex + 1].type != TokenTypeSymbol || tokens[argumentsEndIndex + 1].value[0] != '=') { return SyntaxErrorInvalidFunctionDeclaration; }
 	
-	declaration->function.arguments = ListCreate(sizeof(String));
+	declaration->function.arguments = ListCreate(sizeof(String), 4);
 	for (int32_t i = 2; i < argumentsEndIndex; i++)
 	{
 		if (tokens[i].type != TokenTypeIdentifier) { return SyntaxErrorInvalidFunctionDeclaration; }
@@ -198,7 +198,7 @@ static SyntaxError ReadOperon(TokenStatement tokens, int32_t start, int32_t end,
 	if (type == OperonTypeArguments || type == OperonTypeArrayLiteral || type == OperonTypeVectorLiteral)
 	{
 		if (type == OperonTypeArrayLiteral || type == OperonTypeVectorLiteral) { start += 1; end -= 1; }
-		operon->expressions = ListCreate(sizeof(Expression *));
+		operon->expressions = ListCreate(sizeof(Expression *), 4);
 		int32_t prevStart = start;
 		int32_t commaIndex = FindComma(tokens, start, end);
 		int32_t elementIndex = 0;

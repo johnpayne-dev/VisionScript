@@ -3,7 +3,7 @@
 
 static list(String) SplitCodeIntoStatements(String code)
 {
-	list(String) statements = ListCreate(sizeof(String));
+	list(String) statements = ListCreate(sizeof(String), 16);
 	int lastStatementStart = 0;
 	for (int i = 0; i < StringLength(code); i++)
 	{
@@ -134,12 +134,12 @@ static bool IsNumber(String statement, int i, int * end)
 
 list(TokenStatement) Tokenize(String code)
 {
-	list(TokenStatement) tokenStatements = ListCreate(sizeof(TokenStatement));
+	list(TokenStatement) tokenStatements = ListCreate(sizeof(TokenStatement), 16);
 	
 	list(String) statements = SplitCodeIntoStatements(code);
 	for (int i = 0; i < ListLength(statements); i++)
 	{
-		TokenStatement statement = ListCreate(sizeof(Token));
+		TokenStatement statement = ListCreate(sizeof(Token), 32);
 		int j = 0;
 		while (j < StringLength(statements[i]))
 		{
