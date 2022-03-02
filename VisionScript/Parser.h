@@ -58,9 +58,16 @@ typedef enum SyntaxError
 	SyntaxErrorMissingExpression,
 	SyntaxErrorMissingBracket,
 	SyntaxErrorMissingOperator,
-	SyntaxErrorInvalidCommaPlacement,
-	SyntaxErrorInvalidAssignmentPlacement,
 	SyntaxErrorTooManyVectorElements,
+	SyntaxErrorInvalidCommaPlacement,
+	SyntaxErrorInvalidForPlacement,
+	SyntaxErrorInvalidForAssignment,
+	SyntaxErrorInvalidForAssignmentPlacement,
+	SyntaxErrorInvalidEllipsisPlacement,
+	SyntaxErrorInvalidEllipsisOperon,
+	SyntaxErrorIndexingConstant,
+	SyntaxErrorIndexingWithConstant,
+	SyntaxErrorIndexingWithVector,
 	SyntaxErrorInvalidFunctionCall,
 } SyntaxError;
 

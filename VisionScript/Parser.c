@@ -247,6 +247,51 @@ static bool IsUnaryOperator(Operator operator)
 	return operator == OperatorPositive || operator == OperatorNegative;
 }
 
+static bool InsideArray(TokenStatement tokens, int32_t index)
+{
+	int32_t depth = 0;
+	for (int32_t i = index; i <= ListLength(tokens); i++)
+	{
+		if (tokens[i].type == TokenTypeBracket)
+		{
+			if (depth == 0 && tokens[i].value[0] == ']') { return true; }
+			if (tokens[i].value[0] == '(' || tokens[i].value[0] == '[' || tokens[i].value[0] == '{') { depth++; }
+			if (tokens[i].value[0] == ')' || tokens[i].value[0] == ']' || tokens[i].value[0] == '}') { depth--; }
+		}
+	}
+	return false;
+}
+
+static SyntaxError CheckOperatorLogic(Expression * expression, TokenStatement tokens, int32_t opIndex)
+{
+	if (expression->operonTypes[0] == OperonTypeArguments) { return SyntaxErrorInvalidCommaPlacement; }
+	if (expression->operonTypes[1] == OperonTypeArguments && expression->operator != OperatorFunctionCall) { return SyntaxErrorInvalidCommaPlacement; }
+	if (expression->operonTypes[0] == OperonTypeForAssignment) { return SyntaxErrorInvalidForAssignmentPlacement; }
+	if (expression->operonTypes[1] == OperonTypeForAssignment && expression->operator != OperatorFor) { return SyntaxErrorInvalidForAssignmentPlacement; }
+	switch (expression->operator)
+	{
+		case OperatorFor:
+			if (!InsideArray(tokens, opIndex)) { return SyntaxErrorInvalidForPlacement; }
+			if (expression->operonTypes[1] != OperonTypeForAssignment) { return SyntaxErrorInvalidForAssignment; }
+			break;
+		case OperatorEllipsis:
+			if (!InsideArray(tokens, opIndex)) { return SyntaxErrorInvalidEllipsisPlacement; }
+			if (expression->operonTypes[0] == OperonTypeArrayLiteral || expression->operonTypes[1] == OperonTypeArrayLiteral) { return SyntaxErrorInvalidEllipsisOperon; }
+			if (expression->operonTypes[0] == OperonTypeVectorLiteral || expression->operonTypes[1] == OperonTypeVectorLiteral) { return SyntaxErrorInvalidEllipsisOperon; }
+			break;
+		case OperatorIndex:
+			if (expression->operonTypes[0] == OperonTypeConstant) { return SyntaxErrorIndexingConstant; }
+			if (expression->operonTypes[1] == OperonTypeConstant) { return SyntaxErrorIndexingWithConstant; }
+			if (expression->operonTypes[1] == OperonTypeVectorLiteral) { return SyntaxErrorIndexingWithVector; }
+			break;
+		case OperatorFunctionCall:
+			if (expression->operonTypes[0] != OperonTypeIdentifier) { return SyntaxErrorInvalidFunctionCall; }
+			break;
+		default: break;
+	}
+	return SyntaxErrorNone;
+}
+
 static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, Expression ** expression)
 {
 	if (end < start) { return SyntaxErrorMissingExpression; }
@@ -315,6 +360,7 @@ static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t
 		(*expression)->operons[1] = rightOperon;
 	}
 	
+	if (error != SyntaxErrorNone) { error = CheckOperatorLogic(*expression, tokens, opIndex); }
 	return error;
 }
 
