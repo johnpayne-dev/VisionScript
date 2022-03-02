@@ -94,6 +94,7 @@ typedef struct Statement
 	Expression * expression;
 } Statement;
 
-Statement ParseTokenStatement(TokenStatement tokens);
+Statement * ParseTokenStatement(TokenStatement tokens);
+void DestroyStatement(Statement * statement);
 
 #endif

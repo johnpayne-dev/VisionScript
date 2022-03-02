@@ -2,7 +2,7 @@
 #include <string.h>
 #include "String.h"
 
-String StringCreate(char * chars)
+String StringCreate(const char * chars)
 {
 	String string = malloc(strlen(chars) + 1);
 	memcpy(string, chars, strlen(chars) + 1);
@@ -14,12 +14,12 @@ int32_t StringLength(String string)
 	return (int32_t)strlen(string);
 }
 
-void StringConcat(String * string, char * chars)
+void StringConcat(String * string, const char * chars)
 {
 	StringInsert(string, StringLength(*string), chars);
 }
 
-void StringConcatFront(char * chars, String * string)
+void StringConcatFront(const char * chars, String * string)
 {
 	StringInsert(string, 0, chars);
 }
@@ -45,15 +45,15 @@ int32_t StringIndexOf(String string, char chr)
 	return -1;
 }
 
-void StringSet(String * string, char * chars)
+void StringSet(String * string, const char * chars)
 {
 	StringDestroy(*string);
 	*string = StringCreate(chars);
 }
 
-void StringInsert(String * string, int32_t index, char * chars)
+void StringInsert(String * string, int32_t index, const char * chars)
 {
-	int32_t len1 = StringLength(*string), len2 = StringLength(chars);
+	int32_t len1 = StringLength(*string), len2 = (int32_t)strlen(chars);
 	if (index > len1) { index = len1; }
 	*string = realloc(*string, len1 + len2 + 1);
 	for (int32_t i = len1; i >= index; i--) { (*string)[i + len2] = (*string)[i]; }

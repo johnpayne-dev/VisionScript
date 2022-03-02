@@ -13,11 +13,11 @@ typedef struct HashEntry
 
 typedef struct HashMap
 {
-	const uint32_t capacity;
+	uint32_t capacity;
 	HashEntry * entries;
 } HashMap;
 
-HashMap HashMapCreate(const uint32_t capacity);
+HashMap HashMapCreate(uint32_t capacity);
 void HashMapSet(HashMap map, const char * key, void * value);
 void * HashMapGet(HashMap map, const char * key);
 void HashMapDestroy(HashMap map);

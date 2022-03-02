@@ -318,44 +318,50 @@ static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t
 	return error;
 }
 
-Statement ParseTokenStatement(TokenStatement tokens)
+Statement * ParseTokenStatement(TokenStatement tokens)
 {
-	Statement statement = { .error = SyntaxErrorNone };
+	Statement * statement = malloc(sizeof(Statement));
+	*statement = (Statement){ .error = SyntaxErrorNone };
 	
 	for (int32_t i = 0; i < ListLength(tokens); i++)
 	{
 		if (tokens[i].type == TokenTypeUnknown)
 		{
-			statement.error = SyntaxErrorUnknownToken;
+			statement->error = SyntaxErrorUnknownToken;
 			return statement;
 		}
 	}
 	
-	statement.type = DetermineStatementType(tokens);
-	if (statement.type == StatementTypeUnknown)
+	statement->type = DetermineStatementType(tokens);
+	if (statement->type == StatementTypeUnknown)
 	{
-		statement.error = SyntaxErrorUnknownStatementType;
+		statement->error = SyntaxErrorUnknownStatementType;
 		return statement;
 	}
 	
 	int32_t declarationEndIndex = 0;
-	switch (statement.type)
+	switch (statement->type)
 	{
 		case StatementTypeVariable:
-			statement.error = ParseVariableDeclaration(tokens, &statement.declaration, &declarationEndIndex);
+			statement->error = ParseVariableDeclaration(tokens, &statement->declaration, &declarationEndIndex);
 			break;
 		case StatementTypeFunction:
-			statement.error = ParseFunctionDeclaration(tokens, &statement.declaration, &declarationEndIndex);
+			statement->error = ParseFunctionDeclaration(tokens, &statement->declaration, &declarationEndIndex);
 			break;
 		case StatementTypeRender:
-			statement.error = ParseRenderDeclaration(tokens, &statement.declaration, &declarationEndIndex);
+			statement->error = ParseRenderDeclaration(tokens, &statement->declaration, &declarationEndIndex);
 		default: break;
 	}
-	if (statement.error != SyntaxErrorNone) { return statement; }
+	if (statement->error != SyntaxErrorNone) { return statement; }
 	
 	int32_t expressionStartIndex = declarationEndIndex + 1;
 	int32_t expressionEndIndex = ListLength(tokens) - 1;
-	statement.error = ParseExpression(tokens, expressionStartIndex, expressionEndIndex, &statement.expression);
+	statement->error = ParseExpression(tokens, expressionStartIndex, expressionEndIndex, &statement->expression);
 	
 	return statement;
+}
+
+void DestroyStatement(Statement * statement)
+{
+	free(statement);
 }
