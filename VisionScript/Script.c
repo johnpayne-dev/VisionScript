@@ -43,25 +43,25 @@ Script * LoadScript(const char * code)
 	return script;
 }
 
-static RuntimeError EvaluateOperon(Script * script, Statement * statement, list(VectorArray) arguments, OperonType operonType, Operon operon, VectorArray * result)
+static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, list(VectorArray) arguments, OperonType operonType, Operon operon, VectorArray * result)
 {
 	if (operonType == OperonTypeExpression)
 	{
-		return EvaluateExpression(script, statement, arguments, operon.expression, result);
+		return EvaluateExpression(identifiers, statement, arguments, operon.expression, result);
 	}
 	else if (operonType == OperonTypeIdentifier)
 	{
-		if (statement->type == StatementTypeFunction)
+		if (statement != NULL && statement->type == StatementTypeFunction)
 		{
 			for (int32_t i = 0; i < ListLength(statement->declaration.function.arguments); i++)
 			{
 				if (strcmp(operon.identifier, statement->declaration.function.arguments[i]) == 0) { *result = arguments[i]; return RuntimeErrorNone; }
 			}
 		}
-		Statement * idenStatement = HashMapGet(script->identifiers, operon.identifier);
+		Statement * idenStatement = HashMapGet(identifiers, operon.identifier);
 		if (idenStatement == NULL) { return RuntimeErrorUndefinedIdentifier; }
 		if (idenStatement->type == StatementTypeFunction) { return RuntimeErrorIdentifierNotVariable; }
-		return EvaluateExpression(script, idenStatement, NULL, idenStatement->expression, result);
+		return EvaluateExpression(identifiers, idenStatement, NULL, idenStatement->expression, result);
 	}
 	else if (operonType == OperonTypeConstant)
 	{
@@ -78,7 +78,7 @@ static RuntimeError EvaluateOperon(Script * script, Statement * statement, list(
 		for (int32_t i = 0; i < result->dimensions; i++)
 		{
 			VectorArray component;
-			RuntimeError error = EvaluateExpression(script, statement, arguments, operon.expressions[i], &component);
+			RuntimeError error = EvaluateExpression(identifiers, statement, arguments, operon.expressions[i], &component);
 			if (error != RuntimeErrorNone) { return error; }
 			
 			if (component.dimensions > 1) { return RuntimeErrorVectorInsideVector; }
@@ -95,7 +95,7 @@ static RuntimeError EvaluateOperon(Script * script, Statement * statement, list(
 		VectorArray * elements = malloc(sizeof(VectorArray) * ListLength(operon.expressions));
 		for (int32_t i = 0; i < ListLength(operon.expressions); i++)
 		{
-			RuntimeError error = EvaluateExpression(script, statement, arguments, operon.expressions[i], elements + i);
+			RuntimeError error = EvaluateExpression(identifiers, statement, arguments, operon.expressions[i], elements + i);
 			if (error != RuntimeErrorNone) { return error; }
 			
 			if (result->dimensions == 0) { result->dimensions = elements[i].dimensions; }
@@ -132,62 +132,72 @@ void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
 	result->length = upper - lower + 1;
 	result->dimensions = 1;
 	result->xyzw[0] = malloc(result->length * sizeof(float));
-	for (int32_t i = lower; i <= upper; i++) { result->xyzw[0][i] = i; }
+	for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = i + lower; }
 }
 
 void EvaluateAdd(VectorArray * a, VectorArray * b)
 {
+	int32_t len = a->length < b->length ? a->length : b->length;
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
-		for (int32_t i = 0; i < a->length < b->length ? a->length : b->length; i++)
+		for (int32_t i = 0; i < len; i++)
 		{
 			a->xyzw[d][i] += b->xyzw[d][i];
 		}
 	}
+	a->length = len;
 }
 
 void EvaluateSubtract(VectorArray * a, VectorArray * b)
 {
+	int32_t len = a->length < b->length ? a->length : b->length;
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
-		for (int32_t i = 0; i < a->length < b->length ? a->length : b->length; i++)
+		for (int32_t i = 0; i < len; i++)
 		{
 			a->xyzw[d][i] -= b->xyzw[d][i];
 		}
 	}
+	a->length = len;
 }
 
 void EvaluateMultiply(VectorArray * a, VectorArray * b)
 {
+	int32_t len = a->length < b->length ? a->length : b->length;
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
-		for (int32_t i = 0; i < a->length < b->length ? a->length : b->length; i++)
+		for (int32_t i = 0; i < len; i++)
 		{
 			a->xyzw[d][i] *= b->xyzw[d][i];
 		}
 	}
+	a->length = len;
 }
 
 void EvaluateDivide(VectorArray * a, VectorArray * b)
 {
+	int32_t len = a->length < b->length ? a->length : b->length;
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
-		for (int32_t i = 0; i < a->length < b->length ? a->length : b->length; i++)
+		for (int32_t i = 0; i < len; i++)
 		{
 			a->xyzw[d][i] /= b->xyzw[d][i];
 		}
 	}
+	a->length = len;
 }
 
 void EvaluateModulo(VectorArray * a, VectorArray * b)
 {
+	int32_t len = a->length < b->length ? a->length : b->length;
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
-		for (int32_t i = 0; i < a->length < b->length ? a->length : b->length; i++)
+		for (int32_t i = 0; i < len; i++)
 		{
 			a->xyzw[d][i] = fmodf(a->xyzw[d][i], b->xyzw[d][i]);
 		}
 	}
+	a->length = len;
 }
 
 void EvaluateNegate(VectorArray * a)
@@ -203,18 +213,19 @@ void EvaluateNegate(VectorArray * a)
 
 void EvaluatePower(VectorArray * a, VectorArray * b)
 {
+	int32_t len = a->length < b->length ? a->length : b->length;
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
-		for (int32_t i = 0; i < a->length < b->length ? a->length : b->length; i++)
+		for (int32_t i = 0; i < len; i++)
 		{
 			a->xyzw[d][i] = powf(a->xyzw[d][i], b->xyzw[d][i]);
 		}
 	}
 }
 
-static RuntimeError EvaluateFunctionCall(Script * script, Statement * statement, list(VectorArray) arguments, String function, list(Expression *) expressions, VectorArray * result)
+static RuntimeError EvaluateFunctionCall(HashMap identifiers, Statement * statement, list(VectorArray) arguments, String function, list(Expression *) expressions, VectorArray * result)
 {
-	Statement * idenStatement = HashMapGet(script->identifiers, function);
+	Statement * idenStatement = HashMapGet(identifiers, function);
 	if (idenStatement == NULL) { return RuntimeErrorUndefinedIdentifier; }
 	if (idenStatement->type == StatementTypeVariable) { return RuntimeErrorIdentifierNotFunction; }
 	
@@ -222,32 +233,32 @@ static RuntimeError EvaluateFunctionCall(Script * script, Statement * statement,
 	for (int32_t i = 0; i < ListLength(expressions); i++)
 	{
 		ListPush((void **)args, &(VectorArray){ 0 });
-		RuntimeError error = EvaluateExpression(script, statement, arguments, expressions[i], args + i);
+		RuntimeError error = EvaluateExpression(identifiers, statement, arguments, expressions[i], args + i);
 		if (error != RuntimeErrorNone) { return error; }
 	}
-	RuntimeError error = EvaluateExpression(script, idenStatement, args, idenStatement->expression, result);
+	RuntimeError error = EvaluateExpression(identifiers, idenStatement, args, idenStatement->expression, result);
 	ListDestroy(args);
 	return error;
 }
 
-RuntimeError EvaluateExpression(Script * script, Statement * statement, list(VectorArray) arguments, Expression * expression, VectorArray * result)
+RuntimeError EvaluateExpression(HashMap identifiers, Statement * statement, list(VectorArray) arguments, Expression * expression, VectorArray * result)
 {
-	if (expression->operator == OperatorNone) { return EvaluateOperon(script, statement, arguments, expression->operonTypes[0], expression->operons[0], result); }
-	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(script, statement, arguments, expression->operons[0].identifier, expression->operons[1].expressions, result); }
+	if (expression->operator == OperatorNone) { return EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[0], expression->operons[0], result); }
+	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(identifiers, statement, arguments, expression->operons[0].identifier, expression->operons[1].expressions, result); }
 	if (expression->operator == OperatorFor) { return RuntimeErrorNotImplemented; }
 	if (expression->operator == OperatorIndex) { return RuntimeErrorNotImplemented; }
 	
-	VectorArray value;
+	VectorArray value = { 0 };
 	if (expression->operator == OperatorPositive || expression->operator == OperatorNegative)
 	{
-		RuntimeError error = EvaluateOperon(script, statement, arguments, expression->operonTypes[0], expression->operons[0], result);
+		RuntimeError error = EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[0], expression->operons[0], result);
 		if (error != RuntimeErrorNone) { return error; }
 	}
 	else
 	{
-		RuntimeError error = EvaluateOperon(script, statement, arguments, expression->operonTypes[0], expression->operons[0], result);
+		RuntimeError error = EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[0], expression->operons[0], result);
 		if (error != RuntimeErrorNone) { return error; }
-		error = EvaluateOperon(script, statement, arguments, expression->operonTypes[1], expression->operons[1], &value);
+		error = EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[1], expression->operons[1], &value);
 		if (error != RuntimeErrorNone) { return error; }
 	}
 	
@@ -282,7 +293,7 @@ RuntimeError EvaluateExpression(Script * script, Statement * statement, list(Vec
 			default: break;
 		}
 	}
-	for (int32_t i = 0; i < value.dimensions; i++) { free(value.xyzw[i]); }
+	if (value.length > 0) { for (int32_t i = 0; i < value.dimensions; i++) { free(value.xyzw[i]); } }
 	return RuntimeErrorNone;
 }
 

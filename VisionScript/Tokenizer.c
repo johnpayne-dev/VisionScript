@@ -161,3 +161,9 @@ list(TokenStatement) Tokenize(String code)
 
 	return tokenStatements;
 }
+
+list(Token) TokenizeLine(String line)
+{
+	StringConcat(&line, ";");
+	return Tokenize(line)[0];
+}

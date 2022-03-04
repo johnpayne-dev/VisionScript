@@ -39,7 +39,7 @@ typedef struct Script
 
 Script * LoadScript(const char * code);
 
-RuntimeError EvaluateExpression(Script * script, Statement * statement, list(VectorArray) arguments, Expression * expression, VectorArray * result);
+RuntimeError EvaluateExpression(HashMap identifiers, Statement * statement, list(VectorArray) arguments, Expression * expression, VectorArray * result);
 
 void DestroyScript(Script * script);
 

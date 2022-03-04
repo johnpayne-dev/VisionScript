@@ -182,8 +182,6 @@ static OperonType DetermineOperonType(TokenStatement tokens, int32_t start, int3
 	return OperonTypeExpression;
 }
 
-static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, Expression ** expression);
-
 static SyntaxError ReadOperon(TokenStatement tokens, int32_t start, int32_t end, OperonType type, Operon * operon)
 {
 	SyntaxError error = SyntaxErrorNone;
@@ -292,7 +290,7 @@ static SyntaxError CheckOperatorLogic(Expression * expression, TokenStatement to
 	return SyntaxErrorNone;
 }
 
-static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, Expression ** expression)
+SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, Expression ** expression)
 {
 	if (end < start) { return SyntaxErrorMissingExpression; }
 	
@@ -307,7 +305,7 @@ static SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t
 			case 6: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, false, false, &opIndex); break;       // binary, left to right
 			case 5: error = FindOperator(tokens, start, end, (const char *[]){ "*", "/", "%" }, 3, false, false, &opIndex); break;  // binary, left to right
 			case 4: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, true, false, &opIndex); break;        // unary,  left to right
-			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "^" }, 1, false, true, &opIndex); break;             // binary, right to left
+			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "^" }, 1, false, false, &opIndex); break;            // binary, left to right
 			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, false, true, &opIndex); break;             // binary, right to left
 			case 1: error = FindFunctionCall(tokens, start, end, &opIndex); break;
 			default: break;

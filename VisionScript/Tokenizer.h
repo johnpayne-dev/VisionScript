@@ -24,5 +24,6 @@ typedef struct Token
 typedef list(Token) TokenStatement;
 
 list(TokenStatement) Tokenize(String code);
+list(Token) TokenizeLine(String line);
 
 #endif
