@@ -358,7 +358,7 @@ SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, E
 		(*expression)->operons[1] = rightOperon;
 	}
 	
-	if (error != SyntaxErrorNone) { error = CheckOperatorLogic(*expression, tokens, opIndex); }
+	if (error == SyntaxErrorNone) { error = CheckOperatorLogic(*expression, tokens, opIndex); }
 	return error;
 }
 

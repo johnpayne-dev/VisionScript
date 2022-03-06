@@ -75,16 +75,28 @@ static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, l
 		result->dimensions = ListLength(operon.expressions);
 		result->length = -1;
 		
+		VectorArray components[4];
 		for (int32_t i = 0; i < result->dimensions; i++)
 		{
-			VectorArray component;
-			RuntimeError error = EvaluateExpression(identifiers, statement, arguments, operon.expressions[i], &component);
+			RuntimeError error = EvaluateExpression(identifiers, statement, arguments, operon.expressions[i], components + i);
 			if (error != RuntimeErrorNone) { return error; }
 			
-			if (component.dimensions > 1) { return RuntimeErrorVectorInsideVector; }
+			if (components[i].dimensions > 1) { return RuntimeErrorVectorInsideVector; }
 			
-			result->length = component.length < result->length ? component.length : result->length;
-			result->xyzw[i] = component.xyzw[0];
+			if (components[i].length > 1) { result->length = components[i].length < result->length ? components[i].length : result->length; }
+			
+			result->xyzw[i] = components[i].xyzw[0];
+		}
+		if (result->length == -1) { result->length = 1; }
+		
+		for (int32_t i = 0; i < result->dimensions; i++)
+		{
+			if (components[i].length == 1 && result->length > 1)
+			{
+				result->xyzw[i] = malloc(sizeof(float) * result->length);
+				for (int32_t j = 0; j < result->length; j++) { result->xyzw[i][j] = components[i].xyzw[0][0]; }
+				free(components[i].xyzw[0]);
+			}
 		}
 	}
 	else if (operonType == OperonTypeArrayLiteral)
@@ -112,7 +124,7 @@ static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, l
 				result->xyzw[i] = malloc(sizeof(float) * result->length);
 				for (int32_t j = 0, p = 0; j < ListLength(operon.expressions); j++)
 				{
-					memcpy(result->xyzw[i] + p, elements[j].xyzw[i], elements[j].length);
+					memcpy(result->xyzw[i] + p, elements[j].xyzw[i], elements[j].length * sizeof(float));
 					p += elements[j].length;
 					free(elements[j].xyzw[i]);
 				}
@@ -135,69 +147,58 @@ void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
 	for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = i + lower; }
 }
 
-void EvaluateAdd(VectorArray * a, VectorArray * b)
+static inline float Operation(Operator operator, float a, float b)
 {
-	int32_t len = a->length < b->length ? a->length : b->length;
-	for (int8_t d = 0; d < a->dimensions; d++)
+	switch (operator)
 	{
-		for (int32_t i = 0; i < len; i++)
-		{
-			a->xyzw[d][i] += b->xyzw[d][i];
-		}
+		case OperatorAdd: return a + b;
+		case OperatorSubtract: return a - b;
+		case OperatorMultiply: return a * b;
+		case OperatorDivide: return a / b;
+		case OperatorModulo: return fmodf(a, b);
+		case OperatorPower: return powf(a, b);
+		default: return 0.0;
 	}
-	a->length = len;
 }
 
-void EvaluateSubtract(VectorArray * a, VectorArray * b)
+void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * b)
 {
-	int32_t len = a->length < b->length ? a->length : b->length;
-	for (int8_t d = 0; d < a->dimensions; d++)
+	int8_t dimensions = a->dimensions > b->dimensions ? a->dimensions : b->dimensions;
+	int32_t length = a->length < b->length ? a->length : b->length;
+	bool aScalar = false, bScalar = false;
+	if (a->length == 1 && b->length > 1) { length = b->length; aScalar = true; }
+	if (b->length == 1 && a->length > 1) { length = a->length; bScalar = true; }
+	
+	if (a->dimensions == 1 && b->dimensions > 1)
 	{
-		for (int32_t i = 0; i < len; i++)
+		for (int8_t d = 1; d < b->dimensions; d++)
 		{
-			a->xyzw[d][i] -= b->xyzw[d][i];
+			a->xyzw[d] = malloc(length * sizeof(float));
+			memcpy(a->xyzw[d], a->xyzw[0], length * sizeof(float));
 		}
+		a->dimensions = b->dimensions;
 	}
-	a->length = len;
-}
+	if (b->dimensions == 1 && a->dimensions > 1)
+	{
+		for (int8_t d = 1; d < a->dimensions; d++)
+		{
+			b->xyzw[d] = malloc(length * sizeof(float));
+			memcpy(b->xyzw[d], b->xyzw[0], length * sizeof(float));
+		}
+		b->dimensions = a->dimensions;
+	}
 
-void EvaluateMultiply(VectorArray * a, VectorArray * b)
-{
-	int32_t len = a->length < b->length ? a->length : b->length;
-	for (int8_t d = 0; d < a->dimensions; d++)
+	for (int8_t d = 0; d < dimensions; d++)
 	{
-		for (int32_t i = 0; i < len; i++)
+		for (int32_t i = 0; i < length; i++)
 		{
-			a->xyzw[d][i] *= b->xyzw[d][i];
+			if (a->length == 1 && b->length > 1) { b->xyzw[d][bScalar ? 0 : i] = Operation(operator, a->xyzw[d][aScalar ? 0 : i], b->xyzw[d][bScalar ? 0 : i]); }
+			else { a->xyzw[d][aScalar ? 0 : i] = Operation(operator, a->xyzw[d][aScalar ? 0 : i], b->xyzw[d][bScalar ? 0 : i]); }
 		}
 	}
-	a->length = len;
-}
-
-void EvaluateDivide(VectorArray * a, VectorArray * b)
-{
-	int32_t len = a->length < b->length ? a->length : b->length;
-	for (int8_t d = 0; d < a->dimensions; d++)
-	{
-		for (int32_t i = 0; i < len; i++)
-		{
-			a->xyzw[d][i] /= b->xyzw[d][i];
-		}
-	}
-	a->length = len;
-}
-
-void EvaluateModulo(VectorArray * a, VectorArray * b)
-{
-	int32_t len = a->length < b->length ? a->length : b->length;
-	for (int8_t d = 0; d < a->dimensions; d++)
-	{
-		for (int32_t i = 0; i < len; i++)
-		{
-			a->xyzw[d][i] = fmodf(a->xyzw[d][i], b->xyzw[d][i]);
-		}
-	}
-	a->length = len;
+	
+	if (a->length == 1 && b->length > 1) { b->length = length; }
+	else { a->length = length; }
 }
 
 void EvaluateNegate(VectorArray * a)
@@ -207,18 +208,6 @@ void EvaluateNegate(VectorArray * a)
 		for (int32_t i = 0; i < a->length; i++)
 		{
 			a->xyzw[d][i] = -a->xyzw[d][i];
-		}
-	}
-}
-
-void EvaluatePower(VectorArray * a, VectorArray * b)
-{
-	int32_t len = a->length < b->length ? a->length : b->length;
-	for (int8_t d = 0; d < a->dimensions; d++)
-	{
-		for (int32_t i = 0; i < len; i++)
-		{
-			a->xyzw[d][i] = powf(a->xyzw[d][i], b->xyzw[d][i]);
 		}
 	}
 }
@@ -269,8 +258,7 @@ RuntimeError EvaluateExpression(HashMap identifiers, Statement * statement, list
 	else if (expression->operator == OperatorEllipsis)
 	{
 		if (result->dimensions > 1 || result->length > 1 || value.dimensions > 1 || value.length > 1) { return RuntimeErrorInvalidEllipsisOperon; }
-		VectorArray lower;
-		memcpy(&lower, result, sizeof(VectorArray));
+		VectorArray lower = *result;
 		EvaluateEllipsis(&lower, &value, result);
 		free(lower.xyzw[0]);
 	}
@@ -281,16 +269,14 @@ RuntimeError EvaluateExpression(HashMap identifiers, Statement * statement, list
 	}
 	else
 	{
-		if (result->dimensions != value.dimensions) { return RuntimeErrorDifferingLengthVectors; }
-		switch (expression->operator)
+		if (result->dimensions != value.dimensions && result->dimensions != 1 && value.dimensions != 1) { return RuntimeErrorDifferingLengthVectors; }
+		
+		EvaluateOperation(expression->operator, result, &value);
+		if (result->length == 1 && value.length > 1)
 		{
-			case OperatorAdd: EvaluateAdd(result, &value); break;
-			case OperatorSubtract: EvaluateSubtract(result, &value); break;
-			case OperatorMultiply: EvaluateMultiply(result, &value); break;
-			case OperatorDivide: EvaluateDivide(result, &value); break;
-			case OperatorModulo: EvaluateModulo(result, &value); break;
-			case OperatorPower: EvaluatePower(result, &value); break;
-			default: break;
+			VectorArray swap = *result;
+			*result = value;
+			value = swap;
 		}
 	}
 	if (value.length > 0) { for (int32_t i = 0; i < value.dimensions; i++) { free(value.xyzw[i]); } }
