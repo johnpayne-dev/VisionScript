@@ -301,12 +301,71 @@ static RuntimeError EvaluateFor(HashMap identifiers, list(Parameter) parameters,
 	return RuntimeErrorNone;
 }
 
+static RuntimeError EvaluateIndex(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result)
+{
+	if (expression->operonTypes[1] == OperonTypeIdentifier)
+	{
+		String identifier = expression->operons[1].identifier;
+		bool isSwizzling = true;
+		for (int32_t i = 0; i < StringLength(identifier); i++)
+		{
+			if (i >= 4 || (identifier[i] != 'x' && identifier[i] != 'y' && identifier[i] != 'z' && identifier[i] != 'w'))
+			{
+				isSwizzling = false;
+				break;
+			}
+		}
+		if (isSwizzling)
+		{
+			VectorArray value = { 0 };
+			RuntimeError error = EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], &value);
+			if (error != RuntimeErrorNone) { return error; }
+			
+			result->dimensions = StringLength(identifier);
+			result->length = value.length;
+			bool shouldDuplicate[4] = { false, false, false, false };
+			for (int8_t d = 0; d < result->dimensions; d++)
+			{
+				int8_t component = 0;
+				if (identifier[d] == 'x') { component = 0; }
+				if (identifier[d] == 'y') { component = 1; }
+				if (identifier[d] == 'z') { component = 2; }
+				if (identifier[d] == 'w') { component = 3; }
+				if (component >= value.dimensions) { return RuntimeErrorInvalidSwizzling; }
+				
+				if (!shouldDuplicate[component]) { result->xyzw[d] = value.xyzw[component]; shouldDuplicate[component] = true; }
+				else
+				{
+					result->xyzw[d] = malloc(result->length * sizeof(float));
+					memcpy(result->xyzw[d], value.xyzw[component], result->length * sizeof(float));
+				}
+			}
+			for (int8_t d = 0; d < value.dimensions; d++)
+			{
+				if (!shouldDuplicate[d]) { free(value.xyzw[d]); }
+			}
+			return RuntimeErrorNone;
+		}
+	}
+	
+	/*VectorArray value = { 0 }, index = { 0 };
+	RuntimeError error = EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], &value);
+	if (error != RuntimeErrorNone) { return error; }
+	error = EvaluateOperon(identifiers, parameters, expression->operonTypes[1], expression->operons[1], &index);
+	if (error != RuntimeErrorNone) { return error; }
+	
+	if (index.dimensions > 1) { return RuntimeErrorIndexingWithVector; }*/
+	
+	
+	return RuntimeErrorNotImplemented;
+}
+
 RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result)
 {
 	if (expression->operator == OperatorNone) { return EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], result); }
 	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(identifiers, parameters, expression->operons[0].identifier, expression->operons[1].expressions, result); }
 	if (expression->operator == OperatorFor) { return EvaluateFor(identifiers, parameters, expression->operonTypes[0], expression->operons[0], expression->operons[1].forAssignment, result); }
-	if (expression->operator == OperatorIndex) { return RuntimeErrorNotImplemented; }
+	if (expression->operator == OperatorIndex) { return EvaluateIndex(identifiers, parameters, expression, result); }
 	
 	VectorArray value = { 0 };
 	if (expression->operator == OperatorPositive || expression->operator == OperatorNegative)

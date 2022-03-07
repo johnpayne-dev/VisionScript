@@ -18,6 +18,7 @@ typedef enum RuntimeError
 	RuntimeErrorInvalidEllipsisOperon,
 	RuntimeErrorIndexingWithVector,
 	RuntimeErrorDifferingLengthVectors,
+	RuntimeErrorInvalidSwizzling,
 	RuntimeErrorNotImplemented,
 } RuntimeError;
 

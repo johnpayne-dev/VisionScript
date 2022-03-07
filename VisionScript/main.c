@@ -52,7 +52,7 @@ int main(int argc, const char * argv[])
 	
 	Script * script = LoadScript(code);
 	
-	list(Token) tokens = TokenizeLine(StringCreate("n / (n + 1)"));
+	list(Token) tokens = TokenizeLine(StringCreate("[(i,j,k,l) for l = [0...1] for k = [0...1] for j = [0...1] for i = [0...1]].x"));
 	Expression * expression;
 	SyntaxError syntax = ParseExpression(tokens, 0, ListLength(tokens) - 1, &expression);
 	if (syntax != SyntaxErrorNone) { printf("SyntaxError: %i\n", syntax); return 0; }
