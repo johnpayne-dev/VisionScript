@@ -172,9 +172,6 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 {
 	int8_t dimensions = a->dimensions > b->dimensions ? a->dimensions : b->dimensions;
 	int32_t length = a->length < b->length ? a->length : b->length;
-	bool aScalar = false, bScalar = false;
-	if (a->length == 1 && b->length > 1) { length = b->length; aScalar = true; }
-	if (b->length == 1 && a->length > 1) { length = a->length; bScalar = true; }
 	
 	if (a->dimensions == 1 && b->dimensions > 1)
 	{
@@ -194,6 +191,10 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 		}
 		b->dimensions = a->dimensions;
 	}
+	
+	bool aScalar = false, bScalar = false;
+	if (a->length == 1 && b->length > 1) { length = b->length; aScalar = true; }
+	if (b->length == 1 && a->length > 1) { length = a->length; bScalar = true; }
 
 	for (int8_t d = 0; d < dimensions; d++)
 	{
