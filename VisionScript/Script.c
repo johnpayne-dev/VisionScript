@@ -238,17 +238,10 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, list(Parameter) pa
 		Parameter parameter = { .identifier = idenStatement->declaration.function.arguments[i] };
 		RuntimeError error = EvaluateExpression(identifiers, parameters, expressions[i], &parameter.value);
 		if (error != RuntimeErrorNone) { return error; }
-		ListPush((void **)arguments, &parameter);
+		ListPush((void **)&arguments, &parameter);
 	}
 	RuntimeError error = EvaluateExpression(identifiers, arguments, idenStatement->expression, result);
 	if (error != RuntimeErrorNone) { return error; }
-	for (int32_t i = 0; i < ListLength(arguments); i++)
-	{
-		for (int8_t d = 0; d < arguments[i].value.dimensions; d++)
-		{
-			free(arguments[i].value.xyzw[d]);
-		}
-	}
 	ListDestroy(arguments);
 	return error;
 }

@@ -344,7 +344,7 @@ SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, E
 	{
 		if (operator == OperatorFunctionCall) { end--; }
 		OperonType leftOperonType = DetermineOperonType(tokens, start, opIndex - 1);
-		OperonType rightOperonType = DetermineOperonType(tokens, opIndex + 1, end);
+		OperonType rightOperonType = operator == OperatorFunctionCall ? OperonTypeArguments : DetermineOperonType(tokens, opIndex + 1, end);
 		Operon leftOperon = { 0 }, rightOperon = { 0 };
 		
 		error = ReadOperon(tokens, start, opIndex - 1, leftOperonType, &leftOperon);
