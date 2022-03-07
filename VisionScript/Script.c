@@ -145,8 +145,8 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 
 static void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
 {
-	int32_t lower = floorf(a->xyzw[0][0] + 0.5);
-	int32_t upper = floorf(b->xyzw[0][0] + 0.5);
+	int32_t lower = roundf(a->xyzw[0][0]);
+	int32_t upper = roundf(b->xyzw[0][0]);
 	if (upper - lower > (1 << 24) || upper - lower < 0) { *result = (VectorArray){ 0 }; return; }
 	result->length = upper - lower + 1;
 	result->dimensions = 1;
@@ -201,22 +201,6 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 		{
 			if (a->length == 1 && b->length > 1) { b->xyzw[d][bScalar ? 0 : i] = Operation(operator, a->xyzw[d][aScalar ? 0 : i], b->xyzw[d][bScalar ? 0 : i]); }
 			else { a->xyzw[d][aScalar ? 0 : i] = Operation(operator, a->xyzw[d][aScalar ? 0 : i], b->xyzw[d][bScalar ? 0 : i]); }
-			/* possible optimization for future reference
-			if (aScalar)
-			{
-				if (a->length == 1 && b->length > 1) { b->xyzw[d][i] = Operation(operator, a->xyzw[d][0], b->xyzw[d][i]); }
-				else { a->xyzw[d][0] = Operation(operator, a->xyzw[d][0], b->xyzw[d][i]); }
-			}
-			else if (bScalar)
-			{
-				if (a->length == 1 && b->length > 1) { b->xyzw[d][0] = Operation(operator, a->xyzw[d][i], b->xyzw[d][0]); }
-				else { a->xyzw[d][i] = Operation(operator, a->xyzw[d][i], b->xyzw[d][0]); }
-			}
-			else
-			{
-				if (a->length == 1 && b->length > 1) { b->xyzw[d][i] = Operation(operator, a->xyzw[d][i], b->xyzw[d][i]); }
-				else { a->xyzw[d][i] = Operation(operator, a->xyzw[d][i], b->xyzw[d][i]); }
-			}*/
 		}
 	}
 	
@@ -348,16 +332,29 @@ static RuntimeError EvaluateIndex(HashMap identifiers, list(Parameter) parameter
 		}
 	}
 	
-	/*VectorArray value = { 0 }, index = { 0 };
+	VectorArray value = { 0 }, index = { 0 };
 	RuntimeError error = EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], &value);
 	if (error != RuntimeErrorNone) { return error; }
 	error = EvaluateOperon(identifiers, parameters, expression->operonTypes[1], expression->operons[1], &index);
 	if (error != RuntimeErrorNone) { return error; }
+	if (index.dimensions > 1) { return RuntimeErrorIndexingWithVector; }
 	
-	if (index.dimensions > 1) { return RuntimeErrorIndexingWithVector; }*/
+	result->dimensions = value.dimensions;
+	result->length = index.length;
+	for (int8_t d = 0; d < result->dimensions; d++)
+	{
+		result->xyzw[d] = malloc(result->length * sizeof(float));
+		for (int32_t i = 0; i < result->length; i++)
+		{
+			int32_t j = roundf(index.xyzw[0][i]);
+			if (j < 0 || j >= value.length) { result->xyzw[d][i] = NAN; }
+			else { result->xyzw[d][i] = value.xyzw[d][j]; }
+		}
+		free(value.xyzw[d]);
+	}
+	free(index.xyzw[0]);
 	
-	
-	return RuntimeErrorNotImplemented;
+	return RuntimeErrorNone;
 }
 
 RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result)
