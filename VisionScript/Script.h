@@ -14,6 +14,7 @@ typedef enum RuntimeError
 	RuntimeErrorArrayInsideArray,
 	RuntimeErrorIdentifierNotVariable,
 	RuntimeErrorIdentifierNotFunction,
+	RuntimeErrorIncorrectParameterCount,
 	RuntimeErrorInvalidEllipsisOperon,
 	RuntimeErrorIndexingWithVector,
 	RuntimeErrorDifferingLengthVectors,
@@ -37,9 +38,15 @@ typedef struct Script
 	HashMap identifiers;
 } Script;
 
+typedef struct Parameter
+{
+	String identifier;
+	VectorArray value;
+} Parameter;
+
 Script * LoadScript(const char * code);
 
-RuntimeError EvaluateExpression(HashMap identifiers, Statement * statement, list(VectorArray) arguments, Expression * expression, VectorArray * result);
+RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result);
 
 void DestroyScript(Script * script);
 

@@ -43,25 +43,22 @@ Script * LoadScript(const char * code)
 	return script;
 }
 
-static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, list(VectorArray) arguments, OperonType operonType, Operon operon, VectorArray * result)
+static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) parameters, OperonType operonType, Operon operon, VectorArray * result)
 {
-	if (operonType == OperonTypeExpression)
-	{
-		return EvaluateExpression(identifiers, statement, arguments, operon.expression, result);
-	}
+	if (operonType == OperonTypeExpression) { return EvaluateExpression(identifiers, parameters, operon.expression, result); }
 	else if (operonType == OperonTypeIdentifier)
 	{
-		if (statement != NULL && statement->type == StatementTypeFunction)
+		if (parameters != NULL)
 		{
-			for (int32_t i = 0; i < ListLength(statement->declaration.function.arguments); i++)
+			for (int32_t i = 0; i < ListLength(parameters); i++)
 			{
-				if (strcmp(operon.identifier, statement->declaration.function.arguments[i]) == 0) { *result = arguments[i]; return RuntimeErrorNone; }
+				if (strcmp(operon.identifier, parameters[i].identifier) == 0) { *result = parameters[i].value; return RuntimeErrorNone; }
 			}
 		}
 		Statement * idenStatement = HashMapGet(identifiers, operon.identifier);
 		if (idenStatement == NULL) { return RuntimeErrorUndefinedIdentifier; }
 		if (idenStatement->type == StatementTypeFunction) { return RuntimeErrorIdentifierNotVariable; }
-		return EvaluateExpression(identifiers, idenStatement, NULL, idenStatement->expression, result);
+		return EvaluateExpression(identifiers, NULL, idenStatement->expression, result);
 	}
 	else if (operonType == OperonTypeConstant)
 	{
@@ -78,7 +75,7 @@ static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, l
 		VectorArray components[4];
 		for (int32_t i = 0; i < result->dimensions; i++)
 		{
-			RuntimeError error = EvaluateExpression(identifiers, statement, arguments, operon.expressions[i], components + i);
+			RuntimeError error = EvaluateExpression(identifiers, parameters, operon.expressions[i], components + i);
 			if (error != RuntimeErrorNone) { return error; }
 			
 			if (components[i].dimensions > 1) { return RuntimeErrorVectorInsideVector; }
@@ -107,7 +104,7 @@ static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, l
 		VectorArray * elements = malloc(sizeof(VectorArray) * ListLength(operon.expressions));
 		for (int32_t i = 0; i < ListLength(operon.expressions); i++)
 		{
-			RuntimeError error = EvaluateExpression(identifiers, statement, arguments, operon.expressions[i], elements + i);
+			RuntimeError error = EvaluateExpression(identifiers, parameters, operon.expressions[i], elements + i);
 			if (error != RuntimeErrorNone) { return error; }
 			
 			if (result->dimensions == 0) { result->dimensions = elements[i].dimensions; }
@@ -136,11 +133,11 @@ static RuntimeError EvaluateOperon(HashMap identifiers, Statement * statement, l
 	return RuntimeErrorNone;
 }
 
-void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
+static void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
 {
 	int32_t lower = floorf(a->xyzw[0][0] + 0.5);
 	int32_t upper = floorf(b->xyzw[0][0] + 0.5);
-	if (upper - lower > 1000000 || upper - lower < 0) { *result = (VectorArray){ 0 }; return; }
+	if (upper - lower > (1 << 24) || upper - lower < 0) { *result = (VectorArray){ 0 }; return; }
 	result->length = upper - lower + 1;
 	result->dimensions = 1;
 	result->xyzw[0] = malloc(result->length * sizeof(float));
@@ -161,7 +158,7 @@ static inline float Operation(Operator operator, float a, float b)
 	}
 }
 
-void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * b)
+static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * b)
 {
 	int8_t dimensions = a->dimensions > b->dimensions ? a->dimensions : b->dimensions;
 	int32_t length = a->length < b->length ? a->length : b->length;
@@ -194,6 +191,22 @@ void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * b)
 		{
 			if (a->length == 1 && b->length > 1) { b->xyzw[d][bScalar ? 0 : i] = Operation(operator, a->xyzw[d][aScalar ? 0 : i], b->xyzw[d][bScalar ? 0 : i]); }
 			else { a->xyzw[d][aScalar ? 0 : i] = Operation(operator, a->xyzw[d][aScalar ? 0 : i], b->xyzw[d][bScalar ? 0 : i]); }
+			/* possible optimization for future reference
+			if (aScalar)
+			{
+				if (a->length == 1 && b->length > 1) { b->xyzw[d][i] = Operation(operator, a->xyzw[d][0], b->xyzw[d][i]); }
+				else { a->xyzw[d][0] = Operation(operator, a->xyzw[d][0], b->xyzw[d][i]); }
+			}
+			else if (bScalar)
+			{
+				if (a->length == 1 && b->length > 1) { b->xyzw[d][0] = Operation(operator, a->xyzw[d][i], b->xyzw[d][0]); }
+				else { a->xyzw[d][i] = Operation(operator, a->xyzw[d][i], b->xyzw[d][0]); }
+			}
+			else
+			{
+				if (a->length == 1 && b->length > 1) { b->xyzw[d][i] = Operation(operator, a->xyzw[d][i], b->xyzw[d][i]); }
+				else { a->xyzw[d][i] = Operation(operator, a->xyzw[d][i], b->xyzw[d][i]); }
+			}*/
 		}
 	}
 	
@@ -201,7 +214,7 @@ void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * b)
 	else { a->length = length; }
 }
 
-void EvaluateNegate(VectorArray * a)
+static void EvaluateNegate(VectorArray * a)
 {
 	for (int8_t d = 0; d < a->dimensions; d++)
 	{
@@ -212,42 +225,52 @@ void EvaluateNegate(VectorArray * a)
 	}
 }
 
-static RuntimeError EvaluateFunctionCall(HashMap identifiers, Statement * statement, list(VectorArray) arguments, String function, list(Expression *) expressions, VectorArray * result)
+static RuntimeError EvaluateFunctionCall(HashMap identifiers, list(Parameter) parameters, String function, list(Expression *) expressions, VectorArray * result)
 {
 	Statement * idenStatement = HashMapGet(identifiers, function);
 	if (idenStatement == NULL) { return RuntimeErrorUndefinedIdentifier; }
 	if (idenStatement->type == StatementTypeVariable) { return RuntimeErrorIdentifierNotFunction; }
+	if (ListLength(expressions) != ListLength(idenStatement->declaration.function.arguments)) { return RuntimeErrorIncorrectParameterCount; }
 	
-	list(VectorArray) args = ListCreate(sizeof(VectorArray), ListLength(expressions));
+	list(Parameter) arguments = ListCreate(sizeof(Parameter), ListLength(expressions));
 	for (int32_t i = 0; i < ListLength(expressions); i++)
 	{
-		ListPush((void **)args, &(VectorArray){ 0 });
-		RuntimeError error = EvaluateExpression(identifiers, statement, arguments, expressions[i], args + i);
+		Parameter parameter = { .identifier = idenStatement->declaration.function.arguments[i] };
+		RuntimeError error = EvaluateExpression(identifiers, parameters, expressions[i], &parameter.value);
 		if (error != RuntimeErrorNone) { return error; }
+		ListPush((void **)arguments, &parameter);
 	}
-	RuntimeError error = EvaluateExpression(identifiers, idenStatement, args, idenStatement->expression, result);
-	ListDestroy(args);
+	RuntimeError error = EvaluateExpression(identifiers, arguments, idenStatement->expression, result);
+	if (error != RuntimeErrorNone) { return error; }
+	for (int32_t i = 0; i < ListLength(arguments); i++)
+	{
+		for (int8_t d = 0; d < arguments[i].value.dimensions; d++)
+		{
+			free(arguments[i].value.xyzw[d]);
+		}
+	}
+	ListDestroy(arguments);
 	return error;
 }
 
-RuntimeError EvaluateExpression(HashMap identifiers, Statement * statement, list(VectorArray) arguments, Expression * expression, VectorArray * result)
+RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result)
 {
-	if (expression->operator == OperatorNone) { return EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[0], expression->operons[0], result); }
-	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(identifiers, statement, arguments, expression->operons[0].identifier, expression->operons[1].expressions, result); }
+	if (expression->operator == OperatorNone) { return EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], result); }
+	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(identifiers, parameters, expression->operons[0].identifier, expression->operons[1].expressions, result); }
 	if (expression->operator == OperatorFor) { return RuntimeErrorNotImplemented; }
 	if (expression->operator == OperatorIndex) { return RuntimeErrorNotImplemented; }
 	
 	VectorArray value = { 0 };
 	if (expression->operator == OperatorPositive || expression->operator == OperatorNegative)
 	{
-		RuntimeError error = EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[0], expression->operons[0], result);
+		RuntimeError error = EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], result);
 		if (error != RuntimeErrorNone) { return error; }
 	}
 	else
 	{
-		RuntimeError error = EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[0], expression->operons[0], result);
+		RuntimeError error = EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], result);
 		if (error != RuntimeErrorNone) { return error; }
-		error = EvaluateOperon(identifiers, statement, arguments, expression->operonTypes[1], expression->operons[1], &value);
+		error = EvaluateOperon(identifiers, parameters, expression->operonTypes[1], expression->operons[1], &value);
 		if (error != RuntimeErrorNone) { return error; }
 	}
 	

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include "Script.h"
 
 static void PrintVectorArray(VectorArray array)
@@ -20,6 +21,18 @@ static void PrintVectorArray(VectorArray array)
 	printf("\n");
 }
 
+/*#include <stdlib.h>
+#include <math.h>
+void test(void)
+{
+	float * values = malloc(16777216 * sizeof(float));
+	for (int32_t i = 0; i < 16777216; i++)
+	{
+		values[i] = powf(i + 1.0, 0.5);
+	}
+	free(values);
+}*/
+
 int main(int argc, const char * argv[])
 {
 	if (argc < 2)
@@ -38,13 +51,14 @@ int main(int argc, const char * argv[])
 		"parametric ((B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y)\n";
 	
 	Script * script = LoadScript(code);
-	
 	list(Token) tokens = TokenizeLine(StringCreate("2^2^(-2)"));
 	Expression * expression;
 	SyntaxError syntax = ParseExpression(tokens, 0, ListLength(tokens) - 1, &expression);
 	if (syntax != SyntaxErrorNone) { printf("SyntaxError: %i\n", syntax); return 0; }
 	VectorArray result;
-	RuntimeError runtime = EvaluateExpression(script->identifiers, NULL, NULL, expression, &result);
+	clock_t start = clock();
+	RuntimeError runtime = EvaluateExpression(script->identifiers, NULL, expression, &result);
+	printf("Done in %fs\n", (clock() - start) / (float)CLOCKS_PER_SEC);
 	if (runtime != RuntimeErrorNone) { printf("RuntimeError: %i\n", runtime); return 0; }
 	PrintVectorArray(result);
 	
