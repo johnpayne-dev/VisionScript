@@ -101,6 +101,14 @@ void ListClear(list(void) * list)
 	*list = newList;
 }
 
+list(void) ListClone(list(void) list)
+{
+	uint64_t size = sizeof(struct ListData) + ListElementSize(list) * ListCapacity(list);
+	struct ListData * clone = malloc(size);
+	memcpy(clone, (struct ListData *)list - 1, size);
+	return clone + 1;
+}
+
 void ListDestroy(list(void) list)
 {
 	free((struct ListData *)list - 1);

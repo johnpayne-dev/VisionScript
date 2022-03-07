@@ -33,6 +33,8 @@ bool ListContains(list(void) list, void * value);
 
 void ListClear(list(void) * list);
 
+list(void) ListClone(list(void) list);
+
 void ListDestroy(list(void) list);
 
 

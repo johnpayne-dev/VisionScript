@@ -52,7 +52,17 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 		{
 			for (int32_t i = 0; i < ListLength(parameters); i++)
 			{
-				if (strcmp(operon.identifier, parameters[i].identifier) == 0) { *result = parameters[i].value; return RuntimeErrorNone; }
+				if (strcmp(operon.identifier, parameters[i].identifier) == 0)
+				{
+					result->dimensions = parameters[i].value.dimensions;
+					result->length = parameters[i].value.length;
+					for (int8_t d = 0; d < result->dimensions; d++)
+					{
+						result->xyzw[d] = malloc(result->length * sizeof(float));
+						memcpy(result->xyzw[d], parameters[i].value.xyzw[d], result->length * sizeof(float));
+					}
+					return RuntimeErrorNone;
+				}
 			}
 		}
 		Statement * idenStatement = HashMapGet(identifiers, operon.identifier);
@@ -246,11 +256,56 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, list(Parameter) pa
 	return error;
 }
 
+static RuntimeError EvaluateFor(HashMap identifiers, list(Parameter) parameters, OperonType operonType, Operon operon, struct ForAssignment assignment, VectorArray * result)
+{
+	*result = (VectorArray){ 0 };
+	VectorArray assignmentValue = { 0 };
+	RuntimeError error = EvaluateExpression(identifiers, parameters, assignment.expression, &assignmentValue);
+	if (error != RuntimeErrorNone) { return error; }
+	
+	VectorArray * values = malloc(assignmentValue.length * sizeof(VectorArray));
+	if (parameters == NULL) { parameters = ListCreate(sizeof(Parameter), 1); }
+	else { parameters = ListClone(parameters); }
+	ListInsert((void **)&parameters, &(Parameter){ .identifier = assignment.identifier }, 0);
+	parameters[0].value.length = 1;
+	parameters[0].value.dimensions = assignmentValue.dimensions;
+	
+	for (int32_t i = 0; i < assignmentValue.length; i++)
+	{
+		for (int8_t d = 0; d < assignmentValue.dimensions; d++) { parameters[0].value.xyzw[d] = &assignmentValue.xyzw[d][i]; }
+		RuntimeError error = EvaluateOperon(identifiers, parameters, operonType, operon, &values[i]);
+		if (error != RuntimeErrorNone) { return error; }
+		if (result->dimensions == 0) { result->dimensions = values[i].dimensions; }
+		if (values[i].dimensions != result->dimensions) { return RuntimeErrorNonUniformArray; }
+		if (values[i].length > 1)
+		{
+			if (operonType != OperonTypeExpression) { return RuntimeErrorArrayInsideArray; }
+			if (operon.expression->operator != OperatorFor) { return RuntimeErrorArrayInsideArray; }
+		}
+		result->length += values[i].length;
+	}
+	
+	for (int8_t d = 0; d < result->dimensions; d++)
+	{
+		result->xyzw[d] = malloc(result->length * sizeof(float));
+		for (int32_t i = 0, p = 0; i < assignmentValue.length; i++)
+		{
+			memcpy(result->xyzw[d] + p, values[i].xyzw[d], values[i].length * sizeof(float));
+			p += values[i].length;
+			free(values[i].xyzw[d]);
+		}
+	}
+	free(values);
+	for (int8_t d = 0; d < assignmentValue.dimensions; d++) { free(assignmentValue.xyzw[d]); }
+	
+	return RuntimeErrorNone;
+}
+
 RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result)
 {
 	if (expression->operator == OperatorNone) { return EvaluateOperon(identifiers, parameters, expression->operonTypes[0], expression->operons[0], result); }
 	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(identifiers, parameters, expression->operons[0].identifier, expression->operons[1].expressions, result); }
-	if (expression->operator == OperatorFor) { return RuntimeErrorNotImplemented; }
+	if (expression->operator == OperatorFor) { return EvaluateFor(identifiers, parameters, expression->operonTypes[0], expression->operons[0], expression->operons[1].forAssignment, result); }
 	if (expression->operator == OperatorIndex) { return RuntimeErrorNotImplemented; }
 	
 	VectorArray value = { 0 };
@@ -267,11 +322,7 @@ RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters,
 		if (error != RuntimeErrorNone) { return error; }
 	}
 	
-	if (expression->operator == OperatorFor)
-	{
-		
-	}
-	else if (expression->operator == OperatorEllipsis)
+	if (expression->operator == OperatorEllipsis)
 	{
 		if (result->dimensions > 1 || result->length > 1 || value.dimensions > 1 || value.length > 1) { return RuntimeErrorInvalidEllipsisOperon; }
 		VectorArray lower = *result;
@@ -279,10 +330,6 @@ RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters,
 		free(lower.xyzw[0]);
 	}
 	else if (expression->operator == OperatorNegative) { EvaluateNegate(result); }
-	else if (expression->operator == OperatorIndex)
-	{
-		if (value.dimensions > 1) { return RuntimeErrorIndexingWithVector; }
-	}
 	else
 	{
 		if (result->dimensions != value.dimensions && result->dimensions != 1 && value.dimensions != 1) { return RuntimeErrorDifferingLengthVectors; }
