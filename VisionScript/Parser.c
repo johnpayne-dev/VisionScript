@@ -2,76 +2,7 @@
 #include <string.h>
 #include "Parser.h"
 
-static StatementType DetermineStatementType(TokenStatement statement)
-{
-	if (ListLength(statement) < 2) { return StatementTypeUnknown; }
-	if (statement[0].type == TokenTypeIdentifier)
-	{
-		if (statement[1].type == TokenTypeBracket && statement[1].value[0] == '(')
-		{
-			return StatementTypeFunction;
-		}
-		if (statement[1].type == TokenTypeSymbol && statement[1].value[0] == '=')
-		{
-			return StatementTypeVariable;
-		}
-		return StatementTypeUnknown;
-	}
-	if (statement[0].type == TokenTypeKeyword)
-	{
-		if (StringEquals(statement[0].value, "point") || StringEquals(statement[0].value, "parametric") || StringEquals(statement[0].value, "polygon"))
-		{
-			return StatementTypeRender;
-		}
-	}
-	return StatementTypeUnknown;
-}
-
-static SyntaxError ParseVariableDeclaration(TokenStatement tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
-{
-	if (ListLength(tokens) < 2) { return SyntaxErrorInvalidVariableDeclaration; }
-	if (tokens[1].type != TokenTypeSymbol || tokens[1].value[0] != '=') { return SyntaxErrorInvalidVariableDeclaration; }
-	declaration->variable.identifier = StringCreate(tokens[0].value);
-	*declarationEndIndex = 1;
-	return SyntaxErrorNone;
-}
-
-static SyntaxError ParseFunctionDeclaration(TokenStatement tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
-{
-	int32_t argumentsEndIndex = 0;
-	while (argumentsEndIndex < ListLength(tokens))
-	{
-		if (tokens[argumentsEndIndex].type == TokenTypeBracket && tokens[argumentsEndIndex].value[0] == ')') { break; }
-		argumentsEndIndex++;
-	}
-	if (argumentsEndIndex >= ListLength(tokens) - 1) { return SyntaxErrorInvalidFunctionDeclaration; }
-	if (tokens[argumentsEndIndex + 1].type != TokenTypeSymbol || tokens[argumentsEndIndex + 1].value[0] != '=') { return SyntaxErrorInvalidFunctionDeclaration; }
-	
-	declaration->function.arguments = ListCreate(sizeof(String), 4);
-	for (int32_t i = 2; i < argumentsEndIndex; i++)
-	{
-		if (tokens[i].type != TokenTypeIdentifier) { return SyntaxErrorInvalidFunctionDeclaration; }
-		ListPush((void **)&declaration->function.arguments, &(String){ StringCreate(tokens[i].value) });
-		i++;
-		
-		if (i == argumentsEndIndex) { break; }
-		if (tokens[i].type != TokenTypeSymbol || tokens[i].value[0] != ',') { return SyntaxErrorInvalidFunctionDeclaration; }
-	}
-	declaration->function.identifier = StringCreate(tokens[0].value);
-	*declarationEndIndex = argumentsEndIndex + 1;
-	return SyntaxErrorNone;
-}
-
-static SyntaxError ParseRenderDeclaration(TokenStatement tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
-{
-	if (StringEquals(tokens[0].value, "point")) { declaration->render.type = StatementRenderTypePoint; }
-	if (StringEquals(tokens[0].value, "parametric")) { declaration->render.type = StatementRenderTypeParametric; }
-	if (StringEquals(tokens[0].value, "polygon")) { declaration->render.type = StatementRenderTypePolygon; }
-	*declarationEndIndex = 0;
-	return SyntaxErrorNone;
-}
-
-static int32_t FindCorrespondingBracket(TokenStatement tokens, int32_t start, int32_t end, int32_t bracketIndex)
+static int32_t FindCorrespondingBracket(list(Token) tokens, int32_t start, int32_t end, int32_t bracketIndex)
 {
 	bool findLeft = false;
 	char bracket = '\0';
@@ -102,7 +33,77 @@ static int32_t FindCorrespondingBracket(TokenStatement tokens, int32_t start, in
 	return index;
 }
 
-static int32_t FindComma(TokenStatement tokens, int32_t start, int32_t end)
+static StatementType DetermineStatementType(list(Token) statement)
+{
+	if (ListLength(statement) < 2) { return StatementTypeUnknown; }
+	if (statement[0].type == TokenTypeIdentifier)
+	{
+		if (statement[1].type == TokenTypeBracket && statement[1].value[0] == '(')
+		{
+			int32_t index = FindCorrespondingBracket(statement, 1, ListLength(statement) - 1, 1);
+			if (index > -1 && index != ListLength(statement) - 1 && statement[index + 1].value[0] == '=') { return StatementTypeFunction; }
+		}
+		if (statement[1].type == TokenTypeSymbol && statement[1].value[0] == '=')
+		{
+			return StatementTypeVariable;
+		}
+		return StatementTypeUnknown;
+	}
+	if (statement[0].type == TokenTypeKeyword)
+	{
+		if (StringEquals(statement[0].value, "point") || StringEquals(statement[0].value, "parametric") || StringEquals(statement[0].value, "polygon"))
+		{
+			return StatementTypeRender;
+		}
+	}
+	return StatementTypeUnknown;
+}
+
+static SyntaxError ParseVariableDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
+{
+	if (ListLength(tokens) < 2) { return SyntaxErrorInvalidVariableDeclaration; }
+	if (tokens[1].type != TokenTypeSymbol || tokens[1].value[0] != '=') { return SyntaxErrorInvalidVariableDeclaration; }
+	declaration->variable.identifier = StringCreate(tokens[0].value);
+	*declarationEndIndex = 1;
+	return SyntaxErrorNone;
+}
+
+static SyntaxError ParseFunctionDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
+{
+	int32_t argumentsEndIndex = 0;
+	while (argumentsEndIndex < ListLength(tokens))
+	{
+		if (tokens[argumentsEndIndex].type == TokenTypeBracket && tokens[argumentsEndIndex].value[0] == ')') { break; }
+		argumentsEndIndex++;
+	}
+	if (argumentsEndIndex >= ListLength(tokens) - 1) { return SyntaxErrorInvalidFunctionDeclaration; }
+	if (tokens[argumentsEndIndex + 1].type != TokenTypeSymbol || tokens[argumentsEndIndex + 1].value[0] != '=') { return SyntaxErrorInvalidFunctionDeclaration; }
+	
+	declaration->function.arguments = ListCreate(sizeof(String), 4);
+	for (int32_t i = 2; i < argumentsEndIndex; i++)
+	{
+		if (tokens[i].type != TokenTypeIdentifier) { return SyntaxErrorInvalidFunctionDeclaration; }
+		ListPush((void **)&declaration->function.arguments, &(String){ StringCreate(tokens[i].value) });
+		i++;
+		
+		if (i == argumentsEndIndex) { break; }
+		if (tokens[i].type != TokenTypeSymbol || tokens[i].value[0] != ',') { return SyntaxErrorInvalidFunctionDeclaration; }
+	}
+	declaration->function.identifier = StringCreate(tokens[0].value);
+	*declarationEndIndex = argumentsEndIndex + 1;
+	return SyntaxErrorNone;
+}
+
+static SyntaxError ParseRenderDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
+{
+	if (StringEquals(tokens[0].value, "point")) { declaration->render.type = StatementRenderTypePoint; }
+	if (StringEquals(tokens[0].value, "parametric")) { declaration->render.type = StatementRenderTypeParametric; }
+	if (StringEquals(tokens[0].value, "polygon")) { declaration->render.type = StatementRenderTypePolygon; }
+	*declarationEndIndex = 0;
+	return SyntaxErrorNone;
+}
+
+static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end)
 {
 	int32_t depth = 0;
 	for (int32_t i = start; i <= end; i++)
@@ -118,7 +119,7 @@ static int32_t FindComma(TokenStatement tokens, int32_t start, int32_t end)
 	return -1;
 }
 
-static SyntaxError FindOperator(TokenStatement tokens, int32_t start, int32_t end, const char * operators[], int32_t operatorCount, bool unary, bool rightToLeft, int32_t * index)
+static SyntaxError FindOperator(list(Token) tokens, int32_t start, int32_t end, const char * operators[], int32_t operatorCount, bool unary, bool rightToLeft, int32_t * index)
 {
 	*index = -1;
 	int32_t i = rightToLeft ? end : start;
@@ -152,7 +153,7 @@ static SyntaxError FindOperator(TokenStatement tokens, int32_t start, int32_t en
 	return SyntaxErrorNone;
 }
 
-static SyntaxError FindFunctionCall(TokenStatement tokens, int32_t start, int32_t end, int32_t * index)
+static SyntaxError FindFunctionCall(list(Token) tokens, int32_t start, int32_t end, int32_t * index)
 {
 	*index = -1;
 	int32_t i = start;
@@ -171,7 +172,7 @@ static SyntaxError FindFunctionCall(TokenStatement tokens, int32_t start, int32_
 	return SyntaxErrorNone;
 }
 
-static OperonType DetermineOperonType(TokenStatement tokens, int32_t start, int32_t end)
+static OperonType DetermineOperonType(list(Token) tokens, int32_t start, int32_t end)
 {
 	if (tokens[start].value[0] == '(' && FindCorrespondingBracket(tokens, start, end, start) == end && FindComma(tokens, start + 1, end - 1) >= 0) { return OperonTypeVectorLiteral; }
 	if (tokens[start].value[0] == '[' && FindCorrespondingBracket(tokens, start, end, start) == end) { return OperonTypeArrayLiteral; }
@@ -182,7 +183,7 @@ static OperonType DetermineOperonType(TokenStatement tokens, int32_t start, int3
 	return OperonTypeExpression;
 }
 
-static SyntaxError ReadOperon(TokenStatement tokens, int32_t start, int32_t end, OperonType type, Operon * operon)
+static SyntaxError ReadOperon(list(Token) tokens, int32_t start, int32_t end, OperonType type, Operon * operon)
 {
 	SyntaxError error = SyntaxErrorNone;
 	if (type == OperonTypeExpression) { error = ParseExpression(tokens, start, end, &operon->expression); }
@@ -245,7 +246,7 @@ static bool IsUnaryOperator(Operator operator)
 	return operator == OperatorPositive || operator == OperatorNegative;
 }
 
-static bool InsideArray(TokenStatement tokens, int32_t index)
+static bool InsideArray(list(Token) tokens, int32_t index)
 {
 	int32_t depth = 0;
 	for (int32_t i = index; i <= ListLength(tokens); i++)
@@ -260,7 +261,7 @@ static bool InsideArray(TokenStatement tokens, int32_t index)
 	return false;
 }
 
-static SyntaxError CheckOperatorLogic(Expression * expression, TokenStatement tokens, int32_t opIndex)
+static SyntaxError CheckOperatorLogic(Expression * expression, list(Token) tokens, int32_t opIndex)
 {
 	if (expression->operonTypes[0] == OperonTypeArguments) { return SyntaxErrorInvalidCommaPlacement; }
 	if (expression->operonTypes[1] == OperonTypeArguments && expression->operator != OperatorFunctionCall) { return SyntaxErrorInvalidCommaPlacement; }
@@ -290,7 +291,7 @@ static SyntaxError CheckOperatorLogic(Expression * expression, TokenStatement to
 	return SyntaxErrorNone;
 }
 
-SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, Expression ** expression)
+SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression ** expression)
 {
 	if (end < start) { return SyntaxErrorMissingExpression; }
 	
@@ -362,7 +363,8 @@ SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, E
 	return error;
 }
 
-Statement * ParseTokenStatement(TokenStatement tokens)
+#include <stdio.h>
+Statement * ParseTokenLine(list(Token) tokens)
 {
 	Statement * statement = malloc(sizeof(Statement));
 	*statement = (Statement){ .error = SyntaxErrorNone };
@@ -371,19 +373,14 @@ Statement * ParseTokenStatement(TokenStatement tokens)
 	{
 		if (tokens[i].type == TokenTypeUnknown)
 		{
+			printf("%s\n", tokens[i].value);
 			statement->error = SyntaxErrorUnknownToken;
 			return statement;
 		}
 	}
 	
 	statement->type = DetermineStatementType(tokens);
-	if (statement->type == StatementTypeUnknown)
-	{
-		statement->error = SyntaxErrorUnknownStatementType;
-		return statement;
-	}
-	
-	int32_t declarationEndIndex = 0;
+	int32_t declarationEndIndex = -1;
 	switch (statement->type)
 	{
 		case StatementTypeVariable:

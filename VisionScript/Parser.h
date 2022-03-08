@@ -101,8 +101,8 @@ typedef struct Statement
 	Expression * expression;
 } Statement;
 
-Statement * ParseTokenStatement(TokenStatement tokens);
-SyntaxError ParseExpression(TokenStatement tokens, int32_t start, int32_t end, Expression ** expression);
+Statement * ParseTokenLine(list(Token) tokens);
+SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression ** expression);
 void DestroyStatement(Statement * statement);
 
 #endif

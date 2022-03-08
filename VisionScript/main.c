@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 #include "Script.h"
+#include "Evaluator.h"
 
 static void PrintVectorArray(VectorArray array)
 {
@@ -21,23 +23,38 @@ static void PrintVectorArray(VectorArray array)
 	printf("\n");
 }
 
-/*#include <stdlib.h>
-#include <math.h>
-void test(void)
-{
-	float * values = malloc(16777216 * sizeof(float));
-	for (int32_t i = 0; i < 16777216; i++)
-	{
-		values[i] = powf(i + 1.0, 0.5);
-	}
-	free(values);
-}*/
-
 int main(int argc, const char * argv[])
 {
 	if (argc < 2)
 	{
-		printf("Invalid arguments.\n");
+		HashMap identifiers = HashMapCreate(65536);
+		while (true)
+		{
+			String input = StringCreate("");
+			printf(">>> ");
+			for (int32_t c = getchar(); c != '\n'; c = getchar())
+			{
+				if (c >= 128) { continue; }
+				StringConcat(&input, (char []){ (char)c, '\0' });
+			}
+			if (strcmp(input, "exit") == 0) { break; }
+			if (strcmp(input, "") == 0) { continue; }
+			
+			Statement * statement = ParseTokenLine(TokenizeLine(input));
+			if (statement->error != SyntaxErrorNone) { printf("SyntaxError: %i\n", statement->error); continue; }
+			if (statement->type == StatementTypeUnknown)
+			{
+				VectorArray result;
+				clock_t timer = clock();
+				RuntimeError error = EvaluateExpression(identifiers, NULL, statement->expression, &result);
+				timer = clock() - timer;
+				if (error != RuntimeErrorNone) { printf("RuntimeError: %i\n", error); continue; }
+				//printf("%fs: ", timer / (float)CLOCKS_PER_SEC);
+				PrintVectorArray(result);
+			}
+			if (statement->type == StatementTypeVariable) { HashMapSet(identifiers, statement->declaration.variable.identifier, statement); }
+			if (statement->type == StatementTypeFunction) { HashMapSet(identifiers, statement->declaration.function.identifier, statement); }
+		}
 		return 0;
 	}
 	printf("%s %s\n", argv[0], argv[1]);
@@ -51,18 +68,6 @@ int main(int argc, const char * argv[])
 		"parametric ((B.x - A.x)*t + A.x, (B.y - A.y)*t + A.y)\n";
 	
 	Script * script = LoadScript(code);
-	
-	list(Token) tokens = TokenizeLine(StringCreate("[(i,j,k,l) for l = [0...1] for k = [0...1] for j = [0...1] for i = [0...1]].x"));
-	Expression * expression;
-	SyntaxError syntax = ParseExpression(tokens, 0, ListLength(tokens) - 1, &expression);
-	if (syntax != SyntaxErrorNone) { printf("SyntaxError: %i\n", syntax); return 0; }
-	VectorArray result;
-	clock_t start = clock();
-	RuntimeError runtime = EvaluateExpression(script->identifiers, NULL, expression, &result);
-	printf("Done in %fs\n", (clock() - start) / (float)CLOCKS_PER_SEC);
-	if (runtime != RuntimeErrorNone) { printf("RuntimeError: %i\n", runtime); return 0; }
-	PrintVectorArray(result);
-	
 	DestroyScript(script);
 	
 	return 0;

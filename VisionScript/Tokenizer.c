@@ -132,38 +132,37 @@ static bool IsNumber(String statement, int i, int * end)
 	return true;
 }
 
-list(TokenStatement) Tokenize(String code)
+list(Token) TokenizeLine(String line)
 {
-	list(TokenStatement) tokenStatements = ListCreate(sizeof(TokenStatement), 16);
+	list(Token) tokens = ListCreate(sizeof(Token), 32);
+	int32_t i = 0;
+	while (i < StringLength(line))
+	{
+		int32_t end = i;
+		TokenType tokenType = TokenTypeUnknown;
+		if (IsKeyword(line, i, &end)) { tokenType = TokenTypeKeyword; }
+		else if (IsNumber(line, i, &end)) { tokenType = TokenTypeNumber; }
+		else if (IsOperator(line, i, &end)) { tokenType = TokenTypeOperator; }
+		else if (IsIdentifier(line, i, &end)) { tokenType = TokenTypeIdentifier; }
+		else if (IsBracket(line, i, &end)) { tokenType = TokenTypeBracket; }
+		else if (IsSymbol(line, i, &end)) { tokenType = TokenTypeSymbol; }
+		else if (IsWhitespace(line[i])) { i++; continue; }
+		ListPush((void **)&tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end) });
+		i = end + 1;
+	}
+	return tokens;
+}
+
+list(list(Token)) TokenizeCode(String code)
+{
+	list(list(Token)) tokenLines = ListCreate(sizeof(list(Token)), 16);
 	
 	list(String) statements = SplitCodeIntoStatements(code);
 	for (int i = 0; i < ListLength(statements); i++)
 	{
-		TokenStatement statement = ListCreate(sizeof(Token), 32);
-		int j = 0;
-		while (j < StringLength(statements[i]))
-		{
-			int end = j;
-			TokenType tokenType = TokenTypeUnknown;
-			if (IsKeyword(statements[i], j, &end)) { tokenType = TokenTypeKeyword; }
-			else if (IsNumber(statements[i], j, &end)) { tokenType = TokenTypeNumber; }
-			else if (IsOperator(statements[i], j, &end)) { tokenType = TokenTypeOperator; }
-			else if (IsIdentifier(statements[i], j, &end)) { tokenType = TokenTypeIdentifier; }
-			else if (IsBracket(statements[i], j, &end)) { tokenType = TokenTypeBracket; }
-			else if (IsSymbol(statements[i], j, &end)) { tokenType = TokenTypeSymbol; }
-			else if (IsWhitespace(statements[i][j])) { j++; continue; }
-			ListPush((void **)&statement, &(Token){ .type = tokenType, .value = StringSub(statements[i], j, end) });
-			j = end + 1;
-		}
-		ListPush((void **)&tokenStatements, &statement);
+		list(Token) tokenLine = TokenizeLine(statements[i]);
+		ListPush((void **)&tokenLines, &tokenLine);
 	}
 	ListDestroy(statements);
-
-	return tokenStatements;
-}
-
-list(Token) TokenizeLine(String line)
-{
-	StringConcat(&line, ";");
-	return Tokenize(line)[0];
+	return tokenLines;
 }

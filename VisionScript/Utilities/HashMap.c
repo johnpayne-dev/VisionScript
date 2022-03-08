@@ -34,7 +34,7 @@ void HashMapSet(HashMap map, const char * key, void * value)
 	uint32_t index = hash % map.capacity;
 	while (true)
 	{
-		if (map.entries[index].value == NULL)
+		if (map.entries[index].value == NULL || strcmp(map.entries[index].key, key) == 0)
 		{
 			map.entries[index] = (HashEntry){ key, value };
 			return;
