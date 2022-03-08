@@ -18,8 +18,8 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 					result->length = parameters[i].value.length;
 					for (int8_t d = 0; d < result->dimensions; d++)
 					{
-						result->xyzw[d] = malloc(result->length * sizeof(float));
-						memcpy(result->xyzw[d], parameters[i].value.xyzw[d], result->length * sizeof(float));
+						result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
+						memcpy(result->xyzw[d], parameters[i].value.xyzw[d], result->length * sizeof(scalar_t));
 					}
 					return RuntimeErrorNone;
 				}
@@ -34,7 +34,7 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 	{
 		result->dimensions = 1;
 		result->length = 1;
-		result->xyzw[0] = malloc(sizeof(float));
+		result->xyzw[0] = malloc(sizeof(scalar_t));
 		result->xyzw[0][0] = operon.constant;
 	}
 	else if (operonType == OperonTypeVectorLiteral)
@@ -60,7 +60,7 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 		{
 			if (components[i].length == 1 && result->length > 1)
 			{
-				result->xyzw[i] = malloc(sizeof(float) * result->length);
+				result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
 				for (int32_t j = 0; j < result->length; j++) { result->xyzw[i][j] = components[i].xyzw[0][0]; }
 				free(components[i].xyzw[0]);
 			}
@@ -88,10 +88,10 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 			if (ListLength(operon.expressions) == 1) { result->xyzw[i] = elements[0].xyzw[i]; }
 			else
 			{
-				result->xyzw[i] = malloc(sizeof(float) * result->length);
+				result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
 				for (int32_t j = 0, p = 0; j < ListLength(operon.expressions); j++)
 				{
-					memcpy(result->xyzw[i] + p, elements[j].xyzw[i], elements[j].length * sizeof(float));
+					memcpy(result->xyzw[i] + p, elements[j].xyzw[i], elements[j].length * sizeof(scalar_t));
 					p += elements[j].length;
 					free(elements[j].xyzw[i]);
 				}
@@ -110,11 +110,11 @@ static void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * res
 	if (upper - lower > (1 << 24) || upper - lower < 0) { *result = (VectorArray){ 0 }; return; }
 	result->length = upper - lower + 1;
 	result->dimensions = 1;
-	result->xyzw[0] = malloc(result->length * sizeof(float));
+	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = i + lower; }
 }
 
-static inline float Operation(Operator operator, float a, float b)
+static inline scalar_t Operation(Operator operator, scalar_t a, scalar_t b)
 {
 	switch (operator)
 	{
@@ -137,8 +137,8 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 	{
 		for (int8_t d = 1; d < b->dimensions; d++)
 		{
-			a->xyzw[d] = malloc(length * sizeof(float));
-			memcpy(a->xyzw[d], a->xyzw[0], length * sizeof(float));
+			a->xyzw[d] = malloc(length * sizeof(scalar_t));
+			memcpy(a->xyzw[d], a->xyzw[0], length * sizeof(scalar_t));
 		}
 		a->dimensions = b->dimensions;
 	}
@@ -146,8 +146,8 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 	{
 		for (int8_t d = 1; d < a->dimensions; d++)
 		{
-			b->xyzw[d] = malloc(length * sizeof(float));
-			memcpy(b->xyzw[d], b->xyzw[0], length * sizeof(float));
+			b->xyzw[d] = malloc(length * sizeof(scalar_t));
+			memcpy(b->xyzw[d], b->xyzw[0], length * sizeof(scalar_t));
 		}
 		b->dimensions = a->dimensions;
 	}
@@ -232,10 +232,10 @@ static RuntimeError EvaluateFor(HashMap identifiers, list(Parameter) parameters,
 	
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
-		result->xyzw[d] = malloc(result->length * sizeof(float));
+		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
 		for (int32_t i = 0, p = 0; i < assignmentValue.length; i++)
 		{
-			memcpy(result->xyzw[d] + p, values[i].xyzw[d], values[i].length * sizeof(float));
+			memcpy(result->xyzw[d] + p, values[i].xyzw[d], values[i].length * sizeof(scalar_t));
 			p += values[i].length;
 			free(values[i].xyzw[d]);
 		}
@@ -281,8 +281,8 @@ static RuntimeError EvaluateIndex(HashMap identifiers, list(Parameter) parameter
 				if (!shouldDuplicate[component]) { result->xyzw[d] = value.xyzw[component]; shouldDuplicate[component] = true; }
 				else
 				{
-					result->xyzw[d] = malloc(result->length * sizeof(float));
-					memcpy(result->xyzw[d], value.xyzw[component], result->length * sizeof(float));
+					result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
+					memcpy(result->xyzw[d], value.xyzw[component], result->length * sizeof(scalar_t));
 				}
 			}
 			for (int8_t d = 0; d < value.dimensions; d++)
@@ -304,7 +304,7 @@ static RuntimeError EvaluateIndex(HashMap identifiers, list(Parameter) parameter
 	result->length = index.length;
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
-		result->xyzw[d] = malloc(result->length * sizeof(float));
+		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
 		for (int32_t i = 0; i < result->length; i++)
 		{
 			int32_t j = roundf(index.xyzw[0][i]);

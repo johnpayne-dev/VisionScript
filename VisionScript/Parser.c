@@ -363,7 +363,6 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 	return error;
 }
 
-#include <stdio.h>
 Statement * ParseTokenLine(list(Token) tokens)
 {
 	Statement * statement = malloc(sizeof(Statement));
@@ -373,7 +372,6 @@ Statement * ParseTokenLine(list(Token) tokens)
 	{
 		if (tokens[i].type == TokenTypeUnknown)
 		{
-			printf("%s\n", tokens[i].value);
 			statement->error = SyntaxErrorUnknownToken;
 			return statement;
 		}

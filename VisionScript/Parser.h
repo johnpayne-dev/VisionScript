@@ -4,6 +4,8 @@
 #include "Utilities/List.h"
 #include "Tokenizer.h"
 
+typedef float scalar_t;
+
 typedef enum Operator
 {
 	OperatorNone,
@@ -33,7 +35,7 @@ typedef union Operon
 	struct Expression * expression;
 	list(struct Expression *) expressions;
 	String identifier;
-	float constant;
+	scalar_t constant;
 	struct ForAssignment
 	{
 		String identifier;

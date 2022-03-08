@@ -25,7 +25,7 @@ typedef enum RuntimeError
 
 typedef struct VectorArray
 {
-	float * xyzw[4];
+	scalar_t * xyzw[4];
 	uint8_t dimensions;
 	uint32_t length;
 } VectorArray;

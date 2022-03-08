@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include <stdlib.h>
 #include "Script.h"
 #include "Evaluator.h"
 
@@ -18,6 +19,11 @@ static void PrintVectorArray(VectorArray array)
 		}
 		if (array.dimensions > 1) { printf(")"); }
 		if (i != array.length - 1) { printf(", "); }
+		if (i == 9 && array.length >= 100)
+		{
+			printf("..., ");
+			i = array.length - 5;
+		}
 	}
 	if (array.length > 1) { printf("]"); }
 	printf("\n");
@@ -27,11 +33,12 @@ int main(int argc, const char * argv[])
 {
 	if (argc < 2)
 	{
+		printf("VisionScript v0 - Console Interpretter\n");
 		HashMap identifiers = HashMapCreate(65536);
 		while (true)
 		{
 			String input = StringCreate("");
-			printf(">>> ");
+			printf("\n>>> ");
 			for (int32_t c = getchar(); c != '\n'; c = getchar())
 			{
 				if (c >= 128) { continue; }
@@ -49,8 +56,9 @@ int main(int argc, const char * argv[])
 				RuntimeError error = EvaluateExpression(identifiers, NULL, statement->expression, &result);
 				timer = clock() - timer;
 				if (error != RuntimeErrorNone) { printf("RuntimeError: %i\n", error); continue; }
-				//printf("%fs: ", timer / (float)CLOCKS_PER_SEC);
 				PrintVectorArray(result);
+				if (timer / (float)CLOCKS_PER_SEC > 0.01) { printf("Done in %fs\n", timer / (float)CLOCKS_PER_SEC); } 
+				for (int8_t d = 0; d < result.dimensions; d++) { free(result.xyzw[d]); }
 			}
 			if (statement->type == StatementTypeVariable) { HashMapSet(identifiers, statement->declaration.variable.identifier, statement); }
 			if (statement->type == StatementTypeFunction) { HashMapSet(identifiers, statement->declaration.function.identifier, statement); }
