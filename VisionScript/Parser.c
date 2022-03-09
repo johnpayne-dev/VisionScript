@@ -198,6 +198,7 @@ static SyntaxError ReadOperon(list(Token) tokens, int32_t start, int32_t end, Op
 	{
 		if (type == OperonTypeArrayLiteral || type == OperonTypeVectorLiteral) { start += 1; end -= 1; }
 		operon->expressions = ListCreate(sizeof(Expression *), 4);
+		if (start == end + 1) { return SyntaxErrorNone; }
 		int32_t prevStart = start;
 		int32_t commaIndex = FindComma(tokens, start, end);
 		int32_t elementIndex = 0;

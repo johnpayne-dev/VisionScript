@@ -197,7 +197,17 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, list(Parameter) pa
 			return EvaluateBuiltinFunction(builtin, NULL, result);
 		}
 		
-		return RuntimeErrorNotImplemented;
+		list(VectorArray) arguments = ListCreate(sizeof(VectorArray), ListLength(expressions));
+		for (int32_t i = 0; i < ListLength(expressions); i++)
+		{
+			ListPush((void **)&arguments, &(VectorArray){ 0 });
+			RuntimeError error = EvaluateExpression(identifiers, parameters, expressions[i], &arguments[i]);
+			if (error != RuntimeErrorNone) { return error; }
+		}
+		RuntimeError error = EvaluateBuiltinFunction(builtin, arguments, result);
+		for (int32_t i = 0; i < ListLength(arguments); i++) { for (int8_t d = 0; d < arguments[i].dimensions; d++) { free(arguments[i].xyzw[d]); } }
+		ListDestroy(arguments);
+		return error;
 	}
 	else
 	{
