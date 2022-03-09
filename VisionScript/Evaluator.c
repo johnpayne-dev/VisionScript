@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Evaluator.h"
+#include "Builtin.h"
 
 static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) parameters, OperonType operonType, Operon operon, VectorArray * result)
 {
@@ -183,22 +184,39 @@ static void EvaluateNegate(VectorArray * a)
 static RuntimeError EvaluateFunctionCall(HashMap identifiers, list(Parameter) parameters, String function, list(Expression *) expressions, VectorArray * result)
 {
 	Statement * idenStatement = HashMapGet(identifiers, function);
-	if (idenStatement == NULL) { return RuntimeErrorUndefinedIdentifier; }
-	if (idenStatement->type == StatementTypeVariable) { return RuntimeErrorIdentifierNotFunction; }
-	if (ListLength(expressions) != ListLength(idenStatement->declaration.function.arguments)) { return RuntimeErrorIncorrectParameterCount; }
-	
-	list(Parameter) arguments = ListCreate(sizeof(Parameter), ListLength(expressions));
-	for (int32_t i = 0; i < ListLength(expressions); i++)
+	if (idenStatement == NULL)
 	{
-		Parameter parameter = { .identifier = idenStatement->declaration.function.arguments[i] };
-		RuntimeError error = EvaluateExpression(identifiers, parameters, expressions[i], &parameter.value);
-		if (error != RuntimeErrorNone) { return error; }
-		ListPush((void **)&arguments, &parameter);
+		BuiltinFunction builtin = DetermineBuiltinFunction(function);
+		if (builtin == BuiltinFunctionNone) { return RuntimeErrorUndefinedIdentifier; }
+		
+		if (IsFunctionSingleArgument(builtin))
+		{
+			if (ListLength(expressions) > 1) { return RuntimeErrorIncorrectParameterCount; }
+			RuntimeError error = EvaluateExpression(identifiers, parameters, expressions[0], result);
+			if (error != RuntimeErrorNone) { return error; }
+			return EvaluateBuiltinFunction(builtin, NULL, result);
+		}
+		
+		return RuntimeErrorNotImplemented;
 	}
-	RuntimeError error = EvaluateExpression(identifiers, arguments, idenStatement->expression, result);
-	if (error != RuntimeErrorNone) { return error; }
-	ListDestroy(arguments);
-	return error;
+	else
+	{
+		if (idenStatement->type == StatementTypeVariable) { return RuntimeErrorIdentifierNotFunction; }
+		if (ListLength(expressions) != ListLength(idenStatement->declaration.function.arguments)) { return RuntimeErrorIncorrectParameterCount; }
+		
+		list(Parameter) arguments = ListCreate(sizeof(Parameter), ListLength(expressions));
+		for (int32_t i = 0; i < ListLength(expressions); i++)
+		{
+			Parameter parameter = { .identifier = idenStatement->declaration.function.arguments[i] };
+			RuntimeError error = EvaluateExpression(identifiers, parameters, expressions[i], &parameter.value);
+			if (error != RuntimeErrorNone) { return error; }
+			ListPush((void **)&arguments, &parameter);
+		}
+		RuntimeError error = EvaluateExpression(identifiers, arguments, idenStatement->expression, result);
+		if (error != RuntimeErrorNone) { return error; }
+		ListDestroy(arguments);
+		return error;
+	}
 }
 
 static RuntimeError EvaluateFor(HashMap identifiers, list(Parameter) parameters, OperonType operonType, Operon operon, struct ForAssignment assignment, VectorArray * result)

@@ -1,0 +1,85 @@
+#ifndef Builtin_h
+#define Builtin_h
+
+#include "Evaluator.h"
+
+typedef enum BuiltinFunction
+{
+	BuiltinFunctionSIN,
+	BuiltinFunctionCOS,
+	BuiltinFunctionTAN,
+	BuiltinFunctionASIN,
+	BuiltinFunctionACOS,
+	BuiltinFunctionATAN,
+	BuiltinFunctionATAN2,
+	BuiltinFunctionSEC,
+	BuiltinFunctionCSC,
+	BuiltinFunctionCOT,
+	BuiltinFunctionASEC,
+	BuiltinFunctionACSC,
+	BuiltinFunctionACOT,
+	BuiltinFunctionSINH,
+	BuiltinFunctionCOSH,
+	BuiltinFunctionTANH,
+	BuiltinFunctionASINH,
+	BuiltinFunctionACOSH,
+	BuiltinFunctionATANH,
+	BuiltinFunctionSECH,
+	BuiltinFunctionCSCH,
+	BuiltinFunctionCOTH,
+	BuiltinFunctionASECH,
+	BuiltinFunctionACSCH,
+	BuiltinFunctionACOTH,
+	BuiltinFunctionABS,
+	BuiltinFunctionARGMAX,
+	BuiltinFunctionARGMIN,
+	BuiltinFunctionCBRT,
+	BuiltinFunctionCEIL,
+	BuiltinFunctionCORR,
+	BuiltinFunctionCOV,
+	BuiltinFunctionERF,
+	BuiltinFunctionEXP,
+	BuiltinFunctionFACTORIAL,
+	BuiltinFunctionFLOOR,
+	BuiltinFunctionGAMMA,
+	BuiltinFunctionGCD,
+	BuiltinFunctionJOIN,
+	BuiltinFunctionLCM,
+	BuiltinFunctionLEN,
+	BuiltinFunctionLN,
+	BuiltinFunctionLOG,
+	BuiltinFunctionLOG10,
+	BuiltinFunctionLOG2,
+	BuiltinFunctionMAX,
+	BuiltinFunctionMEAN,
+	BuiltinFunctionMEDIAN,
+	BuiltinFunctionMIN,
+	BuiltinFunctionPROD,
+	BuiltinFunctionQUANTILE,
+	BuiltinFunctionRAND,
+	BuiltinFunctionROUND,
+	BuiltinFunctionSHUFFLE,
+	BuiltinFunctionSIGN,
+	BuiltinFunctionSORT,
+	BuiltinFunctionSQRT,
+	BuiltinFunctionSTDEV,
+	BuiltinFunctionSUM,
+	BuiltinFunctionUNIQUE,
+	BuiltinFunctionVAR,
+	BuiltinFunctionCROSS,
+	BuiltinFunctionDIST,
+	BuiltinFunctionDISTSQ,
+	BuiltinFunctionDOT,
+	BuiltinFunctionMAGN,
+	BuiltinFunctionMAGNSQ,
+	BuiltinFunctionNORMALIZE,
+	BuiltinFunctionNone,
+} BuiltinFunction;
+
+BuiltinFunction DetermineBuiltinFunction(const char * identifier);
+
+bool IsFunctionSingleArgument(BuiltinFunction function);
+
+RuntimeError EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
+
+#endif
