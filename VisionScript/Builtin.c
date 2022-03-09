@@ -330,6 +330,7 @@ static RuntimeError _count(VectorArray * result)
 	result->xyzw[0] = malloc(sizeof(scalar_t));
 	result->xyzw[0][0] = len;
 	result->length = 1;
+	result->dimensions = 1;
 	return RuntimeErrorNone;
 }
 
@@ -927,11 +928,35 @@ RuntimeError EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray)
 	}
 }
 
-/*static const char * builtinVariables[] =
+static const char * builtinVariables[] =
 {
 	"pi", "tau", "e", "inf",
-	
-	"cam_x", "cam_y", "cam_scale", "cam_rot",
+	/*"cam_x", "cam_y", "cam_scale", "cam_rot",
 	"mouse_x", "mouse_y", "mouse_dx", "mouse_dy", "mouse_btn", "mouse_clk,"
-	"time",
-};*/
+	"time",*/
+};
+
+BuiltinVariable DetermineBuiltinVariable(const char * identifier)
+{
+	for (int32_t i = 0; i < sizeof(builtinVariables) / sizeof(builtinVariables[0]); i++)
+	{
+		if (strcmp(identifier, builtinVariables[i]) == 0) { return i; }
+	}
+	return BuiltinVariableNone;
+}
+
+RuntimeError EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result)
+{
+	result->length = 1;
+	result->dimensions = 1;
+	result->xyzw[0] = malloc(sizeof(scalar_t));
+	switch (variable)
+	{
+		case BuiltinVariablePI: result->xyzw[0][0] = M_PI; break;
+		case BuiltinVariableTAU: result->xyzw[0][0] = 2 * M_PI; break;
+		case BuiltinVariableE: result->xyzw[0][0] = M_E; break;
+		case BuiltinVariableINF: result->xyzw[0][0] = INFINITY; break;
+		default: return RuntimeErrorNotImplemented;
+	}
+	return RuntimeErrorNone;
+}

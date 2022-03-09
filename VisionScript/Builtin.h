@@ -79,4 +79,17 @@ bool IsFunctionSingleArgument(BuiltinFunction function);
 
 RuntimeError EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
 
+typedef enum BuiltinVariable
+{
+	BuiltinVariablePI,
+	BuiltinVariableTAU,
+	BuiltinVariableE,
+	BuiltinVariableINF,
+	BuiltinVariableNone
+} BuiltinVariable;
+
+BuiltinVariable DetermineBuiltinVariable(const char * identifier);
+
+RuntimeError EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result);
+
 #endif

@@ -27,7 +27,12 @@ static RuntimeError EvaluateOperon(HashMap identifiers, list(Parameter) paramete
 			}
 		}
 		Statement * idenStatement = HashMapGet(identifiers, operon.identifier);
-		if (idenStatement == NULL) { return RuntimeErrorUndefinedIdentifier; }
+		if (idenStatement == NULL)
+		{
+			BuiltinVariable builtin = DetermineBuiltinVariable(operon.identifier);
+			if (builtin != BuiltinVariableNone) { return EvaluateBuiltinVariable(builtin, result); }
+			return RuntimeErrorUndefinedIdentifier;
+		}
 		if (idenStatement->type == StatementTypeFunction) { return RuntimeErrorIdentifierNotVariable; }
 		return EvaluateExpression(identifiers, NULL, idenStatement->expression, result);
 	}
