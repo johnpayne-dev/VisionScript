@@ -16,6 +16,7 @@ typedef enum RuntimeError
 	RuntimeErrorIdentifierNotVariable,
 	RuntimeErrorIdentifierNotFunction,
 	RuntimeErrorIncorrectParameterCount,
+	RuntimeErrorInvalidArgumentType,
 	RuntimeErrorInvalidEllipsisOperon,
 	RuntimeErrorIndexingWithVector,
 	RuntimeErrorDifferingLengthVectors,
