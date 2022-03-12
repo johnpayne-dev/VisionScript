@@ -6,7 +6,7 @@
 #include "Utilities/HashMap.h"
 #include "Parser.h"
 
-typedef enum RuntimeError
+typedef enum RuntimeErrorCode
 {
 	RuntimeErrorNone,
 	RuntimeErrorUndefinedIdentifier,
@@ -22,6 +22,14 @@ typedef enum RuntimeError
 	RuntimeErrorDifferingLengthVectors,
 	RuntimeErrorInvalidSwizzling,
 	RuntimeErrorNotImplemented,
+} RuntimeErrorCode;
+
+typedef struct RuntimeError
+{
+	RuntimeErrorCode code;
+	int32_t tokenStart;
+	int32_t tokenEnd;
+	Statement * statement;
 } RuntimeError;
 
 typedef struct VectorArray

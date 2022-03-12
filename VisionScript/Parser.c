@@ -61,11 +61,11 @@ static StatementType DetermineStatementType(list(Token) statement)
 
 static SyntaxError ParseVariableDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
 {
-	if (ListLength(tokens) < 2) { return SyntaxErrorInvalidVariableDeclaration; }
-	if (tokens[1].type != TokenTypeSymbol || tokens[1].value[0] != '=') { return SyntaxErrorInvalidVariableDeclaration; }
+	if (ListLength(tokens) < 2) { return (SyntaxError){ SyntaxErrorInvalidVariableDeclaration, 0, 0 }; }
+	if (tokens[1].type != TokenTypeSymbol || tokens[1].value[0] != '=') { return (SyntaxError){ SyntaxErrorInvalidVariableDeclaration, 0, 1 }; }
 	declaration->variable.identifier = StringCreate(tokens[0].value);
 	*declarationEndIndex = 1;
-	return SyntaxErrorNone;
+	return (SyntaxError){ SyntaxErrorNone };
 }
 
 static SyntaxError ParseFunctionDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
@@ -76,22 +76,22 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, StatementDeclara
 		if (tokens[argumentsEndIndex].type == TokenTypeBracket && tokens[argumentsEndIndex].value[0] == ')') { break; }
 		argumentsEndIndex++;
 	}
-	if (argumentsEndIndex >= ListLength(tokens) - 1) { return SyntaxErrorInvalidFunctionDeclaration; }
-	if (tokens[argumentsEndIndex + 1].type != TokenTypeSymbol || tokens[argumentsEndIndex + 1].value[0] != '=') { return SyntaxErrorInvalidFunctionDeclaration; }
+	if (argumentsEndIndex >= ListLength(tokens) - 1) { return (SyntaxError){ SyntaxErrorInvalidFunctionDeclaration, 1, argumentsEndIndex }; }
+	if (tokens[argumentsEndIndex + 1].type != TokenTypeSymbol || tokens[argumentsEndIndex + 1].value[0] != '=') { return (SyntaxError){ SyntaxErrorInvalidFunctionDeclaration, 1, argumentsEndIndex }; }
 	
 	declaration->function.arguments = ListCreate(sizeof(String), 4);
 	for (int32_t i = 2; i < argumentsEndIndex; i++)
 	{
-		if (tokens[i].type != TokenTypeIdentifier) { return SyntaxErrorInvalidFunctionDeclaration; }
+		if (tokens[i].type != TokenTypeIdentifier) { return (SyntaxError){ SyntaxErrorInvalidFunctionDeclaration, i, i }; }
 		ListPush((void **)&declaration->function.arguments, &(String){ StringCreate(tokens[i].value) });
 		i++;
 		
 		if (i == argumentsEndIndex) { break; }
-		if (tokens[i].type != TokenTypeSymbol || tokens[i].value[0] != ',') { return SyntaxErrorInvalidFunctionDeclaration; }
+		if (tokens[i].type != TokenTypeSymbol || tokens[i].value[0] != ',') { return (SyntaxError){ SyntaxErrorInvalidFunctionDeclaration, i, i }; }
 	}
 	declaration->function.identifier = StringCreate(tokens[0].value);
 	*declarationEndIndex = argumentsEndIndex + 1;
-	return SyntaxErrorNone;
+	return (SyntaxError){ SyntaxErrorNone };
 }
 
 static SyntaxError ParseRenderDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
@@ -100,7 +100,7 @@ static SyntaxError ParseRenderDeclaration(list(Token) tokens, StatementDeclarati
 	if (StringEquals(tokens[0].value, "parametric")) { declaration->render.type = StatementRenderTypeParametric; }
 	if (StringEquals(tokens[0].value, "polygon")) { declaration->render.type = StatementRenderTypePolygon; }
 	*declarationEndIndex = 0;
-	return SyntaxErrorNone;
+	return (SyntaxError){ SyntaxErrorNone };
 }
 
 static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end)
@@ -128,7 +128,7 @@ static SyntaxError FindOperator(list(Token) tokens, int32_t start, int32_t end, 
 		if (tokens[i].type == TokenTypeBracket)
 		{
 			int32_t bracketIndex = FindCorrespondingBracket(tokens, start, end, i);
-			if (bracketIndex < 0) { return SyntaxErrorMissingBracket; }
+			if (bracketIndex < 0) { return (SyntaxError){ SyntaxErrorMissingBracket, i, end }; }
 			i = bracketIndex + (rightToLeft ? -1 : 1);
 			continue;
 		}
@@ -157,7 +157,7 @@ static SyntaxError FindOperator(list(Token) tokens, int32_t start, int32_t end, 
 		}
 		i += rightToLeft ? -1 : 1;
 	}
-	return SyntaxErrorNone;
+	return (SyntaxError){ SyntaxErrorNone };
 }
 
 static SyntaxError FindFunctionCall(list(Token) tokens, int32_t start, int32_t end, int32_t * index)
@@ -170,13 +170,13 @@ static SyntaxError FindFunctionCall(list(Token) tokens, int32_t start, int32_t e
 		{
 			if (tokens[i].value[0] == '(' && i > 0 && tokens[i - 1].type == TokenTypeIdentifier) { *index = i; }
 			int32_t bracketIndex = FindCorrespondingBracket(tokens, start, end, i);
-			if (bracketIndex < 0) { return SyntaxErrorMissingBracket; }
+			if (bracketIndex < 0) { return (SyntaxError){ SyntaxErrorMissingBracket, i, end }; }
 			i = bracketIndex + 1;
 			continue;
 		}
 		i++;
 	}
-	return SyntaxErrorNone;
+	return (SyntaxError){ SyntaxErrorNone };
 }
 
 static OperonType DetermineOperonType(list(Token) tokens, int32_t start, int32_t end)
@@ -193,7 +193,7 @@ static OperonType DetermineOperonType(list(Token) tokens, int32_t start, int32_t
 
 static SyntaxError ReadOperon(list(Token) tokens, int32_t start, int32_t end, OperonType type, Operon * operon)
 {
-	SyntaxError error = SyntaxErrorNone;
+	SyntaxError error = { SyntaxErrorNone };
 	if (type == OperonTypeExpression) { error = ParseExpression(tokens, start, end, &operon->expression); }
 	if (type == OperonTypeIdentifier) { operon->identifier = StringCreate(tokens[start].value); }
 	if (type == OperonTypeConstant) { operon->constant = atof(tokens[start].value); }
@@ -206,16 +206,16 @@ static SyntaxError ReadOperon(list(Token) tokens, int32_t start, int32_t end, Op
 	{
 		if (type == OperonTypeArrayLiteral || type == OperonTypeVectorLiteral) { start += 1; end -= 1; }
 		operon->expressions = ListCreate(sizeof(Expression *), 4);
-		if (start == end + 1) { return SyntaxErrorNone; }
+		if (start == end + 1) { return (SyntaxError){ SyntaxErrorNone }; }
 		int32_t prevStart = start;
 		int32_t commaIndex = FindComma(tokens, start, end);
 		int32_t elementIndex = 0;
 		while (commaIndex > -1)
 		{
-			if (type == OperonTypeVectorLiteral && elementIndex >= 3) { error = SyntaxErrorTooManyVectorElements; break; }
+			if (type == OperonTypeVectorLiteral && elementIndex >= 3) { return (SyntaxError){ SyntaxErrorTooManyVectorElements, commaIndex, end }; }
 			ListPush((void **)&operon->expressions, &(Expression *){ NULL });
 			error = ParseExpression(tokens, prevStart, commaIndex - 1, &operon->expressions[elementIndex]);
-			if (error != SyntaxErrorNone) { return error; }
+			if (error.code != SyntaxErrorNone) { return error; }
 			prevStart = commaIndex + 1;
 			commaIndex = FindComma(tokens, commaIndex + 1, end);
 			elementIndex++;
@@ -272,39 +272,37 @@ static bool InsideArray(list(Token) tokens, int32_t index)
 
 static SyntaxError CheckOperatorLogic(Expression * expression, list(Token) tokens, int32_t opIndex)
 {
-	if (expression->operonTypes[0] == OperonTypeArguments) { return SyntaxErrorInvalidCommaPlacement; }
-	if (expression->operonTypes[1] == OperonTypeArguments && expression->operator != OperatorFunctionCall) { return SyntaxErrorInvalidCommaPlacement; }
-	if (expression->operonTypes[0] == OperonTypeForAssignment) { return SyntaxErrorInvalidForAssignmentPlacement; }
-	if (expression->operonTypes[1] == OperonTypeForAssignment && expression->operator != OperatorFor) { return SyntaxErrorInvalidForAssignmentPlacement; }
+	if (expression->operonTypes[0] == OperonTypeArguments) { return (SyntaxError){ SyntaxErrorInvalidCommaPlacement, opIndex, opIndex }; }
+	if (expression->operonTypes[1] == OperonTypeArguments && expression->operator != OperatorFunctionCall) { return (SyntaxError){ SyntaxErrorInvalidCommaPlacement, opIndex, opIndex }; }
+	if (expression->operonTypes[0] == OperonTypeForAssignment) { return (SyntaxError){ SyntaxErrorInvalidForAssignmentPlacement, opIndex, opIndex }; }
+	if (expression->operonTypes[1] == OperonTypeForAssignment && expression->operator != OperatorFor) { return (SyntaxError){ SyntaxErrorInvalidForAssignmentPlacement, opIndex, opIndex }; }
 	switch (expression->operator)
 	{
 		case OperatorFor:
-			if (!InsideArray(tokens, opIndex)) { return SyntaxErrorInvalidForPlacement; }
-			if (expression->operonTypes[1] != OperonTypeForAssignment) { return SyntaxErrorInvalidForAssignment; }
+			if (!InsideArray(tokens, opIndex)) { return (SyntaxError){ SyntaxErrorInvalidForPlacement, opIndex, opIndex };; }
+			if (expression->operonTypes[1] != OperonTypeForAssignment) { return (SyntaxError){ SyntaxErrorInvalidForAssignment, opIndex, opIndex };; }
 			break;
 		case OperatorEllipsis:
-			if (!InsideArray(tokens, opIndex)) { return SyntaxErrorInvalidEllipsisPlacement; }
-			if (expression->operonTypes[0] == OperonTypeArrayLiteral || expression->operonTypes[1] == OperonTypeArrayLiteral) { return SyntaxErrorInvalidEllipsisOperon; }
-			if (expression->operonTypes[0] == OperonTypeVectorLiteral || expression->operonTypes[1] == OperonTypeVectorLiteral) { return SyntaxErrorInvalidEllipsisOperon; }
+			if (!InsideArray(tokens, opIndex)) { return (SyntaxError){ SyntaxErrorInvalidEllipsisPlacement, opIndex, opIndex };; }
+			if (expression->operonTypes[0] == OperonTypeArrayLiteral || expression->operonTypes[1] == OperonTypeArrayLiteral) { return (SyntaxError){ SyntaxErrorInvalidEllipsisOperon, opIndex, opIndex };; }
+			if (expression->operonTypes[0] == OperonTypeVectorLiteral || expression->operonTypes[1] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorInvalidEllipsisOperon, opIndex, opIndex };; }
 			break;
 		case OperatorIndex:
-			if (expression->operonTypes[0] == OperonTypeConstant) { return SyntaxErrorIndexingConstant; }
-			if (expression->operonTypes[1] == OperonTypeConstant) { return SyntaxErrorIndexingWithConstant; }
-			if (expression->operonTypes[1] == OperonTypeVectorLiteral) { return SyntaxErrorIndexingWithVector; }
+			if (expression->operonTypes[1] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorIndexingWithVector, opIndex, opIndex };; }
 			break;
 		case OperatorFunctionCall:
-			if (expression->operonTypes[0] != OperonTypeIdentifier) { return SyntaxErrorInvalidFunctionCall; }
+			if (expression->operonTypes[0] != OperonTypeIdentifier) { return (SyntaxError){ SyntaxErrorInvalidFunctionCall, opIndex, opIndex };; }
 			break;
 		default: break;
 	}
-	return SyntaxErrorNone;
+	return (SyntaxError){ SyntaxErrorNone };
 }
 
 SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression ** expression)
 {
-	if (end < start) { return SyntaxErrorMissingExpression; }
+	if (end < start) { return (SyntaxError){ SyntaxErrorMissingExpression, start, end }; }
 	
-	SyntaxError error = SyntaxErrorNone;
+	SyntaxError error = { SyntaxErrorNone };
 	int32_t opIndex = -1;
 	int32_t precedence = 6;
 	while (precedence > 0)
@@ -319,7 +317,7 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 			case 1: error = FindFunctionCall(tokens, start, end, &opIndex); break;
 			default: break;
 		}
-		if (error != SyntaxErrorNone) { return error; }
+		if (error.code != SyntaxErrorNone) { return error; }
 		if (opIndex > -1) { break; }
 		precedence--;
 	}
@@ -332,34 +330,39 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 		Operon operon = { 0 };
 		if (operonType == OperonTypeExpression)
 		{
-			if (tokens[start].value[0] != '(' || FindCorrespondingBracket(tokens, start, end, start) != end) { return SyntaxErrorMissingOperator; }
+			if (tokens[start].value[0] != '(' || FindCorrespondingBracket(tokens, start, end, start) != end) { return (SyntaxError){ SyntaxErrorMissingOperator, start, end }; }
 			error = ReadOperon(tokens, start + 1, end - 1, operonType, &operon);
 		}
 		else { error = ReadOperon(tokens, start, end, operonType, &operon); }
 		(*expression)->operator = operator;
 		(*expression)->operonTypes[0] = operonType;
 		(*expression)->operons[0] = operon;
+		(*expression)->operonStart[0] = start;
+		(*expression)->operonEnd[0] = end;
 	}
 	else if (IsUnaryOperator(operator))
 	{
 		OperonType operonType = DetermineOperonType(tokens, opIndex + 1, end);
-		if (operonType == OperonTypeNone) { return SyntaxErrorMissingOperon; }
+		if (operonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, opIndex, end }; }
 		Operon operon = { 0 };
 		error = ReadOperon(tokens, opIndex + 1, end, operonType, &operon);
 		(*expression)->operator = operator;
 		(*expression)->operonTypes[0] = operonType;
 		(*expression)->operons[0] = operon;
+		(*expression)->operonStart[0] = opIndex + 1;
+		(*expression)->operonEnd[0] = end;
 	}
 	else
 	{
 		if (operator == OperatorFunctionCall) { end--; }
 		OperonType leftOperonType = DetermineOperonType(tokens, start, opIndex - 1);
 		OperonType rightOperonType = operator == OperatorFunctionCall ? OperonTypeArguments : DetermineOperonType(tokens, opIndex + 1, end);
-		if (leftOperonType == OperonTypeNone || rightOperonType == OperonTypeNone) { return SyntaxErrorMissingOperon; }
+		if (leftOperonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, start, opIndex }; }
+		if (rightOperonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, opIndex, end }; }
 		Operon leftOperon = { 0 }, rightOperon = { 0 };
 		
 		error = ReadOperon(tokens, start, opIndex - 1, leftOperonType, &leftOperon);
-		if (error != SyntaxErrorNone) { return error; }
+		if (error.code != SyntaxErrorNone) { return error; }
 		error = ReadOperon(tokens, opIndex + 1, end, rightOperonType, &rightOperon);
 		
 		(*expression)->operator = operator;
@@ -367,9 +370,13 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 		(*expression)->operonTypes[1] = rightOperonType;
 		(*expression)->operons[0] = leftOperon;
 		(*expression)->operons[1] = rightOperon;
+		(*expression)->operonStart[0] = start;
+		(*expression)->operonEnd[0] = opIndex - 1;
+		(*expression)->operonStart[1] = opIndex + 1;
+		(*expression)->operonEnd[1] = end;
 	}
 	
-	if (error == SyntaxErrorNone) { error = CheckOperatorLogic(*expression, tokens, opIndex); }
+	if (error.code == SyntaxErrorNone) { error = CheckOperatorLogic(*expression, tokens, opIndex); }
 	return error;
 }
 
@@ -382,7 +389,7 @@ Statement * ParseTokenLine(list(Token) tokens)
 	{
 		if (tokens[i].type == TokenTypeUnknown)
 		{
-			statement->error = SyntaxErrorUnknownToken;
+			statement->error = (SyntaxError){ SyntaxErrorUnknownToken, i, i };
 			return statement;
 		}
 	}
@@ -401,7 +408,7 @@ Statement * ParseTokenLine(list(Token) tokens)
 			statement->error = ParseRenderDeclaration(tokens, &statement->declaration, &declarationEndIndex);
 		default: break;
 	}
-	if (statement->error != SyntaxErrorNone) { return statement; }
+	if (statement->error.code != SyntaxErrorNone) { return statement; }
 	
 	int32_t expressionStartIndex = declarationEndIndex + 1;
 	int32_t expressionEndIndex = ListLength(tokens) - 1;

@@ -77,7 +77,7 @@ BuiltinFunction DetermineBuiltinFunction(const char * identifier);
 
 bool IsFunctionSingleArgument(BuiltinFunction function);
 
-RuntimeError EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
+RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
 
 typedef enum BuiltinVariable
 {
@@ -90,6 +90,6 @@ typedef enum BuiltinVariable
 
 BuiltinVariable DetermineBuiltinVariable(const char * identifier);
 
-RuntimeError EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result);
+RuntimeErrorCode EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result);
 
 #endif

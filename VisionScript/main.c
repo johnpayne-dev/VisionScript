@@ -49,7 +49,7 @@ int main(int argc, const char * argv[])
 			if (strcmp(input, "") == 0) { continue; }
 			
 			Statement * statement = ParseTokenLine(TokenizeLine(input));
-			if (statement->error != SyntaxErrorNone) { printf("SyntaxError: %i\n", statement->error); continue; }
+			if (statement->error.code != SyntaxErrorNone) { printf("SyntaxError: %i\n", statement->error.code); continue; }
 			
 			if (statement->type == StatementTypeUnknown)
 			{
@@ -57,7 +57,7 @@ int main(int argc, const char * argv[])
 				clock_t timer = clock();
 				RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, &result);
 				timer = clock() - timer;
-				if (error != RuntimeErrorNone) { printf("RuntimeError: %i\n", error); continue; }
+				if (error.code != RuntimeErrorNone) { printf("RuntimeError: %i\n", error.code); continue; }
 				PrintVectorArray(result);
 				if (timer / (float)CLOCKS_PER_SEC > 0.01) { printf("Done in %fs\n", timer / (float)CLOCKS_PER_SEC); } 
 				for (int8_t d = 0; d < result.dimensions; d++) { free(result.xyzw[d]); }
@@ -68,7 +68,7 @@ int main(int argc, const char * argv[])
 				clock_t timer = clock();
 				RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, result);
 				timer = clock() - timer;
-				if (error != RuntimeErrorNone) { printf("RuntimeError: %i\n", error); continue; }
+				if (error.code != RuntimeErrorNone) { printf("RuntimeError: %i\n", error.code); continue; }
 				if (timer / (float)CLOCKS_PER_SEC > 0.01) { printf("Done in %fs\n", timer / (float)CLOCKS_PER_SEC); }
 				HashMapSet(identifiers, statement->declaration.variable.identifier, statement);
 				HashMapSet(cache, statement->declaration.variable.identifier, result);

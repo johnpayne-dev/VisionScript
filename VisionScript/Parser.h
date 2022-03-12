@@ -48,9 +48,11 @@ typedef struct Expression
 	Operator operator;
 	OperonType operonTypes[2];
 	Operon operons[2];
+	int32_t operonStart[2];
+	int32_t operonEnd[2];
 } Expression;
 
-typedef enum SyntaxError
+typedef enum SyntaxErrorCode
 {
 	SyntaxErrorNone,
 	SyntaxErrorUnknownToken,
@@ -72,6 +74,13 @@ typedef enum SyntaxError
 	SyntaxErrorIndexingWithConstant,
 	SyntaxErrorIndexingWithVector,
 	SyntaxErrorInvalidFunctionCall,
+} SyntaxErrorCode;
+
+typedef struct SyntaxError
+{
+	SyntaxErrorCode code;
+	int32_t tokenStart;
+	int32_t tokenEnd;
 } SyntaxError;
 
 typedef enum StatementType

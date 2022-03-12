@@ -86,43 +86,43 @@ static int coupled_compare(const void * a, const void * b)
 	return (x->s - y->s > 0) - (x->s - y->s < 0);
 }
 
-static RuntimeError _sin(VectorArray * result)
+static RuntimeErrorCode _sin(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = sinf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _cos(VectorArray * result)
+static RuntimeErrorCode _cos(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = cosf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _tan(VectorArray * result)
+static RuntimeErrorCode _tan(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = tanf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _asin(VectorArray * result)
+static RuntimeErrorCode _asin(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = asinf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _acos(VectorArray * result)
+static RuntimeErrorCode _acos(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = acosf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _atan(VectorArray * result)
+static RuntimeErrorCode _atan(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = atanf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _atan2(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _atan2(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions > 1 || args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
@@ -141,121 +141,121 @@ static RuntimeError _atan2(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _sec(VectorArray * result)
+static RuntimeErrorCode _sec(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = 1.0 / cosf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _csc(VectorArray * result)
+static RuntimeErrorCode _csc(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = 1.0 / sinf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _cot(VectorArray * result)
+static RuntimeErrorCode _cot(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = 1.0 / tanf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _asec(VectorArray * result)
+static RuntimeErrorCode _asec(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = acosf(1.0 / result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _acsc(VectorArray * result)
+static RuntimeErrorCode _acsc(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = asinf(1.0 / result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _acot(VectorArray * result)
+static RuntimeErrorCode _acot(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = M_PI_2 - atanf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _sinh(VectorArray * result)
+static RuntimeErrorCode _sinh(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = sinhf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _cosh(VectorArray * result)
+static RuntimeErrorCode _cosh(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = coshf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _tanh(VectorArray * result)
+static RuntimeErrorCode _tanh(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = tanhf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _asinh(VectorArray * result)
+static RuntimeErrorCode _asinh(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = asinhf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _acosh(VectorArray * result)
+static RuntimeErrorCode _acosh(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = acoshf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _atanh(VectorArray * result)
+static RuntimeErrorCode _atanh(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = atanhf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _sech(VectorArray * result)
+static RuntimeErrorCode _sech(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = 1.0 / coshf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _csch(VectorArray * result)
+static RuntimeErrorCode _csch(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = 1.0 / sinhf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _coth(VectorArray * result)
+static RuntimeErrorCode _coth(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = 1.0 / tanhf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _asech(VectorArray * result)
+static RuntimeErrorCode _asech(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = acoshf(1.0 / result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _acsch(VectorArray * result)
+static RuntimeErrorCode _acsch(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = asinhf(1.0 / result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _acoth(VectorArray * result)
+static RuntimeErrorCode _acoth(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = atanhf(1.0 / result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _abs(VectorArray * result)
+static RuntimeErrorCode _abs(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = fabsf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _argmax(VectorArray * result)
+static RuntimeErrorCode _argmax(VectorArray * result)
 {
 	if (result->dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 	scalar_t max = result->xyzw[0][0];
@@ -271,7 +271,7 @@ static RuntimeError _argmax(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _argmin(VectorArray * result)
+static RuntimeErrorCode _argmin(VectorArray * result)
 {
 	if (result->dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 	scalar_t min = result->xyzw[0][0];
@@ -287,19 +287,19 @@ static RuntimeError _argmin(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _cbrt(VectorArray * result)
+static RuntimeErrorCode _cbrt(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = cbrtf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _ceil(VectorArray * result)
+static RuntimeErrorCode _ceil(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = ceilf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _corr(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
@@ -323,7 +323,7 @@ static RuntimeError _corr(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _count(VectorArray * result)
+static RuntimeErrorCode _count(VectorArray * result)
 {
 	int32_t len = result->length;
 	free(result->xyzw[0]);
@@ -334,7 +334,7 @@ static RuntimeError _count(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _cov(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
@@ -356,37 +356,37 @@ static RuntimeError _cov(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _erf(VectorArray * result)
+static RuntimeErrorCode _erf(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = erff(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _exp(VectorArray * result)
+static RuntimeErrorCode _exp(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = expf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _factorial(VectorArray * result)
+static RuntimeErrorCode _factorial(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = tgammaf(result->xyzw[d][i] + 1.0); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _floor(VectorArray * result)
+static RuntimeErrorCode _floor(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = floorf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _gamma(VectorArray * result)
+static RuntimeErrorCode _gamma(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = tgammaf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _join(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _join(list(VectorArray) args, VectorArray * result)
 {
 	result->dimensions = 0;
 	result->length = 0;
@@ -408,13 +408,13 @@ static RuntimeError _join(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _ln(VectorArray * result)
+static RuntimeErrorCode _ln(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = logf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _log(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _log(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions && args[0].dimensions != 1 && args[1].dimensions != 1) { return RuntimeErrorInvalidArgumentType; }
@@ -441,19 +441,19 @@ static RuntimeError _log(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _log10(VectorArray * result)
+static RuntimeErrorCode _log10(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = log10f(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _log2(VectorArray * result)
+static RuntimeErrorCode _log2(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = log2f(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _max(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _max(list(VectorArray) args, VectorArray * result)
 {
 	scalar_t max = args[0].xyzw[0][0];
 	for (int32_t i = 0; i < ListLength(args); i++)
@@ -468,7 +468,7 @@ static RuntimeError _max(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _mean(VectorArray * result)
+static RuntimeErrorCode _mean(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -482,7 +482,7 @@ static RuntimeError _mean(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _median(VectorArray * result)
+static RuntimeErrorCode _median(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -496,7 +496,7 @@ static RuntimeError _median(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _min(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _min(list(VectorArray) args, VectorArray * result)
 {
 	scalar_t min = args[0].xyzw[0][0];
 	for (int32_t i = 0; i < ListLength(args); i++)
@@ -511,7 +511,7 @@ static RuntimeError _min(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _prod(VectorArray * result)
+static RuntimeErrorCode _prod(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -525,7 +525,7 @@ static RuntimeError _prod(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _quantile(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
@@ -546,7 +546,7 @@ static RuntimeError _quantile(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _rand(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _rand(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) == 0)
 	{
@@ -574,13 +574,13 @@ static RuntimeError _rand(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorIncorrectParameterCount;
 }
 
-static RuntimeError _round(VectorArray * result)
+static RuntimeErrorCode _round(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = roundf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _shuffle(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _shuffle(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) == 1 || ListLength(args) == 2)
 	{
@@ -609,13 +609,13 @@ static RuntimeError _shuffle(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorIncorrectParameterCount;
 }
 
-static RuntimeError _sign(VectorArray * result)
+static RuntimeErrorCode _sign(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = (result->xyzw[d][i] > 0) - (result->xyzw[d][i] < 0); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _sort(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _sort(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) == 1)
 	{
@@ -649,13 +649,13 @@ static RuntimeError _sort(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorIncorrectParameterCount;
 }
 
-static RuntimeError _sqrt(VectorArray * result)
+static RuntimeErrorCode _sqrt(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = sqrtf(result->xyzw[d][i]); } }
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _stdev(VectorArray * result)
+static RuntimeErrorCode _stdev(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -672,7 +672,7 @@ static RuntimeError _stdev(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _sum(VectorArray * result)
+static RuntimeErrorCode _sum(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -686,7 +686,7 @@ static RuntimeError _sum(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _var(VectorArray * result)
+static RuntimeErrorCode _var(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -703,7 +703,7 @@ static RuntimeError _var(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _cross(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != 3 || args[1].dimensions != 3) { return RuntimeErrorInvalidArgumentType; }
@@ -726,7 +726,7 @@ static RuntimeError _cross(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _dist(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
@@ -752,7 +752,7 @@ static RuntimeError _dist(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _distsq(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
@@ -777,7 +777,7 @@ static RuntimeError _distsq(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _dot(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
@@ -798,7 +798,7 @@ static RuntimeError _dot(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _length(VectorArray * result)
+static RuntimeErrorCode _length(VectorArray * result)
 {
 	if (result->dimensions == 1) { return RuntimeErrorNone; }
 	for (int32_t i = 0; i < result->length; i++)
@@ -812,7 +812,7 @@ static RuntimeError _length(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _lengthsq(VectorArray * result)
+static RuntimeErrorCode _lengthsq(VectorArray * result)
 {
 	for (int32_t i = 0; i < result->length; i++)
 	{
@@ -824,7 +824,7 @@ static RuntimeError _lengthsq(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeError _normalize(VectorArray * result)
+static RuntimeErrorCode _normalize(VectorArray * result)
 {
 	if (result->dimensions == 1) { return RuntimeErrorNone; }
 	for (int32_t i = 0; i < result->length; i++)
@@ -855,7 +855,7 @@ bool IsFunctionSingleArgument(BuiltinFunction function)
 	return false;
 }
 
-RuntimeError EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result)
+RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result)
 {
 	switch (function)
 	{
@@ -945,7 +945,7 @@ BuiltinVariable DetermineBuiltinVariable(const char * identifier)
 	return BuiltinVariableNone;
 }
 
-RuntimeError EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result)
+RuntimeErrorCode EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result)
 {
 	result->length = 1;
 	result->dimensions = 1;
