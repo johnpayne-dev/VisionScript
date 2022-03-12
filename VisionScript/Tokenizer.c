@@ -121,7 +121,9 @@ static bool IsKeyword(String statement, int i, int * end)
 static bool IsNumber(String statement, int i, int * end)
 {
 	*end = i;
+	if (statement[i] == '-' || statement[i] == '+') { i++; (*end)++; }
 	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; } // check if first character isn't number or '.'
+	if (statement[i] == '.' && statement[i + 1] == '.') { return false; }
 	while (IsDigit(statement[*end]) || statement[*end] == '.')
 	{
 		(*end)++;

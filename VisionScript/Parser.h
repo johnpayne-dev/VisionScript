@@ -60,6 +60,7 @@ typedef enum SyntaxError
 	SyntaxErrorMissingExpression,
 	SyntaxErrorMissingBracket,
 	SyntaxErrorMissingOperator,
+	SyntaxErrorMissingOperon,
 	SyntaxErrorTooManyVectorElements,
 	SyntaxErrorInvalidCommaPlacement,
 	SyntaxErrorInvalidForPlacement,

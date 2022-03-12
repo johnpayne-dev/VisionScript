@@ -119,7 +119,7 @@ static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end)
 	return -1;
 }
 
-static SyntaxError FindOperator(list(Token) tokens, int32_t start, int32_t end, const char * operators[], int32_t operatorCount, bool unary, bool rightToLeft, int32_t * index)
+static SyntaxError FindOperator(list(Token) tokens, int32_t start, int32_t end, const char * operators[], int32_t operatorCount, bool rightToLeft, int32_t * index)
 {
 	*index = -1;
 	int32_t i = rightToLeft ? end : start;
@@ -138,13 +138,20 @@ static SyntaxError FindOperator(list(Token) tokens, int32_t start, int32_t end, 
 			bool found = false;
 			for (int32_t j = 0; j < operatorCount; j++)
 			{
-				if (StringEquals(tokens[i].value, operators[j]))
+				const char * operator = operators[j];
+				if (operator[0] == 'B')
 				{
-					if (unary && i != start && tokens[i - 1].type != TokenTypeOperator) { continue; }
-					if (!unary && (i == start || tokens[i - 1].type == TokenTypeOperator)) { continue; }
-					found = true;
-					break;
+					if (operator[1] == 'L' && (i == start || tokens[i - 1].type == TokenTypeOperator)) { continue; }
+					if (operator[1] == 'R' && (i == end || tokens[i + 1].type == TokenTypeOperator)) { continue; }
+					operator += 2;
 				}
+				else if (operator[0] == 'U')
+				{
+					if (operator[1] == 'L' && i != start) { continue; }
+					if (operator[1] == 'R' && i != end) { continue; }
+					operator += 2;
+				}
+				if (StringEquals(tokens[i].value, operator)) { found = true; break; }
 			}
 			if (found) { *index = i; break; }
 		}
@@ -174,6 +181,7 @@ static SyntaxError FindFunctionCall(list(Token) tokens, int32_t start, int32_t e
 
 static OperonType DetermineOperonType(list(Token) tokens, int32_t start, int32_t end)
 {
+	if (start > end) { return OperonTypeNone; }
 	if (tokens[start].value[0] == '(' && FindCorrespondingBracket(tokens, start, end, start) == end && FindComma(tokens, start + 1, end - 1) >= 0) { return OperonTypeVectorLiteral; }
 	if (tokens[start].value[0] == '[' && FindCorrespondingBracket(tokens, start, end, start) == end) { return OperonTypeArrayLiteral; }
 	if (start == end && tokens[start].type == TokenTypeIdentifier) { return OperonTypeIdentifier; }
@@ -225,12 +233,12 @@ static Operator OperatorType(String string, int32_t precedence)
 	if (StringEquals(string, "...")) { return OperatorEllipsis; }
 	if (StringEquals(string, "+"))
 	{
-		if (precedence == 6) { return OperatorAdd; }
+		if (precedence == 5) { return OperatorAdd; }
 		else { return OperatorPositive; }
 	}
 	if (StringEquals(string, "-"))
 	{
-		if (precedence == 6) { return OperatorSubtract; }
+		if (precedence == 5) { return OperatorSubtract; }
 		else { return OperatorNegative; }
 	}
 	if (StringEquals(string, "*")) { return OperatorMultiply; }
@@ -298,17 +306,16 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 	
 	SyntaxError error = SyntaxErrorNone;
 	int32_t opIndex = -1;
-	int32_t precedence = 7;
+	int32_t precedence = 6;
 	while (precedence > 0)
 	{
 		switch (precedence)
 		{
-			case 7: error = FindOperator(tokens, start, end, (const char *[]){ "for", "..." }, 2, false, true, &opIndex); break;    // binary, right to left
-			case 6: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, false, false, &opIndex); break;       // binary, left to right
-			case 5: error = FindOperator(tokens, start, end, (const char *[]){ "*", "/", "%" }, 3, false, false, &opIndex); break;  // binary, left to right
-			case 4: error = FindOperator(tokens, start, end, (const char *[]){ "+", "-" }, 2, true, false, &opIndex); break;        // unary,  left to right
-			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "^" }, 1, false, false, &opIndex); break;            // binary, left to right
-			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, false, true, &opIndex); break;             // binary, right to left
+			case 6: error = FindOperator(tokens, start, end, (const char *[]){ "for", "..." }, 2, true, &opIndex); break;
+			case 5: error = FindOperator(tokens, start, end, (const char *[]){ "BL+", "BL-" }, 2, true, &opIndex); break;
+			case 4: error = FindOperator(tokens, start, end, (const char *[]){ "*", "/", "%" }, 3, true, &opIndex); break;
+			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "^", "UL+", "UL-" }, 3, false, &opIndex); break;
+			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, true, &opIndex); break;
 			case 1: error = FindFunctionCall(tokens, start, end, &opIndex); break;
 			default: break;
 		}
@@ -336,6 +343,7 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 	else if (IsUnaryOperator(operator))
 	{
 		OperonType operonType = DetermineOperonType(tokens, opIndex + 1, end);
+		if (operonType == OperonTypeNone) { return SyntaxErrorMissingOperon; }
 		Operon operon = { 0 };
 		error = ReadOperon(tokens, opIndex + 1, end, operonType, &operon);
 		(*expression)->operator = operator;
@@ -347,6 +355,7 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 		if (operator == OperatorFunctionCall) { end--; }
 		OperonType leftOperonType = DetermineOperonType(tokens, start, opIndex - 1);
 		OperonType rightOperonType = operator == OperatorFunctionCall ? OperonTypeArguments : DetermineOperonType(tokens, opIndex + 1, end);
+		if (leftOperonType == OperonTypeNone || rightOperonType == OperonTypeNone) { return SyntaxErrorMissingOperon; }
 		Operon leftOperon = { 0 }, rightOperon = { 0 };
 		
 		error = ReadOperon(tokens, start, opIndex - 1, leftOperonType, &leftOperon);

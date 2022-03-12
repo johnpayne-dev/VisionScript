@@ -392,6 +392,7 @@ RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Paramet
 		free(lower.xyzw[0]);
 	}
 	else if (expression->operator == OperatorNegative) { EvaluateNegate(result); }
+	else if (expression->operator == OperatorPositive) {}
 	else
 	{
 		if (result->dimensions != value.dimensions && result->dimensions != 1 && value.dimensions != 1) { return RuntimeErrorDifferingLengthVectors; }
