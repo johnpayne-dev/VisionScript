@@ -37,6 +37,6 @@ typedef struct Parameter
 	VectorArray value;
 } Parameter;
 
-RuntimeError EvaluateExpression(HashMap identifiers, list(Parameter) parameters, Expression * expression, VectorArray * result);
+RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result);
 
 #endif
