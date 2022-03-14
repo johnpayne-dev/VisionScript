@@ -6,6 +6,8 @@
 #include "Utilities/HashMap.h"
 #include "Parser.h"
 
+#define MAX_ARRAY_LENGTH (1 << 24)
+
 typedef enum RuntimeErrorCode
 {
 	RuntimeErrorNone,
@@ -13,6 +15,8 @@ typedef enum RuntimeErrorCode
 	RuntimeErrorVectorInsideVector,
 	RuntimeErrorNonUniformArray,
 	RuntimeErrorArrayInsideArray,
+	RuntimeErrorArrayTooLarge,
+	RuntimeErrorInvalidArrayRange,
 	RuntimeErrorIdentifierNotVariable,
 	RuntimeErrorIdentifierNotFunction,
 	RuntimeErrorIncorrectParameterCount,

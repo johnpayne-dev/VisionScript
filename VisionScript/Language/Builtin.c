@@ -416,6 +416,10 @@ static RuntimeErrorCode _join(list(VectorArray) args, VectorArray * result)
 		if (args[i].dimensions != result->dimensions) { return RuntimeErrorInvalidArgumentType; }
 		result->length += args[i].length;
 	}
+	
+	// return error if array too large
+	if (result->length > MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
+	
 	// copy the contents of each argument into a single array
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{

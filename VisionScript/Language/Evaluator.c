@@ -153,6 +153,9 @@ static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Para
 			result->length += elements[i].length;
 		}
 		
+		// return error if array too large
+		if (result->length > MAX_ARRAY_LENGTH) { return (RuntimeError){ RuntimeErrorArrayTooLarge, operonStart, operonEnd }; }
+		
 		// copy each contents of elements into the final array
 		for (int32_t i = 0; i < result->dimensions; i++)
 		{
@@ -175,16 +178,20 @@ static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Para
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
-static void EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
+static RuntimeErrorCode EvaluateEllipsis(VectorArray * a, VectorArray * b, VectorArray * result)
 {
 	int32_t lower = roundf(a->xyzw[0][0]);
 	int32_t upper = roundf(b->xyzw[0][0]);
-	// if range of ellipsis is too large, return an error
-	if (upper - lower > (1 << 24) || upper - lower < 0) { *result = (VectorArray){ 0 }; return; }
+	
+	// if range of ellipsis is out of range, return an error
+	if (upper - lower > MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
+	if (upper - lower < 0) { return RuntimeErrorInvalidArrayRange; }
+	
 	result->length = upper - lower + 1;
 	result->dimensions = 1;
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = i + lower; }
+	return RuntimeErrorNone;
 }
 
 static inline scalar_t Operation(Operator operator, scalar_t a, scalar_t b)
@@ -376,6 +383,9 @@ static RuntimeError EvaluateFor(HashMap identifiers, HashMap cache, list(Paramet
 		result->length += values[i].length; // increment final array length
 	}
 	
+	// return error if array too large
+	if (result->length > MAX_ARRAY_LENGTH) { return (RuntimeError){ RuntimeErrorArrayTooLarge, expression->operonStart[1], expression->operonEnd[1] }; }
+	
 	// copy each of the values into the final array
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
@@ -452,8 +462,11 @@ static RuntimeError EvaluateIndex(HashMap identifiers, HashMap cache, list(Param
 	if (error.code != RuntimeErrorNone) { return error; }
 	error = EvaluateOperon(identifiers, cache, parameters, expression, 1, &index);
 	if (error.code != RuntimeErrorNone) { return error; }
+	
 	// return error if indexing with a vector
 	if (index.dimensions > 1) { return (RuntimeError){ RuntimeErrorIndexingWithVector, expression->operonStart[1], expression->operonEnd[1] }; }
+	// return error if length of new array is too large
+	if (index.length > MAX_ARRAY_LENGTH) { return (RuntimeError){ RuntimeErrorArrayTooLarge, expression->operonStart[1], expression->operonEnd[1] }; }
 	
 	// go through each indexing element and copy its corresponding indexed element to the final result
 	result->dimensions = value.dimensions;
@@ -504,8 +517,9 @@ RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Paramet
 		if (result->dimensions > 1 || result->length > 1) { return (RuntimeError){ RuntimeErrorInvalidEllipsisOperon, expression->operonStart[0], expression->operonEnd[0] }; }
 		if (value.dimensions > 1 || value.length > 1) { return (RuntimeError){ RuntimeErrorInvalidEllipsisOperon, expression->operonStart[1], expression->operonEnd[1] }; }
 		VectorArray lower = *result;
-		EvaluateEllipsis(&lower, &value, result);
+		RuntimeErrorCode error = EvaluateEllipsis(&lower, &value, result);
 		free(lower.xyzw[0]);
+		if (error != RuntimeErrorNone) { return (RuntimeError){ error, expression->operonStart[0], expression->operonEnd[1] }; }
 	}
 	else if (expression->operator == OperatorNegative) { EvaluateNegate(result); }
 	else if (expression->operator == OperatorPositive) {}
