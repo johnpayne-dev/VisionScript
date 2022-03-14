@@ -39,6 +39,8 @@ typedef struct VectorArray
 	uint32_t length;
 } VectorArray;
 
+void VectorArrayPrint(VectorArray value);
+
 typedef struct Parameter
 {
 	String identifier;

@@ -1,8 +1,33 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "Evaluator.h"
 #include "Builtin.h"
+
+void VectorArrayPrint(VectorArray value)
+{
+	if (value.length > 1) { printf("["); }
+	for (int32_t i = 0; i < value.length; i++)
+	{
+		if (value.dimensions > 1) { printf("("); }
+		for (int32_t j = 0; j < value.dimensions; j++)
+		{
+			if (value.xyzw[j][i] - (int32_t)value.xyzw[j][i] == 0) { printf("%i", (int32_t)value.xyzw[j][i]); }
+			else { printf("%f", value.xyzw[j][i]); }
+			if (j != value.dimensions - 1) { printf(","); }
+		}
+		if (value.dimensions > 1) { printf(")"); }
+		if (i != value.length - 1) { printf(", "); }
+		if (i == 9 && value.length > 100)
+		{
+			printf("..., ");
+			i = value.length - 5;
+		}
+	}
+	if (value.length > 1) { printf("]"); }
+	printf("\n");
+}
 
 static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, int32_t operonIndex, VectorArray * result)
 {

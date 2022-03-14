@@ -18,7 +18,7 @@ Script * LoadScript(const char * code)
 	for (int32_t i = 0; i < ListLength(script->tokenLines); i++)
 	{
 		Statement * statement = ParseTokenLine(script->tokenLines[i]);
-		if (statement->error != SyntaxErrorNone || statement->type == StatementTypeUnknown)
+		if (statement->error.code != SyntaxErrorNone || statement->type == StatementTypeUnknown)
 		{
 			ListPush((void **)&script->errorList, &statement);
 			continue;
