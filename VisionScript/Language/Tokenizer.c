@@ -3,6 +3,7 @@
 
 static list(String) SplitCodeIntoStatements(String code)
 {
+	code = StringCreate(code); // create a copy of the original code
 	list(String) statements = ListCreate(sizeof(String), 16);
 	int lastStatementStart = 0;
 	for (int i = 0; i < StringLength(code); i++)
@@ -21,6 +22,7 @@ static list(String) SplitCodeIntoStatements(String code)
 			lastStatementStart = i + 1;
 		}
 	}
+	StringFree(code);
 	return statements;
 }
 
@@ -39,7 +41,7 @@ static bool IsWhitespace(char c)
 	return c == ' ' || c == '\t';
 }
 
-static bool IsIdentifier(String statement, int i, int * end)
+static bool IsIdentifier(String statement, int32_t i, int32_t * end)
 {
 	*end = i;
 	if (!IsLetter(statement[i]) && statement[i] != '_') { return false; } // if first character isn't letter or underscore
@@ -48,28 +50,26 @@ static bool IsIdentifier(String statement, int i, int * end)
 	return true;
 }
 
-static const char brackets[] = { '(', ')', '[', ']' };
-// '{', '}'
+static const char brackets[] = { '(', ')', '[', ']' }; // Future possible brackets: '{', '}'
 
-static bool IsBracket(String statement, int i, int * end)
+static bool IsBracket(String statement, int32_t i, int32_t * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(brackets); j++)
+	for (int32_t j = 0; j < sizeof(brackets) / sizeof(brackets[0]); j++)
 	{
 		if (statement[i] == brackets[j]) { return true; }
 	}
 	return false;
 }
 
-static const char * operators[] = { "+", "-", "*", "/", "%", "^", "for", "...", "." };
-// "==", "~=", "<=", ">=", "<", ">"
+static const char * operators[] = { "+", "-", "*", "/", "%", "^", "for", "...", "." }; // Future possible operators: "==", "~=", "<=", ">=", "<", ">"
 
-static bool IsOperator(String statement, int i, int * end)
+static bool IsOperator(String statement, int32_t i, int32_t * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(operators) / sizeof(operators[0]); j++)
+	for (int32_t j = 0; j < sizeof(operators) / sizeof(operators[0]); j++)
 	{
-		int k = 0;
+		int32_t k = 0;
 		bool match = true;
 		for (k = 0; operators[j][k] != '\0'; k++) // compares each character of the operator with the statement
 		{
@@ -86,10 +86,10 @@ static bool IsOperator(String statement, int i, int * end)
 
 static const char symbols[] = { ',', '=' };
 
-static bool IsSymbol(String statement, int i, int * end)
+static bool IsSymbol(String statement, int32_t i, int32_t * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(symbols); j++)
+	for (int32_t j = 0; j < sizeof(symbols) / sizeof(symbols[0]); j++)
 	{
 		if (statement[i] == symbols[j]) { return true; }
 	}
@@ -98,12 +98,12 @@ static bool IsSymbol(String statement, int i, int * end)
 
 static const char * keywords[] = { "point", "parametric", "polygon" };
 
-static bool IsKeyword(String statement, int i, int * end)
+static bool IsKeyword(String statement, int32_t i, int32_t * end)
 {
 	*end = i;
-	for (int j = 0; j < sizeof(keywords) / sizeof(keywords[0]); j++)
+	for (int32_t j = 0; j < sizeof(keywords) / sizeof(keywords[0]); j++)
 	{
-		int k = 0;
+		int32_t k = 0;
 		bool match = true;
 		for (k = 0; keywords[j][k] != '\0'; k++) // compares each character of the keyword with the statement
 		{
@@ -118,11 +118,11 @@ static bool IsKeyword(String statement, int i, int * end)
 	return false;
 }
 
-static bool IsNumber(String statement, int i, int * end)
+static bool IsNumber(String statement, int32_t i, int32_t * end)
 {
 	*end = i;
-	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; } // check if first character isn't number or '.'
-	if (statement[i] == '.' && statement[i + 1] == '.') { return false; }
+	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; }  // check if first character isn't number or '.'
+	if (statement[i] == '.' && statement[i + 1] == '.') { return false; } // and make sure the second char isn't also a '.'
 	while (IsDigit(statement[*end]) || statement[*end] == '.')
 	{
 		(*end)++;
@@ -159,11 +159,20 @@ list(list(Token)) TokenizeCode(String code)
 	list(list(Token)) tokenLines = ListCreate(sizeof(list(Token)), 16);
 	
 	list(String) statements = SplitCodeIntoStatements(code);
-	for (int i = 0; i < ListLength(statements); i++)
+	for (int32_t i = 0; i < ListLength(statements); i++)
 	{
 		list(Token) tokenLine = TokenizeLine(statements[i]);
 		ListPush((void **)&tokenLines, &tokenLine);
 	}
-	ListDestroy(statements);
+	ListFree(statements);
 	return tokenLines;
+}
+
+void FreeTokens(list(Token) tokens)
+{
+	for (int32_t i = 0; i < ListLength(tokens); i++)
+	{
+		if (tokens[i].value != NULL) { StringFree(tokens[i].value); }
+	}
+	ListFree(tokens);
 }

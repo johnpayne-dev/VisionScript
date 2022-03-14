@@ -20,7 +20,7 @@ int main(int argc, const char * argv[])
 		"parametric (B - A)*t + A\n";
 	
 	Script * script = LoadScript(code);
-	DestroyScript(script);
+	FreeScript(script);
 	
 	return 0;
 }

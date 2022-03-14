@@ -24,4 +24,6 @@ typedef struct Token
 list(Token) TokenizeLine(String line);
 list(list(Token)) TokenizeCode(String code);
 
+void FreeTokens(list(Token) token);
+
 #endif

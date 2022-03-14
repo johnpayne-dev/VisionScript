@@ -26,6 +26,6 @@ void StringRemove(String * string, int32_t indexStart, int32_t indexEnd);
 
 bool StringEquals(String string, const char * chars);
 
-void StringDestroy(String string);
+void StringFree(String string);
 
 #endif

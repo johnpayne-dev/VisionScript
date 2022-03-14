@@ -30,17 +30,19 @@ typedef enum OperonType
 	OperonTypeForAssignment
 } OperonType;
 
+typedef struct ForAssignment
+{
+	String identifier;
+	struct Expression * expression;
+} ForAssignment;
+
 typedef union Operon
 {
 	struct Expression * expression;
 	list(struct Expression *) expressions;
 	String identifier;
 	scalar_t constant;
-	struct ForAssignment
-	{
-		String identifier;
-		struct Expression * expression;
-	} forAssignment;
+	ForAssignment assignment;
 } Operon;
 
 typedef struct Expression
@@ -114,7 +116,6 @@ typedef struct Statement
 } Statement;
 
 Statement * ParseTokenLine(list(Token) tokens);
-SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression ** expression);
-void DestroyStatement(Statement * statement);
+void FreeStatement(Statement * statement);
 
 #endif

@@ -17,6 +17,6 @@ typedef struct Script
 
 Script * LoadScript(const char * code);
 
-void DestroyScript(Script * script);
+void FreeScript(Script * script);
 
 #endif

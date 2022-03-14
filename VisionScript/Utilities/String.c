@@ -47,7 +47,7 @@ int32_t StringIndexOf(String string, char chr)
 
 void StringSet(String * string, const char * chars)
 {
-	StringDestroy(*string);
+	StringFree(*string);
 	*string = StringCreate(chars);
 }
 
@@ -77,7 +77,7 @@ bool StringEquals(String string, const char * chars)
 	return strcmp(string, chars) == 0;
 }
 
-void StringDestroy(String string)
+void StringFree(String string)
 {
 	free(string);
 }

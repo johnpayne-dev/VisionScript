@@ -58,7 +58,7 @@ void * HashMapGet(HashMap map, const char * key)
 	}
 }
 
-void HashMapDestroy(HashMap map)
+void HashMapFree(HashMap map)
 {
 	free(map.entries);
 }

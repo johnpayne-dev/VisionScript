@@ -76,11 +76,13 @@ static BuiltinFunction singleArgumentBuiltins[] =
 
 static int compare(const void * a, const void * b)
 {
+	// used for list sorting
 	return (*(scalar_t *)a - *(scalar_t *)b > 0) - (*(scalar_t *)a - *(scalar_t *)b < 0);
 }
 
 static int coupled_compare(const void * a, const void * b)
 {
+	// used for list sorting relative to another list
 	struct { int32_t i; scalar_t s; } * x = (void *)a;
 	struct { int32_t i; scalar_t s; } * y = (void *)b;
 	return (x->s - y->s > 0) - (x->s - y->s < 0);
@@ -124,9 +126,11 @@ static RuntimeErrorCode _atan(VectorArray * result)
 
 static RuntimeErrorCode _atan2(list(VectorArray) args, VectorArray * result)
 {
+	// atan2 takes two non-vector arguments
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions > 1 || args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 	
+	// length 1 argument will be extended to length of other argument, otherwise use the min of the two lengths
 	VectorArray y = args[0];
 	VectorArray x = args[1];
 	result->length = y.length < x.length ? y.length : x.length;
@@ -257,6 +261,7 @@ static RuntimeErrorCode _abs(VectorArray * result)
 
 static RuntimeErrorCode _argmax(VectorArray * result)
 {
+	// argmax takes 1 non-vector argument
 	if (result->dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 	scalar_t max = result->xyzw[0][0];
 	int32_t index = 0;
@@ -273,6 +278,7 @@ static RuntimeErrorCode _argmax(VectorArray * result)
 
 static RuntimeErrorCode _argmin(VectorArray * result)
 {
+	// argmin takes 1 non-vector argument
 	if (result->dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 	scalar_t min = result->xyzw[0][0];
 	int32_t index = 0;
@@ -301,18 +307,25 @@ static RuntimeErrorCode _ceil(VectorArray * result)
 
 static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result)
 {
+	// corr takes two arguments of same dimensionality
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	
 	VectorArray a = args[0], b = args[1];
 	int32_t length = a.length < b.length ? a.length : b.length;
 	for (int8_t d = 0; d < a.dimensions; d++)
 	{
+		// calculate the means for both
 		scalar_t avgA = 0.0, avgB = 0.0;
 		for (int32_t i = 0; i < length; i++) { avgA += a.xyzw[d][i]; avgB += b.xyzw[d][i]; }
 		avgA /= length;
 		avgB /= length;
+		
+		// calculate the variance for both
 		scalar_t varA = 0.0, varB = 0.0;
 		for (int32_t i = 0; i < length; i++) { varA += (a.xyzw[d][i] - avgA) * (a.xyzw[d][i] - avgA); varB += (b.xyzw[d][i] - avgB) * (b.xyzw[d][i] - avgB); }
+		
+		// calculate final normalized sum
 		scalar_t sum = 0.0;
 		for (int32_t i = 0; i < length; i++) { sum += (a.xyzw[d][i] - avgA) * (b.xyzw[d][i] - avgB); }
 		result->xyzw[d] = malloc(sizeof(scalar_t));
@@ -336,16 +349,21 @@ static RuntimeErrorCode _count(VectorArray * result)
 
 static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result)
 {
+	// cov takes two arguments of same dimensionality
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	
 	VectorArray a = args[0], b = args[1];
 	int32_t length = a.length < b.length ? a.length : b.length;
 	for (int8_t d = 0; d < a.dimensions; d++)
 	{
+		// calculate means
 		scalar_t avgA = 0.0, avgB = 0.0;
 		for (int32_t i = 0; i < length; i++) { avgA += a.xyzw[d][i]; avgB += b.xyzw[d][i]; }
 		avgA /= length;
 		avgB /= length;
+		
+		// then calculate the covariance
 		scalar_t sum = 0.0;
 		for (int32_t i = 0; i < length; i++) { sum += (a.xyzw[d][i] - avgA) * (b.xyzw[d][i] - avgB); }
 		result->xyzw[d] = malloc(sizeof(scalar_t));
@@ -388,14 +406,17 @@ static RuntimeErrorCode _gamma(VectorArray * result)
 
 static RuntimeErrorCode _join(list(VectorArray) args, VectorArray * result)
 {
+	// takes n arguments of same dimensionality
 	result->dimensions = 0;
 	result->length = 0;
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
+		// first argument determines dimensionality of whole array
 		if (result->dimensions == 0) { result->dimensions = args[i].dimensions; }
 		if (args[i].dimensions != result->dimensions) { return RuntimeErrorInvalidArgumentType; }
 		result->length += args[i].length;
 	}
+	// copy the contents of each argument into a single array
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
 		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
@@ -416,9 +437,11 @@ static RuntimeErrorCode _ln(VectorArray * result)
 
 static RuntimeErrorCode _log(list(VectorArray) args, VectorArray * result)
 {
+	// takes two arguments of same vector, (with exception to dimension 1)
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions && args[0].dimensions != 1 && args[1].dimensions != 1) { return RuntimeErrorInvalidArgumentType; }
 	
+	// determine which arguments are scalars
 	VectorArray b = args[0];
 	VectorArray a = args[1];
 	result->dimensions = a.dimensions > b.dimensions ? a.dimensions : b.dimensions;
@@ -429,6 +452,7 @@ static RuntimeErrorCode _log(list(VectorArray) args, VectorArray * result)
 	if (a.dimensions == 1 && b.dimensions > 1) { ad = true; }
 	if (b.dimensions == 1 && a.dimensions > 1) { bd = true; }
 	
+	// calculate the log
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
 		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
@@ -455,6 +479,7 @@ static RuntimeErrorCode _log2(VectorArray * result)
 
 static RuntimeErrorCode _max(list(VectorArray) args, VectorArray * result)
 {
+	// takes n arguments all of dimension 1
 	scalar_t max = args[0].xyzw[0][0];
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
@@ -486,6 +511,7 @@ static RuntimeErrorCode _median(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
+		// sorts the list then gets the element in the middle
 		qsort(result->xyzw[d], result->length, sizeof(scalar_t), compare);
 		scalar_t median = result->length % 2 == 1 ? result->xyzw[d][result->length / 2] : (result->xyzw[d][result->length / 2] + result->xyzw[d][result->length / 2 - 1]) / 2.0;
 		free(result->xyzw[d]);
@@ -498,6 +524,7 @@ static RuntimeErrorCode _median(VectorArray * result)
 
 static RuntimeErrorCode _min(list(VectorArray) args, VectorArray * result)
 {
+	// takes n arguments all of dimension 1
 	scalar_t min = args[0].xyzw[0][0];
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
@@ -527,12 +554,16 @@ static RuntimeErrorCode _prod(VectorArray * result)
 
 static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result)
 {
+	// takes two arguments, second argument must not be a vector
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	
+	
 	result->length = args[1].length;
 	result->dimensions = args[0].dimensions;
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
+		// sort list and get each element at each given quantile
 		qsort(args[0].xyzw[d], args[0].length, sizeof(scalar_t), compare);
 		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
 		for (int32_t i = 0; i < result->length; i++)
@@ -548,6 +579,7 @@ static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result)
 
 static RuntimeErrorCode _rand(list(VectorArray) args, VectorArray * result)
 {
+	// if there's no arguments passed return a value between 0-1
 	if (ListLength(args) == 0)
 	{
 		result->length = 1;
@@ -558,11 +590,13 @@ static RuntimeErrorCode _rand(list(VectorArray) args, VectorArray * result)
 	}
 	if (ListLength(args) == 1 || ListLength(args) == 2)
 	{
+		// if there's two arguments use the second argument to set the seed
 		if (ListLength(args) == 2)
 		{
 			if (args[1].dimensions > 1 || args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
 			srand(args[1].xyzw[0][0]);
 		}
+		// the first argument is how many random numbers to generate
 		if (args[0].dimensions > 1 || args[0].length > 1) { return RuntimeErrorInvalidArgumentType; }
 		result->length = args[0].xyzw[0][0];
 		result->dimensions = 1;
@@ -584,12 +618,14 @@ static RuntimeErrorCode _shuffle(list(VectorArray) args, VectorArray * result)
 {
 	if (ListLength(args) == 1 || ListLength(args) == 2)
 	{
+		// if two arguments are passed use the second to set the seed
 		if (ListLength(args) == 2)
 		{
 			if (args[1].dimensions > 1 || args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
 			srand(args[1].xyzw[0][0]);
 		}
 		
+		// shuffle the array by swapping each element with another random element
 		result->length = args[0].length;
 		result->dimensions = args[0].dimensions;
 		result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
@@ -617,6 +653,7 @@ static RuntimeErrorCode _sign(VectorArray * result)
 
 static RuntimeErrorCode _sort(list(VectorArray) args, VectorArray * result)
 {
+	// if one argument is passed then sort in ascending order
 	if (ListLength(args) == 1)
 	{
 		result->length = args[0].length;
@@ -629,14 +666,18 @@ static RuntimeErrorCode _sort(list(VectorArray) args, VectorArray * result)
 		}
 		return RuntimeErrorNone;
 	}
+	// if two arguments are passed then sort relative the second list
 	if (ListLength(args) == 2)
 	{
 		if (args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 		int32_t length = args[0].length < args[1].length ? args[0].length : args[1].length;
+		
+		// each index of the first list is coupled with the corresponding element of the second list
 		struct { int32_t i; scalar_t s; } * coupled = malloc(length * (sizeof(int32_t) + sizeof(scalar_t)));
 		for (int32_t i = 0; i < length; i++) { coupled[i].i = i; coupled[i].s = args[1].xyzw[0][i]; }
 		qsort(coupled, length, sizeof(int32_t) + sizeof(scalar_t), coupled_compare);
 		
+		// rearrange the first list to be in the order of how the second list was sorted
 		result->length = length;
 		result->dimensions = args[0].dimensions;
 		for (int8_t d = 0; d < result->dimensions; d++)
@@ -659,9 +700,12 @@ static RuntimeErrorCode _stdev(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
+		// calculate the mean
 		scalar_t avg = 0.0;
 		for (int32_t i = 0; i < result->length; i++) { avg += result->xyzw[d][i]; }
 		avg /= result->length;
+		
+		// sum the deviations
 		scalar_t sum = 0.0;
 		for (int32_t i = 0; i < result->length; i++) { sum += (result->xyzw[d][i] - avg) * (result->xyzw[d][i] - avg); }
 		free(result->xyzw[d]);
@@ -690,9 +734,12 @@ static RuntimeErrorCode _var(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
+		// calculate the mean
 		scalar_t avg = 0.0;
 		for (int32_t i = 0; i < result->length; i++) { avg += result->xyzw[d][i]; }
 		avg /= result->length;
+		
+		// sum the variances
 		scalar_t sum = 0.0;
 		for (int32_t i = 0; i < result->length; i++) { sum += (result->xyzw[d][i] - avg) * (result->xyzw[d][i] - avg); }
 		free(result->xyzw[d]);
@@ -705,19 +752,23 @@ static RuntimeErrorCode _var(VectorArray * result)
 
 static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result)
 {
+	// cross product works on two 3d vectors
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != 3 || args[1].dimensions != 3) { return RuntimeErrorInvalidArgumentType; }
 	
+	// min length of the two unless length 1
 	result->dimensions = 3;
 	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
 	bool ai = false, bi = false;
 	if (args[0].length == 1 && args[1].length > 1) { result->length = args[1].length; ai = true; }
 	if (args[1].length == 1 && args[0].length > 1) { result->length = args[0].length; bi = true; }
+	
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
 		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
 		for (int32_t i = 0; i < result->length; i++)
 		{
+			// multiply corresponding to each component
 			if (d == 0) { result->xyzw[0][i] = args[0].xyzw[1][ai ? 0 : i] * args[1].xyzw[2][bi ? 0 : i] - args[0].xyzw[2][ai ? 0 : i] * args[1].xyzw[1][bi ? 0 : i]; }
 			if (d == 1) { result->xyzw[1][i] = args[0].xyzw[2][ai ? 0 : i] * args[1].xyzw[0][bi ? 0 : i] - args[0].xyzw[0][ai ? 0 : i] * args[1].xyzw[2][bi ? 0 : i]; }
 			if (d == 2) { result->xyzw[2][i] = args[0].xyzw[0][ai ? 0 : i] * args[1].xyzw[1][bi ? 0 : i] - args[0].xyzw[1][ai ? 0 : i] * args[1].xyzw[0][bi ? 0 : i]; }
@@ -728,15 +779,18 @@ static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result)
 
 static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result)
 {
+	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
 	
+	// min length of the two unless length 1
 	result->dimensions = 1;
 	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
 	bool ai = false, bi = false;
 	if (args[0].length == 1 && args[1].length > 1) { result->length = args[1].length; ai = true; }
 	if (args[1].length == 1 && args[0].length > 1) { result->length = args[0].length; bi = true; }
 	
+	// find distance between each vector
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++)
 	{
@@ -754,9 +808,11 @@ static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result)
 
 static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result)
 {
+	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
 	
+	// min length of the two unless length 1
 	result->dimensions = 1;
 	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
 	bool ai = false, bi = false;
@@ -779,9 +835,11 @@ static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result)
 
 static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result)
 {
+	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
 	
+	// min length of the two unless length 1
 	result->dimensions = 1;
 	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
 	bool ai = false, bi = false;
@@ -800,7 +858,8 @@ static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result)
 
 static RuntimeErrorCode _length(VectorArray * result)
 {
-	if (result->dimensions == 1) { return RuntimeErrorNone; }
+	// takes a single vector argument
+	if (result->dimensions == 1) { return RuntimeErrorNone; } // if it's 1 dimension then return itself
 	for (int32_t i = 0; i < result->length; i++)
 	{
 		result->xyzw[0][i] = result->xyzw[0][i] * result->xyzw[0][i];
@@ -814,6 +873,7 @@ static RuntimeErrorCode _length(VectorArray * result)
 
 static RuntimeErrorCode _lengthsq(VectorArray * result)
 {
+	// takes a single vector argument
 	for (int32_t i = 0; i < result->length; i++)
 	{
 		result->xyzw[0][i] = result->xyzw[0][i] * result->xyzw[0][i];
@@ -826,7 +886,8 @@ static RuntimeErrorCode _lengthsq(VectorArray * result)
 
 static RuntimeErrorCode _normalize(VectorArray * result)
 {
-	if (result->dimensions == 1) { return RuntimeErrorNone; }
+	// takes a single vector argument
+	if (result->dimensions == 1) { return RuntimeErrorNone; } // if it's 1 dimension then return itself
 	for (int32_t i = 0; i < result->length; i++)
 	{
 		scalar_t len = 0.0;

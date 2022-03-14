@@ -97,7 +97,7 @@ bool ListContains(list(void) list, void * value)
 void ListClear(list(void) * list)
 {
 	list(void) newList = ListCreate(ListElementSize(*list), ListCapacity(*list));
-	ListDestroy(*list);
+	ListFree(*list);
 	*list = newList;
 }
 
@@ -109,7 +109,7 @@ list(void) ListClone(list(void) list)
 	return clone + 1;
 }
 
-void ListDestroy(list(void) list)
+void ListFree(list(void) list)
 {
 	free((struct ListData *)list - 1);
 }

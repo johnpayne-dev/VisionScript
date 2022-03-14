@@ -8,7 +8,7 @@ Script * LoadScript(const char * code)
 	
 	String codeStr = StringCreate(code);
 	script->tokenLines = TokenizeCode(codeStr);
-	StringDestroy(codeStr);
+	StringFree(codeStr);
 	
 	script->identifierList = ListCreate(sizeof(Statement *), 65536);
 	script->renderList = ListCreate(sizeof(Statement *), 1024);
@@ -41,13 +41,13 @@ Script * LoadScript(const char * code)
 	return script;
 }
 
-void DestroyScript(Script * script)
+void FreeScript(Script * script)
 {
-	for (int32_t i = 0; i < ListLength(script->errorList); i++) { DestroyStatement(script->errorList[i]); }
-	for (int32_t i = 0; i < ListLength(script->renderList); i++) { DestroyStatement(script->renderList[i]); }
-	for (int32_t i = 0; i < ListLength(script->identifierList); i++) { DestroyStatement(script->identifierList[i]); }
-	ListDestroy(script->errorList);
-	ListDestroy(script->renderList);
-	ListDestroy(script->identifierList);
-	HashMapDestroy(script->identifiers);
+	for (int32_t i = 0; i < ListLength(script->errorList); i++) { FreeStatement(script->errorList[i]); }
+	for (int32_t i = 0; i < ListLength(script->renderList); i++) { FreeStatement(script->renderList[i]); }
+	for (int32_t i = 0; i < ListLength(script->identifierList); i++) { FreeStatement(script->identifierList[i]); }
+	ListFree(script->errorList);
+	ListFree(script->renderList);
+	ListFree(script->identifierList);
+	HashMapFree(script->identifiers);
 }

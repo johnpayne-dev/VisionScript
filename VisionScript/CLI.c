@@ -53,6 +53,7 @@ void CLIRun(int32_t varLimit)
 			else
 			{
 				VectorArrayPrint(*result);
+				printf("\n");
 				for (int8_t d = 0; d < result->dimensions; d++) { free(result->xyzw[d]); }
 			}
 			

@@ -20,6 +20,6 @@ typedef struct HashMap
 HashMap HashMapCreate(uint32_t capacity);
 void HashMapSet(HashMap map, const char * key, void * value);
 void * HashMapGet(HashMap map, const char * key);
-void HashMapDestroy(HashMap map);
+void HashMapFree(HashMap map);
 
 #endif

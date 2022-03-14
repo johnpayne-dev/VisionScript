@@ -35,7 +35,7 @@ void ListClear(list(void) * list);
 
 list(void) ListClone(list(void) list);
 
-void ListDestroy(list(void) list);
+void ListFree(list(void) list);
 
 
 #endif
