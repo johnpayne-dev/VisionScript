@@ -45,7 +45,8 @@ typedef struct VectorArray
 	uint32_t length;
 } VectorArray;
 
-void VectorArrayPrint(VectorArray value);
+void PrintVectorArray(VectorArray value);
+void FreeVectorArray(VectorArray value);
 
 typedef struct Parameter
 {

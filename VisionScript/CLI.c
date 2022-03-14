@@ -72,14 +72,28 @@ void CLIRun(int32_t varLimit)
 			
 			if (statement->type == StatementTypeVariable)
 			{
-				// cache it if it's a variable
+				Statement * oldStatement = HashMapGet(identifiers, statement->declaration.variable.identifier);
+				VectorArray * oldValue = HashMapGet(cache, statement->declaration.variable.identifier);
+				
 				HashMapSet(identifiers, statement->declaration.variable.identifier, statement);
 				HashMapSet(cache, statement->declaration.variable.identifier, result);
+				
+				// free old statement and corresponding cache if it exists
+				if (oldStatement != NULL)
+				{
+					FreeTokens(oldStatement->tokens);
+					FreeStatement(oldStatement);
+				}
+				if (oldValue != NULL)
+				{
+					for (int8_t d = 0; d < oldValue->dimensions; d++) { free(oldValue->xyzw[d]); }
+					free(oldValue);
+				}
 			}
 			else
 			{
 				// otherwise print it and free result
-				VectorArrayPrint(*result);
+				PrintVectorArray(*result);
 				printf("\n");
 				for (int8_t d = 0; d < result->dimensions; d++) { free(result->xyzw[d]); }
 				FreeStatement(statement);
@@ -90,6 +104,16 @@ void CLIRun(int32_t varLimit)
 			if (timer / (float)CLOCKS_PER_SEC > 0.01) { printf("Done in %fs\n", timer / (float)CLOCKS_PER_SEC); }
 		}
 	
-		if (statement->type == StatementTypeFunction) { HashMapSet(identifiers, statement->declaration.function.identifier, statement); }
+		if (statement->type == StatementTypeFunction)
+		{
+			Statement * oldStatement = HashMapGet(identifiers, statement->declaration.function.identifier);
+			HashMapSet(identifiers, statement->declaration.function.identifier, statement);
+			// free old statement if it exists
+			if (oldStatement != NULL)
+			{
+				FreeTokens(oldStatement->tokens);
+				FreeStatement(oldStatement);
+			}
+		}
 	}
 }

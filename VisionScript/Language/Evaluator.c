@@ -29,7 +29,7 @@ const char * RuntimeErrorToString(RuntimeErrorCode code)
 	}
 }
 
-void VectorArrayPrint(VectorArray value)
+void PrintVectorArray(VectorArray value)
 {
 	if (value.length > 1) { printf("["); }
 	for (int32_t i = 0; i < value.length; i++)
@@ -53,6 +53,11 @@ void VectorArrayPrint(VectorArray value)
 		}
 	}
 	if (value.length > 1) { printf("]"); }
+}
+
+void FreeVectorArray(VectorArray value)
+{
+	for (int8_t d = 0; d < value.dimensions; d++) { free(value.xyzw[d]); }
 }
 
 static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, int32_t operonIndex, VectorArray * result)
@@ -166,19 +171,41 @@ static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Para
 		for (int32_t i = 0; i < ListLength(operon.expressions); i++)
 		{
 			RuntimeError error = EvaluateExpression(identifiers, cache, parameters, operon.expressions[i], elements + i);
-			if (error.code != RuntimeErrorNone) { return error; }
+			if (error.code != RuntimeErrorNone)
+			{
+				for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
+				free(elements);
+				return error;
+			}
+			
 			// dimension of array is defined to be dimension of the first element
 			if (result->dimensions == 0) { result->dimensions = elements[i].dimensions; }
 			// if an element's dimension isn't the same as the previous elements, return an error
-			if (elements[i].dimensions != result->dimensions) { return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd }; }
+			if (elements[i].dimensions != result->dimensions)
+			{
+				for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
+				free(elements);
+				return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd };
+			}
 			// if an element's length > 1 and it's not from ellipsis or for operator, then that means there's an array inside array so return error
-			if (elements[i].length > 1 && operon.expressions[i]->operator != OperatorFor && operon.expressions[i]->operator != OperatorEllipsis) { return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd }; }
+			if (elements[i].length > 1 && operon.expressions[i]->operator != OperatorFor && operon.expressions[i]->operator != OperatorEllipsis)
+			{
+				for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
+				free(elements);
+				return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd };
+			}
 			// increment total length by each element's length
 			result->length += elements[i].length;
+			continue;
 		}
 		
 		// return error if array too large
-		if (result->length > MAX_ARRAY_LENGTH) { return (RuntimeError){ RuntimeErrorArrayTooLarge, operonStart, operonEnd }; }
+		if (result->length > MAX_ARRAY_LENGTH)
+		{
+			for (int32_t i = 0; i < ListLength(operon.expressions); i++) { FreeVectorArray(elements[i]); }
+			free(elements);
+			return (RuntimeError){ RuntimeErrorArrayTooLarge, operonStart, operonEnd };
+		}
 		
 		// copy each contents of elements into the final array
 		for (int32_t i = 0; i < result->dimensions; i++)
@@ -316,7 +343,12 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 		{
 			Parameter parameter = { .identifier = statement->declaration.function.arguments[i] };
 			RuntimeError error = EvaluateExpression(identifiers, cache, parameters, expressions[i], &parameter.value);
-			if (error.code != RuntimeErrorNone) { return error; }
+			if (error.code != RuntimeErrorNone)
+			{
+				for (int32_t j = 0; j < i; j++) { FreeVectorArray(arguments[j].value); }
+				ListFree(arguments);
+				return error;
+			}
 			ListPush((void **)&arguments, &parameter);
 		}
 		// evaluate the function
@@ -324,7 +356,7 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 		if (error.statement == NULL) { error.statement = statement; } // set the correct statement for error reporting
 		
 		// free the arguments
-		for (int32_t i = 0; i < ListLength(arguments); i++) { for (int32_t d = 0; d < arguments[i].value.dimensions; d++) { free(arguments[i].value.xyzw[d]); } }
+		for (int32_t i = 0; i < ListLength(arguments); i++) { FreeVectorArray(arguments[i].value); }
 		ListFree(arguments);
 		return error;
 	}
@@ -348,12 +380,17 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 		{
 			ListPush((void **)&arguments, &(VectorArray){ 0 });
 			RuntimeError error = EvaluateExpression(identifiers, cache, parameters, expressions[i], &arguments[i]);
-			if (error.code != RuntimeErrorNone) { return error; }
+			if (error.code != RuntimeErrorNone)
+			{
+				for (int32_t j = 0; j < i; j++) { FreeVectorArray(arguments[j]); }
+				ListFree(arguments);
+				return error;
+			}
 		}
 		// evaluate the function
 		RuntimeErrorCode error = EvaluateBuiltinFunction(builtin, arguments, result);
 		// free the arguments
-		for (int32_t i = 0; i < ListLength(arguments); i++) { for (int8_t d = 0; d < arguments[i].dimensions; d++) { free(arguments[i].xyzw[d]); } }
+		for (int32_t i = 0; i < ListLength(arguments); i++) { FreeVectorArray(arguments[i]); }
 		ListFree(arguments);
 		return (RuntimeError){ error, identifierStart, argumentsEnd };
 	}
@@ -364,7 +401,6 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 
 static RuntimeError EvaluateFor(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result)
 {
-	OperonType operonType = expression->operonTypes[0];
 	Operon operon = expression->operons[0];
 	int32_t operonStart = expression->operonStart[0];
 	int32_t operonEnd = expression->operonEnd[0];
@@ -392,23 +428,47 @@ static RuntimeError EvaluateFor(HashMap identifiers, HashMap cache, list(Paramet
 		// change the parameter for each element in the assignment
 		for (int8_t d = 0; d < assignmentValue.dimensions; d++) { parameters[0].value.xyzw[d] = &assignmentValue.xyzw[d][i]; }
 		RuntimeError error = EvaluateOperon(identifiers, cache, parameters, expression, 0, &values[i]);
-		if (error.code != RuntimeErrorNone) { return error; }
+		if (error.code != RuntimeErrorNone)
+		{
+			FreeVectorArray(assignmentValue);
+			for (int32_t j = 0; j < i; j++) { FreeVectorArray(values[j]); }
+			free(values);
+			ListFree(parameters);
+			return error;
+		}
 		
 		// set the result dimensions to the dimension of the first element of the array
 		if (result->dimensions == 0) { result->dimensions = values[i].dimensions; }
 		// return error if inconsistent dimensionality
-		if (values[i].dimensions != result->dimensions) { return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd }; }
-		// return error if array inside array
-		if (values[i].length > 1)
+		if (values[i].dimensions != result->dimensions)
 		{
-			if (operonType != OperonTypeExpression) { return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd }; }
-			if (operon.expression->operator != OperatorFor) { return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd }; }
+			FreeVectorArray(assignmentValue);
+			for (int32_t j = 0; j < i; j++) { FreeVectorArray(values[j]); }
+			free(values);
+			ListFree(parameters);
+			return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd };
+		}
+		// return error if array inside array
+		if (values[i].length > 1 && operon.expression->operator != OperatorFor)
+		{
+			FreeVectorArray(assignmentValue);
+			for (int32_t j = 0; j < i; j++) { FreeVectorArray(values[j]); }
+			free(values);
+			ListFree(parameters);
+			return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd };
 		}
 		result->length += values[i].length; // increment final array length
 	}
 	
 	// return error if array too large
-	if (result->length > MAX_ARRAY_LENGTH) { return (RuntimeError){ RuntimeErrorArrayTooLarge, expression->operonStart[1], expression->operonEnd[1] }; }
+	if (result->length > MAX_ARRAY_LENGTH)
+	{
+		for (int32_t i = 0; i < assignmentValue.length; i++) { FreeVectorArray(values[i]); }
+		free(values);
+		FreeVectorArray(assignmentValue);
+		ListFree(parameters);
+		return (RuntimeError){ RuntimeErrorArrayTooLarge, expression->operonStart[1], expression->operonEnd[1] };
+	}
 	
 	// copy each of the values into the final array
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -422,7 +482,8 @@ static RuntimeError EvaluateFor(HashMap identifiers, HashMap cache, list(Paramet
 		}
 	}
 	free(values);
-	for (int8_t d = 0; d < assignmentValue.dimensions; d++) { free(assignmentValue.xyzw[d]); }
+	FreeVectorArray(assignmentValue);
+	ListFree(parameters);
 	
 	return (RuntimeError){ RuntimeErrorNone };
 }
@@ -460,7 +521,11 @@ static RuntimeError EvaluateIndex(HashMap identifiers, HashMap cache, list(Param
 				if (identifier[d] == 'z') { component = 2; }
 				if (identifier[d] == 'w') { component = 3; }
 				// return error if trying to access component greater than number of dimensions
-				if (component >= value.dimensions) { return (RuntimeError){ RuntimeErrorInvalidSwizzling, expression->operonStart[1], expression->operonEnd[1] }; }
+				if (component >= value.dimensions)
+				{
+					FreeVectorArray(value);
+					return (RuntimeError){ RuntimeErrorInvalidSwizzling, expression->operonStart[1], expression->operonEnd[1] };
+				}
 				
 				// simply move the pointer if it's not a duplicate component
 				if (!shouldDuplicate[component]) { result->xyzw[d] = value.xyzw[component]; shouldDuplicate[component] = true; }
@@ -488,9 +553,18 @@ static RuntimeError EvaluateIndex(HashMap identifiers, HashMap cache, list(Param
 	if (error.code != RuntimeErrorNone) { return error; }
 	
 	// return error if indexing with a vector
-	if (index.dimensions > 1) { return (RuntimeError){ RuntimeErrorIndexingWithVector, expression->operonStart[1], expression->operonEnd[1] }; }
+	if (index.dimensions > 1)
+	{
+		FreeVectorArray(value);
+		FreeVectorArray(index);
+		return (RuntimeError){ RuntimeErrorIndexingWithVector, expression->operonStart[1], expression->operonEnd[1] }; }
 	// return error if length of new array is too large
-	if (index.length > MAX_ARRAY_LENGTH) { return (RuntimeError){ RuntimeErrorArrayTooLarge, expression->operonStart[1], expression->operonEnd[1] }; }
+	if (index.length > MAX_ARRAY_LENGTH)
+	{
+		FreeVectorArray(value);
+		FreeVectorArray(index);
+		return (RuntimeError){ RuntimeErrorArrayTooLarge, expression->operonStart[1], expression->operonEnd[1] };
+	}
 	
 	// go through each indexing element and copy its corresponding indexed element to the final result
 	result->dimensions = value.dimensions;
@@ -514,6 +588,7 @@ static RuntimeError EvaluateIndex(HashMap identifiers, HashMap cache, list(Param
 
 RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result)
 {
+	*result = (VectorArray){ 0 };
 	if (expression->operator == OperatorNone) { return EvaluateOperon(identifiers, cache, parameters, expression, 0, result); }
 	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCall(identifiers, cache, parameters, expression, result); }
 	if (expression->operator == OperatorFor) { return EvaluateFor(identifiers, cache, parameters, expression, result); }
@@ -562,6 +637,6 @@ RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Paramet
 			value = swap;
 		}
 	}
-	if (value.length > 0) { for (int32_t i = 0; i < value.dimensions; i++) { free(value.xyzw[i]); } }
+	if (value.length > 0) { FreeVectorArray(value); }
 	return (RuntimeError){ RuntimeErrorNone };
 }
