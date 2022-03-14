@@ -16,6 +16,7 @@ void CLIRun(int32_t varLimit)
 	HashMap cache = HashMapCreate(varLimit);
 	while (true)
 	{
+		// wait for input
 		String input = StringCreate("");
 		printf("\n>>> ");
 		for (int32_t c = getchar(); c != '\n'; c = getchar())
@@ -23,40 +24,69 @@ void CLIRun(int32_t varLimit)
 			if (c >= 128) { continue; }
 			StringConcat(&input, (char []){ (char)c, '\0' });
 		}
+		
+		// break on exit or do nothing on empty line
 		if (strcmp(input, "exit") == 0) { break; }
 		if (strcmp(input, "") == 0) { continue; }
 		
-		Statement * statement = ParseTokenLine(TokenizeLine(input));
+		list(Token) tokenLine = TokenizeLine(input);
+		Statement * statement = ParseTokenLine(tokenLine);
+		
+		// assert error
 		if (statement->error.code != SyntaxErrorNone)
 		{
-			printf("SyntaxError: %i\n", statement->error.code);
+			printf("SyntaxError: %s", SyntaxErrorToString(statement->error.code));
+			// retrieve the code snippet that the error occured at
+			int32_t start = statement->tokens[statement->error.tokenStart].lineIndexStart;
+			int32_t end = statement->tokens[statement->error.tokenEnd].lineIndexEnd;
+			String snippet = StringSub(statement->tokens[0].line, start, end);
+			printf(" \"%s\"\n", snippet);
+			StringFree(snippet);
+			
+			FreeStatement(statement);
+			FreeTokens(tokenLine);
 			continue;
 		}
 		
 		if (statement->type == StatementTypeUnknown || statement->type == StatementTypeVariable)
 		{
 			VectorArray * result = malloc(sizeof(VectorArray));;
+			
+			// evaluate the expression
 			clock_t timer = clock();
 			RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, result);
 			timer = clock() - timer;
 			if (error.code != RuntimeErrorNone)
 			{
-				printf("RuntimeError: %i\n", error.code);
+				printf("RuntimeError: %s", RuntimeErrorToString(error.code));
+				// retrieve code snippet that the error occured at
+				list(Token) tokens = (error.statement == NULL ? statement : error.statement)->tokens;
+				String snippet = StringSub(tokens[0].line, tokens[error.tokenStart].lineIndexStart, tokens[error.tokenEnd].lineIndexEnd);
+				printf(" \"%s\"\n", snippet);
+				StringFree(snippet);
+				
+				FreeStatement(statement);
+				FreeTokens(tokenLine);
 				continue;
 			}
 			
 			if (statement->type == StatementTypeVariable)
 			{
+				// cache it if it's a variable
 				HashMapSet(identifiers, statement->declaration.variable.identifier, statement);
 				HashMapSet(cache, statement->declaration.variable.identifier, result);
 			}
 			else
 			{
+				// otherwise print it and free result
 				VectorArrayPrint(*result);
 				printf("\n");
 				for (int8_t d = 0; d < result->dimensions; d++) { free(result->xyzw[d]); }
+				FreeStatement(statement);
+				FreeTokens(tokenLine);
 			}
 			
+			// print time if it takes more than .01 seconds
 			if (timer / (float)CLOCKS_PER_SEC > 0.01) { printf("Done in %fs\n", timer / (float)CLOCKS_PER_SEC); }
 		}
 	

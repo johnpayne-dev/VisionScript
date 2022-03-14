@@ -1,8 +1,34 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "Parser.h"
 
 static SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression ** expression);
+
+const char * SyntaxErrorToString(SyntaxErrorCode code)
+{
+	switch (code)
+	{
+		case SyntaxErrorNone: return "no error";
+		case SyntaxErrorUnknownToken: return "unknown token";
+		case SyntaxErrorInvalidVariableDeclaration: return "invalid variable declaration";
+		case SyntaxErrorInvalidFunctionDeclaration: return "invalid function declaration";
+		case SyntaxErrorMissingExpression: return "missing expression";
+		case SyntaxErrorMissingBracket: return "missing corresponding bracket";
+		case SyntaxErrorMissingOperator: return "missing operator";
+		case SyntaxErrorMissingOperon: return "missing operon";
+		case SyntaxErrorTooManyVectorElements: return "too many elements in vector initialization";
+		case SyntaxErrorInvalidCommaPlacement: return "unexpected comma placement";
+		case SyntaxErrorInvalidForPlacement: return "for operator can only be placed in array";
+		case SyntaxErrorInvalidForAssignment: return "invalid for assignment";
+		case SyntaxErrorInvalidForAssignmentPlacement: return "for assignment can only be used within for operator";
+		case SyntaxErrorInvalidEllipsisPlacement: return "ellipsis can only be used within an array";
+		case SyntaxErrorInvalidEllipsisOperon: return "invalid ellipsis operon";
+		case SyntaxErrorIndexingWithVector: return "cannot index an array with a vector";
+		case SyntaxErrorInvalidFunctionCall: return "invalid function call syntax";
+		default: return "unknown error";
+	}
+}
 
 static int32_t FindCorrespondingBracket(list(Token) tokens, int32_t start, int32_t end, int32_t bracketIndex)
 {
@@ -208,7 +234,7 @@ static OperonType DetermineOperonType(list(Token) tokens, int32_t start, int32_t
 	// constant must be one token long
 	if (start == end && tokens[start].type == TokenTypeNumber) { return OperonTypeConstant; }
 	// for assignment must have an identifier with an '=' immediately after
-	if (end - start > 1 && tokens[start].type == TokenTypeIdentifier && tokens[start + 1].value[0] == '=') { return OperonTypeForAssignment; }
+	if (end - start >= 1 && tokens[start].type == TokenTypeIdentifier && tokens[start + 1].value[0] == '=') { return OperonTypeForAssignment; }
 	// arguments must have at least one comma
 	if (FindComma(tokens, start, end) >= 0) { return OperonTypeArguments; }
 	// if it's not one of the above then assume it's an expression
@@ -314,31 +340,31 @@ static bool InsideArray(list(Token) tokens, int32_t index)
 static SyntaxError CheckOperatorLogic(Expression * expression, list(Token) tokens, int32_t opIndex)
 {
 	// if arguments are used anywhere but in function call, return an error
-	if (expression->operonTypes[0] == OperonTypeArguments) { return (SyntaxError){ SyntaxErrorInvalidCommaPlacement, opIndex, opIndex }; }
-	if (expression->operonTypes[1] == OperonTypeArguments && expression->operator != OperatorFunctionCall) { return (SyntaxError){ SyntaxErrorInvalidCommaPlacement, opIndex, opIndex }; }
+	if (expression->operonTypes[0] == OperonTypeArguments) { return (SyntaxError){ SyntaxErrorInvalidCommaPlacement, expression->operonStart[0], expression->operonEnd[0] }; }
+	if (expression->operonTypes[1] == OperonTypeArguments && expression->operator != OperatorFunctionCall) { return (SyntaxError){ SyntaxErrorInvalidCommaPlacement, expression->operonStart[1], expression->operonEnd[1] }; }
 	// if for assignment is used anywhere but in for operator, return an error
-	if (expression->operonTypes[0] == OperonTypeForAssignment) { return (SyntaxError){ SyntaxErrorInvalidForAssignmentPlacement, opIndex, opIndex }; }
-	if (expression->operonTypes[1] == OperonTypeForAssignment && expression->operator != OperatorFor) { return (SyntaxError){ SyntaxErrorInvalidForAssignmentPlacement, opIndex, opIndex }; }
+	if (expression->operonTypes[0] == OperonTypeForAssignment) { return (SyntaxError){ SyntaxErrorInvalidForAssignmentPlacement, expression->operonStart[0], expression->operonEnd[0] }; }
+	if (expression->operonTypes[1] == OperonTypeForAssignment && expression->operator != OperatorFor) { return (SyntaxError){ SyntaxErrorInvalidForAssignmentPlacement, expression->operonStart[1], expression->operonEnd[1] }; }
 	switch (expression->operator)
 	{
 		// return error if for operator is not inside an array or right hand operon is not a for assignment
 		case OperatorFor:
 			if (!InsideArray(tokens, opIndex)) { return (SyntaxError){ SyntaxErrorInvalidForPlacement, opIndex, opIndex }; }
-			if (expression->operonTypes[1] != OperonTypeForAssignment) { return (SyntaxError){ SyntaxErrorInvalidForAssignment, opIndex, opIndex }; }
+			if (expression->operonTypes[1] != OperonTypeForAssignment) { return (SyntaxError){ SyntaxErrorInvalidForAssignment, expression->operonStart[1], expression->operonEnd[1] }; }
 			break;
 		// return error if ellipsis is not in an array or if either operon is not a scalar
 		case OperatorEllipsis:
 			if (!InsideArray(tokens, opIndex)) { return (SyntaxError){ SyntaxErrorInvalidEllipsisPlacement, opIndex, opIndex }; }
-			if (expression->operonTypes[0] == OperonTypeArrayLiteral || expression->operonTypes[1] == OperonTypeArrayLiteral) { return (SyntaxError){ SyntaxErrorInvalidEllipsisOperon, opIndex, opIndex }; }
-			if (expression->operonTypes[0] == OperonTypeVectorLiteral || expression->operonTypes[1] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorInvalidEllipsisOperon, opIndex, opIndex }; }
+			if (expression->operonTypes[0] == OperonTypeArrayLiteral || expression->operonTypes[0] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorInvalidEllipsisOperon, expression->operonStart[0], expression->operonEnd[0] }; }
+			if (expression->operonTypes[1] == OperonTypeArrayLiteral || expression->operonTypes[1] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorInvalidEllipsisOperon, expression->operonStart[1], expression->operonEnd[1] }; }
 			break;
 		// return error if trying to index with a vector literal
 		case OperatorIndex:
-			if (expression->operonTypes[1] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorIndexingWithVector, opIndex, opIndex }; }
+			if (expression->operonTypes[1] == OperonTypeVectorLiteral) { return (SyntaxError){ SyntaxErrorIndexingWithVector, expression->operonStart[1], expression->operonEnd[1] }; }
 			break;
 		// return error if left operon isn't an identifier
 		case OperatorFunctionCall:
-			if (expression->operonTypes[0] != OperonTypeIdentifier) { return (SyntaxError){ SyntaxErrorInvalidFunctionCall, opIndex, opIndex }; }
+			if (expression->operonTypes[0] != OperonTypeIdentifier) { return (SyntaxError){ SyntaxErrorInvalidFunctionCall, expression->operonStart[0], expression->operonEnd[0] }; }
 			break;
 		default: break;
 	}
@@ -348,7 +374,7 @@ static SyntaxError CheckOperatorLogic(Expression * expression, list(Token) token
 static SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression ** expression)
 {
 	// end < start occurs when there is no expression where one is expected
-	if (end < start) { return (SyntaxError){ SyntaxErrorMissingExpression, start, end }; }
+	if (end < start) { return (SyntaxError){ SyntaxErrorMissingExpression, end, start }; }
 	
 	// find the operator index in order of precedence
 	SyntaxError error = { SyntaxErrorNone };
@@ -397,7 +423,7 @@ static SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t en
 	else if (IsUnaryOperator(operator))
 	{
 		OperonType operonType = DetermineOperonType(tokens, opIndex + 1, end);
-		if (operonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, opIndex, end }; }
+		if (operonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, start, end }; }
 		Operon operon = { 0 };
 		error = ReadOperon(tokens, opIndex + 1, end, operonType, &operon);
 		(*expression)->operator = operator;
@@ -412,8 +438,8 @@ static SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t en
 		if (operator == OperatorFunctionCall) { end--; } // disregard ending ')'
 		OperonType leftOperonType = DetermineOperonType(tokens, start, opIndex - 1);
 		OperonType rightOperonType = operator == OperatorFunctionCall ? OperonTypeArguments : DetermineOperonType(tokens, opIndex + 1, end); // conditional ensures functions with 1 argument are stil put into a list
-		if (leftOperonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, start, opIndex }; }
-		if (rightOperonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, opIndex, end }; }
+		if (leftOperonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, opIndex, end }; }
+		if (rightOperonType == OperonTypeNone) { return (SyntaxError){ SyntaxErrorMissingOperon, start, opIndex }; }
 		Operon leftOperon = { 0 }, rightOperon = { 0 };
 		
 		error = ReadOperon(tokens, start, opIndex - 1, leftOperonType, &leftOperon);
@@ -447,7 +473,7 @@ static void FreeExpression(Expression * expression)
 		{
 			if (expression->operons[i].expressions != NULL)
 			{
-				for (int32_t j = 0; j < ListLength(expression->operons[i].expressions); i++)
+				for (int32_t j = 0; j < ListLength(expression->operons[i].expressions); j++)
 				{
 					FreeExpression(expression->operons[i].expressions[j]);
 				}
@@ -468,7 +494,7 @@ static void FreeExpression(Expression * expression)
 Statement * ParseTokenLine(list(Token) tokens)
 {
 	Statement * statement = malloc(sizeof(Statement));
-	*statement = (Statement){ .error = SyntaxErrorNone };
+	*statement = (Statement){ .error = SyntaxErrorNone, .tokens = tokens, };
 	
 	// check for any unknown tokens
 	for (int32_t i = 0; i < ListLength(tokens); i++)

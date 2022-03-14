@@ -19,6 +19,9 @@ typedef struct Token
 {
 	TokenType type;
 	String value;
+	String line;
+	int32_t lineIndexStart;
+	int32_t lineIndexEnd;
 } Token;
 
 list(Token) TokenizeLine(String line);

@@ -5,6 +5,30 @@
 #include "Evaluator.h"
 #include "Builtin.h"
 
+const char * RuntimeErrorToString(RuntimeErrorCode code)
+{
+	switch (code)
+	{
+		case RuntimeErrorNone: return "no error";
+		case RuntimeErrorUndefinedIdentifier: return "undefined identifier";
+		case RuntimeErrorVectorInsideVector: return "vector inside vector";
+		case RuntimeErrorNonUniformArray: return "non uniform array dimensionality";
+		case RuntimeErrorArrayInsideArray: return "array inside array";
+		case RuntimeErrorArrayTooLarge: return "array excedes size limit";
+		case RuntimeErrorInvalidArrayRange: return "invalid array range";
+		case RuntimeErrorIdentifierNotVariable: return "treating function as variable";
+		case RuntimeErrorIdentifierNotFunction: return "treating variable as function";
+		case RuntimeErrorIncorrectParameterCount: return "incorrect number of arguments";
+		case RuntimeErrorInvalidArgumentType: return "invalid argument type";
+		case RuntimeErrorInvalidEllipsisOperon: return "invalid ellipsis operon";
+		case RuntimeErrorIndexingWithVector: return "indexing array with vector";
+		case RuntimeErrorDifferingLengthVectors: return "operating on differing length vectors";
+		case RuntimeErrorInvalidSwizzling: return "accessing nonexistent vector component";
+		case RuntimeErrorNotImplemented: return "not implemented";
+		default: return "unknown error";
+	}
+}
+
 void VectorArrayPrint(VectorArray value)
 {
 	if (value.length > 1) { printf("["); }
@@ -184,7 +208,7 @@ static RuntimeErrorCode EvaluateEllipsis(VectorArray * a, VectorArray * b, Vecto
 	int32_t upper = roundf(b->xyzw[0][0]);
 	
 	// if range of ellipsis is out of range, return an error
-	if (upper - lower > MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
+	if (upper - lower >= MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
 	if (upper - lower < 0) { return RuntimeErrorInvalidArrayRange; }
 	
 	result->length = upper - lower + 1;

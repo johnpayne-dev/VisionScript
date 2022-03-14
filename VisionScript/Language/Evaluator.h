@@ -36,6 +36,8 @@ typedef struct RuntimeError
 	Statement * statement;
 } RuntimeError;
 
+const char * RuntimeErrorToString(RuntimeErrorCode code);
+
 typedef struct VectorArray
 {
 	scalar_t * xyzw[4];

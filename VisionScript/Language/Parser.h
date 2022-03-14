@@ -72,8 +72,6 @@ typedef enum SyntaxErrorCode
 	SyntaxErrorInvalidForAssignmentPlacement,
 	SyntaxErrorInvalidEllipsisPlacement,
 	SyntaxErrorInvalidEllipsisOperon,
-	SyntaxErrorIndexingConstant,
-	SyntaxErrorIndexingWithConstant,
 	SyntaxErrorIndexingWithVector,
 	SyntaxErrorInvalidFunctionCall,
 } SyntaxErrorCode;
@@ -84,6 +82,8 @@ typedef struct SyntaxError
 	int32_t tokenStart;
 	int32_t tokenEnd;
 } SyntaxError;
+
+const char * SyntaxErrorToString(SyntaxErrorCode code);
 
 typedef enum StatementType
 {
@@ -109,6 +109,7 @@ typedef union StatementDeclaration
 
 typedef struct Statement
 {
+	list(Token) tokens;
 	SyntaxError error;
 	StatementType type;
 	StatementDeclaration declaration;

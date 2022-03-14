@@ -148,7 +148,7 @@ list(Token) TokenizeLine(String line)
 		else if (IsBracket(line, i, &end)) { tokenType = TokenTypeBracket; }
 		else if (IsSymbol(line, i, &end)) { tokenType = TokenTypeSymbol; }
 		else if (IsWhitespace(line[i])) { i++; continue; }
-		ListPush((void **)&tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end) });
+		ListPush((void **)&tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .line = StringCreate(line), .lineIndexStart = i, .lineIndexEnd = end });
 		i = end + 1;
 	}
 	return tokens;
@@ -172,7 +172,8 @@ void FreeTokens(list(Token) tokens)
 {
 	for (int32_t i = 0; i < ListLength(tokens); i++)
 	{
-		if (tokens[i].value != NULL) { StringFree(tokens[i].value); }
+		StringFree(tokens[i].value);
+		StringFree(tokens[i].line);
 	}
 	ListFree(tokens);
 }
