@@ -13,9 +13,11 @@ typedef struct Script
 	list(Statement *) renderList;
 	list(Statement *) errorList;
 	HashMap identifiers;
+	HashMap cache;
+	HashMap dependents;
 } Script;
 
-Script * LoadScript(const char * code);
+Script * LoadScript(const char * code, int32_t varLimit);
 
 void FreeScript(Script * script);
 

@@ -11,7 +11,7 @@
 
 void CLIRun(int32_t varLimit)
 {
-	printf("VisionScript v1.0 – Command-Line Interpretter\n");
+	printf("VisionScript v1.0 – Command Line Interpretter\n");
 	HashMap identifiers = HashMapCreate(varLimit);
 	HashMap cache = HashMapCreate(varLimit);
 	while (true)
@@ -31,6 +31,16 @@ void CLIRun(int32_t varLimit)
 		
 		list(Token) tokenLine = TokenizeLine(input);
 		Statement * statement = ParseTokenLine(tokenLine);
+		StringFree(input);
+		
+		// skip if it's a render command
+		if (statement->type == StatementTypeRender)
+		{
+			printf("CLI doens't support render commands\n");
+			FreeStatement(statement);
+			FreeTokens(tokenLine);
+			continue;
+		}
 		
 		// assert error
 		if (statement->error.code != SyntaxErrorNone)
