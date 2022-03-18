@@ -1,20 +1,24 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "Evaluator.h"
 #include "Script.h"
+
+static int CompareStatementIdentifier(const void * a, const void * b)
+{
+	return strcmp((*(Statement **)a)->declaration.variable.identifier, (*(Statement **)b)->declaration.variable.identifier);
+}
 
 static list(Statement *) FindParents(HashMap identifiers, Expression * expression, list(String) parameters)
 {
 	list(Statement *) parents = ListCreate(sizeof(Statement *), 1);
 	
+	// create parameters list if doesn't exist otherwise create a copy
+	if (parameters == NULL) { parameters = ListCreate(sizeof(String), 1); }
+	else { parameters = ListClone(parameters); }
+	
 	// if it's a for operator, add the assignment to the parameters list
-	if (expression->operator == OperatorFor)
-	{
-		// create parameters list if doesn't exist otherwise create a copy
-		if (parameters == NULL) { parameters = ListCreate(sizeof(String), 1); }
-		else { parameters = ListClone(parameters); }
-		ListPush((void **)&parameters, &expression->operons[1].assignment.identifier);
-	}
+	if (expression->operator == OperatorFor) { ListPush((void **)&parameters, &expression->operons[1].assignment.identifier); }
 	
 	// go through one or both operons
 	int32_t operons = expression->operator == OperatorFor || expression->operator == OperatorNone || expression->operator == OperatorNegative || expression->operator == OperatorPositive ? 1 : 2;
@@ -46,13 +50,38 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 				for (int32_t j = 0; j < ListLength(parameters); j++) { if (StringEquals(parameters[j], expression->operons[i].identifier) == 0) { isParameter = true; break; } }
 				if (isParameter) { continue; }
 			}
-			// otherwise add the identifier's statement to the list if it's not null, not a function, and not already in the list
+			
 			Statement * statement = HashMapGet(identifiers, expression->operons[i].identifier);
-			if (statement != NULL && statement->type != StatementTypeFunction && !ListContains(parents, statement)) { ListPush((void **)&parents, &statement); }
+			if (statement != NULL)
+			{
+				// add the identifier's statement to the list if it's a variable and not already in the list
+				if (statement->type == StatementTypeVariable) { ListPush((void **)&parents, &statement); }
+				// if it's a function, look for parents in there
+				if (statement->type == StatementTypeFunction)
+				{
+					for (int32_t j = 0; j < ListLength(statement->declaration.function.arguments); j++) { ListPush((void **)&parameters, &statement->declaration.function.arguments[j]); }
+					
+					list(Statement *) funcParents = FindParents(identifiers, statement->expression, NULL);
+					for (int32_t j = 0; j < ListLength(funcParents); j++) { ListPush((void **)&parents, &funcParents[j]); }
+					ListFree(funcParents);
+				}
+			}
 		}
 	}
-	// free list that was cloned in for assignment
-	if (expression->operator == OperatorFor) { ListFree(parameters); }
+	
+	// free list that was cloned
+	ListFree(parameters);
+	
+	// remove duplicates from list
+	qsort(parents, ListLength(parents), ListElementSize(parents), CompareStatementIdentifier);
+	for (int32_t i = 0; i < ListLength(parents); i++)
+	{
+		if (i > 0 && strcmp(parents[i]->declaration.variable.identifier, parents[i - 1]->declaration.variable.identifier) == 0)
+		{
+			ListRemove((void **)&parents, i);
+			i--;
+		}
+	}
 	
 	return parents;
 }
@@ -107,9 +136,7 @@ Script * LoadScript(const char * code, int32_t varLimit)
 			case StatementTypeVariable:
 				ListPush((void **)&script->identifierList, &statement);
 				HashMapSet(script->identifiers, statement->declaration.variable.identifier, statement);
-				// allocate dependents list
-				list(Statement *) * dependents = malloc(sizeof(list(Statement *)));
-				*dependents = ListCreate(sizeof(Statement *), 1);
+				list(Statement *) dependents = ListCreate(sizeof(Statement *), 1);
 				HashMapSet(script->dependents, statement->declaration.variable.identifier, dependents);
 				break;
 			case StatementTypeFunction:
@@ -129,9 +156,10 @@ Script * LoadScript(const char * code, int32_t varLimit)
 			list(Statement *) parents = FindParents(script->identifiers, script->identifierList[i]->expression, NULL);
 			for (int32_t j = 0; j < ListLength(parents); j++)
 			{
-				ListPush(HashMapGet(script->dependents, parents[j]->declaration.variable.identifier), script->identifierList[i]);
+				list(Statement *) dependents = HashMapGet(script->dependents, parents[j]->declaration.variable.identifier);
+				ListPush((void **)&dependents, &script->identifierList[i]);
+				HashMapSet(script->dependents, parents[j]->declaration.variable.identifier, dependents);
 			}
-			ListFree(parents);
 			RuntimeError error = InitializeCache(script->identifiers, script->cache, script->identifierList[i]);
 			
 			// todo: handle runtime errors properly
@@ -141,9 +169,31 @@ Script * LoadScript(const char * code, int32_t varLimit)
 				printf("%s: ", script->identifierList[i]->declaration.variable.identifier);
 				PrintVectorArray(*(VectorArray *)HashMapGet(script->cache, script->identifierList[i]->declaration.variable.identifier));
 				printf("\n");
+				for (int32_t j = 0; j < ListLength(parents); j++)
+				{
+					printf("\t%s\n", parents[j]->declaration.variable.identifier);
+				}
 			}
+			
+			ListFree(parents);
 		}
 	}
+	
+	
+	/*
+	// print dependents of each variable
+	for (int32_t i = 0; i < ListLength(script->identifierList); i++)
+	{
+		if (script->identifierList[i]->type == StatementTypeVariable)
+		{
+			printf("%s:\n", script->identifierList[i]->declaration.variable.identifier);
+			list(Statement *) dependents = HashMapGet(script->dependents, script->identifierList[i]->declaration.variable.identifier);
+			for (int32_t j = 0; j < ListLength(dependents); j++)
+			{
+				printf("\t%s\n", dependents[j]->declaration.variable.identifier);
+			}
+		}
+	}*/
 	
 	return script;
 }
