@@ -51,7 +51,6 @@ static BuiltinFunction singleArgumentBuiltins[] =
 	BuiltinFunctionARGMIN,
 	BuiltinFunctionCBRT,
 	BuiltinFunctionCEIL,
-	BuiltinFunctionCOUNT,
 	BuiltinFunctionERF,
 	BuiltinFunctionEXP,
 	BuiltinFunctionFACTORIAL,
@@ -336,15 +335,40 @@ static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _count(VectorArray * result)
+static RuntimeErrorCode _count(list(VectorArray) args, VectorArray * result)
 {
-	int32_t len = result->length;
-	free(result->xyzw[0]);
-	result->xyzw[0] = malloc(sizeof(scalar_t));
-	result->xyzw[0][0] = len;
-	result->length = 1;
-	result->dimensions = 1;
-	return RuntimeErrorNone;
+	if (ListLength(args) == 1)
+	{
+		// returns length of the vector array passed
+		int32_t len = args[0].length;
+		result->xyzw[0] = malloc(sizeof(scalar_t));
+		result->xyzw[0][0] = len;
+		result->length = 1;
+		result->dimensions = 1;
+		return RuntimeErrorNone;
+	}
+	if (ListLength(args) == 2)
+	{
+		// counts how many elements equal the second argument
+		if (args[1].dimensions != args[0].dimensions) { return RuntimeErrorInvalidArgumentType; }
+		if (args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
+		int32_t count = 0;
+		for (int32_t i = 0; i < args[0].length; i++)
+		{
+			bool equal = true;
+			for (int32_t d = 0; d < args[0].dimensions; d++)
+			{
+				if (args[0].xyzw[d][i] != args[1].xyzw[d][0]) { equal = false; break; }
+			}
+			if (equal) { count++; }
+		}
+		result->xyzw[0] = malloc(sizeof(scalar_t));
+		result->xyzw[0][0] = count;
+		result->length = 1;
+		result->dimensions = 1;
+		return RuntimeErrorNone;
+	}
+	return RuntimeErrorIncorrectParameterCount;
 }
 
 static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result)
@@ -955,7 +979,7 @@ RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorAr
 		case BuiltinFunctionCBRT: return _cbrt(result);
 		case BuiltinFunctionCEIL: return _ceil(result);
 		case BuiltinFunctionCORR: return _corr(arguments, result);
-		case BuiltinFunctionCOUNT: return _count(result);
+		case BuiltinFunctionCOUNT: return _count(arguments, result);
 		case BuiltinFunctionCOV: return _cov(arguments, result);
 		case BuiltinFunctionERF: return _erf(result);
 		case BuiltinFunctionEXP: return _exp(result);

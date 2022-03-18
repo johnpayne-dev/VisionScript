@@ -387,8 +387,8 @@ static SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t en
 			case 6: error = FindOperator(tokens, start, end, (const char *[]){ "for", "..." }, 2, true, &opIndex); break;
 			case 5: error = FindOperator(tokens, start, end, (const char *[]){ "BL+", "BL-" }, 2, true, &opIndex); break;
 			case 4: error = FindOperator(tokens, start, end, (const char *[]){ "*", "/", "%" }, 3, true, &opIndex); break;
-			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "^", "UL+", "UL-" }, 3, false, &opIndex); break;
-			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, true, &opIndex); break;
+			case 3: error = FindOperator(tokens, start, end, (const char *[]){ "^", "UL+", "UL-" }, 3, false, &opIndex); break;
+			case 2: error = FindOperator(tokens, start, end, (const char *[]){ "." }, 1, true, &opIndex); break;
 			case 1: error = FindFunctionCall(tokens, start, end, &opIndex); break;
 			default: break;
 		}
