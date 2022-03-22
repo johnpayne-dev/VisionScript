@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 
-void RunApplication(int32_t width, int32_t height, const char * title);
+typedef struct WindowConfig
+{
+	int32_t width;
+	int32_t height;
+	const char * title;
+} WindowConfig;
+
+void RunApplication(WindowConfig config);
 
 #endif
