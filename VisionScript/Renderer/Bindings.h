@@ -82,6 +82,7 @@ enum
 typedef id NSRunLoopMode;
 
 extern NSRunLoopMode const NSDefaultRunLoopMode;
+extern NSRunLoopMode NSEventTrackingRunLoopMode;
 
 #endif
 

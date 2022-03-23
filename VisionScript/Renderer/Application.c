@@ -3,7 +3,7 @@
 
 #ifdef _WIN32
 
-void RunApplication(WindowConfig config)
+void RunApplication(AppConfig config)
 {
 }
 
@@ -11,14 +11,14 @@ void RunApplication(WindowConfig config)
 
 #ifdef __APPLE__
 
+#include <objc/runtime.h>
 #include <objc/message.h>
 #include <Carbon/Carbon.h>
-#include <OpenGL/GL.h>
 
 static id app;
 static id window;
 static id view;
-static WindowConfig config;
+static AppConfig config;
 static id timer;
 
 static Class AppDelegateClass;
@@ -82,10 +82,15 @@ static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id no
 	id runLoop = ((id (*)(Class, SEL))objc_msgSend)(objc_getClass("NSRunLoop"), sel_getUid("currentRunLoop"));
 	// [runLoop addTimer:timer forMode:NSDefaultRunLoopMode];
 	((void (*)(id, SEL, id, NSRunLoopMode))objc_msgSend)(runLoop, sel_getUid("addTimer:forMode:"), timer, NSDefaultRunLoopMode);
+	// [runLoop addTimer:timer forMode:NSEventTrackingRunLoopMode]; //Ensure timer fires during resize
+	((void (*)(id, SEL, id, NSRunLoopMode))objc_msgSend)(runLoop, sel_getUid("addTimer:forMode:"), timer, NSEventTrackingRunLoopMode);
+	
+	if (config.startup != NULL) { config.startup(); }
 }
 
 static void AppDelegate_applicationWillTerminate(id self, SEL method, id notification)
 {
+	if (config.shutdown != NULL) { config.shutdown(); }
 }
 
 static void CreateAppDelegateClass()
@@ -112,6 +117,8 @@ static void CreateWindowDelegateClass()
 
 static void OpenGLView_drawRect(id self, SEL method, CGRect bounds)
 {
+	if (config.update != NULL) { config.update(); }
+	if (config.render != NULL) { config.render(); }
 	// flush buffer
 	// [[view openGLContext] flushBuffer];
 	((void (*)(id, SEL))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(view, sel_getUid("openGLContext")), sel_getUid("flushBuffer"));
@@ -131,7 +138,7 @@ static void CreateOpenGLViewClass()
 	objc_registerClassPair(OpenGLViewClass);
 }
 
-void RunApplication(WindowConfig windowConfig)
+void RunApplication(AppConfig windowConfig)
 {
 	// initialize the classes
 	CreateAppDelegateClass();
@@ -160,7 +167,7 @@ void RunApplication(WindowConfig windowConfig)
 
 #ifdef __linux__
 
-void RunApplication(WindowConfig config)
+void RunApplication(AppConfig config)
 {
 }
 

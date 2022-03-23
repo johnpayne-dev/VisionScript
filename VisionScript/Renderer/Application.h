@@ -8,8 +8,12 @@ typedef struct WindowConfig
 	int32_t width;
 	int32_t height;
 	const char * title;
-} WindowConfig;
+	void (*startup)(void);
+	void (*update)(void);
+	void (*render)(void);
+	void (*shutdown)(void);
+} AppConfig;
 
-void RunApplication(WindowConfig config);
+void RunApplication(AppConfig config);
 
 #endif

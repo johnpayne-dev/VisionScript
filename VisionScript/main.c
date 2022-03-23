@@ -1,6 +1,7 @@
 #include <stdio.h>
-#include "Language/Script.h"
+#include "Renderer/Renderer.h"
 #include "CLI.h"
+
 #define VARIABLE_LIMIT 65536
 
 int main(int argc, const char * argv[])
@@ -21,7 +22,7 @@ int main(int argc, const char * argv[])
 		"parametric (B - A)*t + A\n";
 	
 	Script * script = LoadScript(code, VARIABLE_LIMIT);
-	FreeScript(script);
+	RenderScript(script, RendererType2D, true); // doesn't return
 	
 	return 0;
 }
