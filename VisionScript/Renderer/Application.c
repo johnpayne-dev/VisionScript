@@ -14,16 +14,24 @@ void RunApplication(AppConfig config)
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <Carbon/Carbon.h>
+#include <CoreVideo/CoreVideo.h>
 
 static id app;
 static id window;
 static id view;
 static AppConfig config;
-static id timer;
+static CVDisplayLinkRef displayLink;
 
 static Class AppDelegateClass;
 static Class WindowDelegateClass;
-static Class OpenGLViewClass;
+static Class ViewClass;
+
+static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp * now, const CVTimeStamp * outputTime, CVOptionFlags flagsIn, CVOptionFlags * flagsOut, void * target)
+{
+	if (config.update != NULL) { config.update(); }
+	if (config.render != NULL) { config.render(); }
+	return kCVReturnSuccess;
+}
 
 static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id notification)
 {
@@ -47,65 +55,36 @@ static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id no
 	// [window setDelegate:delegate];
 	((void (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("setDelegate:"), (id)delegate);
 	
-
-	// initialize the OpenGLView
-	NSOpenGLPixelFormatAttribute attributes[] =
-	{
-		NSOpenGLPFAAccelerated,
-		NSOpenGLPFAAlphaSize, 8,
-		NSOpenGLPFABackingStore,
-		NSOpenGLPFAClosestPolicy,
-		NSOpenGLPFAColorSize, 24,
-		NSOpenGLPFADepthSize, 24,
-		NSOpenGLPFADoubleBuffer,
-		NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core,
-		NSOpenGLPFAStencilSize, 8,
-		0,
-	};
-	// id format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
-	id format = ((id (*)(id, SEL, NSOpenGLPixelFormatAttribute *))objc_msgSend)(((id (*)(Class, SEL))objc_msgSend)(objc_getClass("NSOpenGLPixelFormat"), sel_getUid("alloc")), sel_getUid("initWithAttributes:"), attributes);
-	// view = [OpenGLView alloc];
-	view = ((id (*)(Class, SEL))objc_msgSend)(OpenGLViewClass, sel_getUid("alloc"));
-	// view = [view initWithFrame:dimensions pixelFormat:format];
-	view = ((id (*)(id, SEL, CGRect, id))objc_msgSend)(view, sel_getUid("initWithFrame:pixelFormat:"), dimensions, format);
-	// [view setWantsBestResolutionOpenGLSurface:YES];
-	((void (*)(id, SEL, bool))objc_msgSend)(view, sel_getUid("setWantsBestResolutionOpenGLSurface:"), true);
-	
-	// set the window's view
+	// initialize the view assign it to the window
+	// view = [[View alloc] initWithFrame:dimensions];
+	view = ((id (*)(id, SEL, CGRect))objc_msgSend)(((id (*)(Class, SEL))objc_msgSend)(ViewClass, sel_getUid("alloc")), sel_getUid("initWithFrame:"), dimensions);
 	// [window setContentView:view];
 	((void (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("setContentView:"), view);
 	
-	// setup the timer to update every frame
-	// timer = [NSTimer timerWithTimeInterval:0.001 target:view selector:@selector(timerFired) userInfo:nil repeats:YES];
-	timer = ((id (*)(Class, SEL, double, id, SEL, id, bool))objc_msgSend)(objc_getClass("NSTimer"), sel_getUid("timerWithTimeInterval:target:selector:userInfo:repeats:"), 0.001, view, sel_getUid("timerFired"), nil, true);
-	// id runLoop = [NSRunLoop currentRunLoop];
-	id runLoop = ((id (*)(Class, SEL))objc_msgSend)(objc_getClass("NSRunLoop"), sel_getUid("currentRunLoop"));
-	// [runLoop addTimer:timer forMode:NSDefaultRunLoopMode];
-	((void (*)(id, SEL, id, NSRunLoopMode))objc_msgSend)(runLoop, sel_getUid("addTimer:forMode:"), timer, NSDefaultRunLoopMode);
-	// [runLoop addTimer:timer forMode:NSEventTrackingRunLoopMode]; //Ensure timer fires during resize
-	((void (*)(id, SEL, id, NSRunLoopMode))objc_msgSend)(runLoop, sel_getUid("addTimer:forMode:"), timer, NSEventTrackingRunLoopMode);
-	
 	if (config.startup != NULL) { config.startup(); }
+	
+	// start the display link
+	CVDisplayLinkCreateWithActiveCGDisplays(&displayLink);
+	CVDisplayLinkSetOutputCallback(displayLink, DisplayLinkCallback, NULL);
+	CVDisplayLinkStart(displayLink);
 }
 
-static void AppDelegate_applicationWillTerminate(id self, SEL method, id notification)
+static bool AppDelegate_applicationShouldTerminateAfterLastWindowClosed(id self, SEL method, id sender)
 {
-	if (config.shutdown != NULL) { config.shutdown(); }
+	return true;
 }
 
 static void CreateAppDelegateClass()
 {
 	AppDelegateClass = objc_allocateClassPair(objc_getClass("NSObject"), "AppDelegate", 0);
 	class_addMethod(AppDelegateClass, sel_registerName("applicationDidFinishLaunching:"), (IMP)AppDelegate_applicationDidFinishLaunching, "v@:@");
-	class_addMethod(AppDelegateClass, sel_registerName("applicationWillTerminate:"), (IMP)AppDelegate_applicationWillTerminate, "v@:@");
+	class_addMethod(AppDelegateClass, sel_registerName("applicationShouldTerminateAfterLastWindowClosed:"), (IMP)AppDelegate_applicationShouldTerminateAfterLastWindowClosed, "i@:@");
 	objc_registerClassPair(AppDelegateClass);
 }
 
 static void WindowDelegate_windowWillClose(id self, SEL method, id notification)
 {
-	// terminate the app upon window being closed
-	// [app terminate];
-	((void (*)(id, SEL, id))objc_msgSend)(app, sel_getUid("terminate:"), nil);
+	if (config.shutdown != NULL) { config.shutdown(); }
 }
 
 static void CreateWindowDelegateClass()
@@ -115,27 +94,37 @@ static void CreateWindowDelegateClass()
 	objc_registerClassPair(WindowDelegateClass);
 }
 
-static void OpenGLView_drawRect(id self, SEL method, CGRect bounds)
+static bool View_wantsUpdateLayer(id self, SEL method)
 {
-	if (config.update != NULL) { config.update(); }
-	if (config.render != NULL) { config.render(); }
-	// flush buffer
-	// [[view openGLContext] flushBuffer];
-	((void (*)(id, SEL))objc_msgSend)(((id (*)(id, SEL))objc_msgSend)(view, sel_getUid("openGLContext")), sel_getUid("flushBuffer"));
+	return true;
 }
 
-static void OpenGLView_timerFired(id self, SEL method)
+static Class View_layerClass(id self, SEL method)
 {
-	// [self setNeedsDisplay:YES];
-	((void (*)(id, SEL, bool))objc_msgSend)(self, sel_getUid("setNeedsDisplay:"), true);
+	//return [CAMetalLayer class];
+	return ((Class (*)(Class, SEL))objc_msgSend)(objc_getClass("CAMetalLayer"), sel_getUid("class"));
 }
 
-static void CreateOpenGLViewClass()
+static id View_makeBackingLayer(id self, SEL mthod)
 {
-	OpenGLViewClass = objc_allocateClassPair(objc_getClass("NSOpenGLView"), "OpenGLView", 0);
-	class_addMethod(OpenGLViewClass, sel_registerName("drawRect:"), (IMP)OpenGLView_drawRect, "v@:{size={width=f,height=f},origin={x=f,y=f}}");
-	class_addMethod(OpenGLViewClass, sel_registerName("timerFired"), (IMP)OpenGLView_timerFired, "v@:");
-	objc_registerClassPair(OpenGLViewClass);
+	// id layer = [CAMetalLayer layer];
+	return ((id (*)(Class, SEL))objc_msgSend)(objc_getClass("CAMetalLayer"), sel_getUid("layer"));
+	//CGSize viewScale = ((CGSize (*)(id, SEL, CGSize))objc_msgSend)(self, sel_getUid("convertSizeToBacking:"), CGSizeMake(1.0, 1.0));
+	/*
+	 CALayer* layer = [self.class.layerClass layer];
+	     CGSize viewScale = [self convertSizeToBacking: CGSizeMake(1.0, 1.0)];
+	     layer.contentsScale = MIN(viewScale.width, viewScale.height);
+	     return layer;
+	 */
+}
+
+static void CreateViewClass()
+{
+	ViewClass = objc_allocateClassPair(objc_getClass("NSView"), "View", 0);
+	class_addMethod(ViewClass, sel_registerName("wantsUpdateLayer"), (IMP)View_wantsUpdateLayer, "i@:");
+	class_addMethod(ViewClass, sel_registerName("layerClass"), (IMP)View_layerClass, "#@:");
+	class_addMethod(ViewClass, sel_registerName("makeBackingLayer"), (IMP)View_makeBackingLayer, "@@:");
+	objc_registerClassPair(ViewClass);
 }
 
 void RunApplication(AppConfig windowConfig)
@@ -143,7 +132,7 @@ void RunApplication(AppConfig windowConfig)
 	// initialize the classes
 	CreateAppDelegateClass();
 	CreateWindowDelegateClass();
-	CreateOpenGLViewClass();
+	CreateViewClass();
 	
 	// create the AppDelegate and set global window config
 	// id delegate = [[AppDelegate alloc] init];
@@ -158,7 +147,7 @@ void RunApplication(AppConfig windowConfig)
 	// [app activateIgnoringOtherApps:YES];
 	((void (*)(id, SEL, bool))objc_msgSend)(app, sel_getUid("activateIgnoringOtherApps:"), true);
 	// [app setDelegate:delegate];
-	((void (*)(id, SEL, id))objc_msgSend)(app, sel_getUid("setDelegate:"), (id)delegate);
+	((void (*)(id, SEL, id))objc_msgSend)(app, sel_getUid("setDelegate:"), delegate);
 	// [app run];
 	((void (*)(id, SEL))objc_msgSend)(app, sel_getUid("run"));
 }

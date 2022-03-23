@@ -1,7 +1,7 @@
-#include <OpenGL/GL.h>
 #include "Application.h"
 #include "Camera.h"
 #include "Renderer.h"
+#include "Backend.h"
 
 static struct Renderer
 {
@@ -13,7 +13,7 @@ static struct Renderer
 
 static void Startup()
 {
-	
+	InitializeGraphicsBackend();
 }
 
 static void Update()
@@ -22,8 +22,6 @@ static void Update()
 
 static void Render()
 {
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
 }
 
 static void Shutdown()
