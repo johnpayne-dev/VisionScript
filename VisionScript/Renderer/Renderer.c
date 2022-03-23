@@ -9,11 +9,12 @@ static struct Renderer
 	RendererType type;
 	union { Camera2D _2d; Camera3D _3d; } camera;
 	bool debug;
+	int32_t width, height;
 } renderer = { 0 };
 
 static void Startup()
 {
-	InitializeGraphicsBackend();
+	InitializeGraphicsBackend(renderer.width, renderer.height);
 }
 
 static void Update()
@@ -35,11 +36,13 @@ void RenderScript(Script * script, RendererType type, bool debug)
 	renderer.type = type;
 	renderer.debug = debug;
 	renderer.camera._2d = (Camera2D){ .scale = vec2_one };
+	renderer.width = 1080;
+	renderer.height = 720;
 	
 	AppConfig config =
 	{
-		.width = 1080,
-		.height = 720,
+		.width = renderer.width,
+		.height = renderer.height,
 		.title = "VisionScript",
 		.startup = Startup,
 		.update = Update,

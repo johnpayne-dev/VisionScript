@@ -16,4 +16,6 @@ typedef struct WindowConfig
 
 void RunApplication(AppConfig config);
 
+const void * ApplicationMacOSView(void);
+
 #endif

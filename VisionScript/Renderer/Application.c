@@ -58,6 +58,8 @@ static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id no
 	// initialize the view assign it to the window
 	// view = [[View alloc] initWithFrame:dimensions];
 	view = ((id (*)(id, SEL, CGRect))objc_msgSend)(((id (*)(Class, SEL))objc_msgSend)(ViewClass, sel_getUid("alloc")), sel_getUid("initWithFrame:"), dimensions);
+	// [view setWantsLayer:YES];
+	((void (*)(id, SEL, bool))objc_msgSend)(view, sel_getUid("setWantsLayer:"), true);
 	// [window setContentView:view];
 	((void (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("setContentView:"), view);
 	
@@ -94,15 +96,10 @@ static void CreateWindowDelegateClass()
 	objc_registerClassPair(WindowDelegateClass);
 }
 
-static bool View_wantsUpdateLayer(id self, SEL method)
-{
-	return true;
-}
-
 static Class View_layerClass(id self, SEL method)
 {
 	//return [CAMetalLayer class];
-	return ((Class (*)(Class, SEL))objc_msgSend)(objc_getClass("CAMetalLayer"), sel_getUid("class"));
+	return objc_getClass("CAMetalLayer");
 }
 
 static id View_makeBackingLayer(id self, SEL mthod)
@@ -121,7 +118,6 @@ static id View_makeBackingLayer(id self, SEL mthod)
 static void CreateViewClass()
 {
 	ViewClass = objc_allocateClassPair(objc_getClass("NSView"), "View", 0);
-	class_addMethod(ViewClass, sel_registerName("wantsUpdateLayer"), (IMP)View_wantsUpdateLayer, "i@:");
 	class_addMethod(ViewClass, sel_registerName("layerClass"), (IMP)View_layerClass, "#@:");
 	class_addMethod(ViewClass, sel_registerName("makeBackingLayer"), (IMP)View_makeBackingLayer, "@@:");
 	objc_registerClassPair(ViewClass);
@@ -161,3 +157,11 @@ void RunApplication(AppConfig config)
 }
 
 #endif
+
+const void * ApplicationMacOSView()
+{
+#ifdef __APPLE__
+	return view;
+#endif
+	return NULL;
+}
