@@ -45,7 +45,6 @@ void VertexBufferUnmapVertices(VertexBuffer vertexBuffer);
 
 void VertexBufferUpload(VertexBuffer vertexBuffer);
 
-void VertexBufferDestroy(VertexBuffer vertexBuffer);
-
+void VertexBufferFree(VertexBuffer vertexBuffer);
 
 #endif

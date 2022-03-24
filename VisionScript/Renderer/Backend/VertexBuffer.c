@@ -128,7 +128,6 @@ void VertexBufferUnmapVertices(VertexBuffer vertexBuffer)
 	vmaUnmapMemory(graphics.allocator, vertexBuffer.stagingAllocation);
 }
 
-
 void VertexBufferUpload(VertexBuffer vertexBuffer)
 {
 	// wait for fence in case the vertex buffer hasn't finished uploading from a previous call
@@ -165,7 +164,7 @@ void VertexBufferUpload(VertexBuffer vertexBuffer)
 	vkQueueSubmit(graphics.graphicsQueue, 1, &submitInfo, vertexBuffer.uploadFence);
 }
 
-void VertexBufferImmediateDestroy(VertexBuffer vertexBuffer)
+void VertexBufferFree(VertexBuffer vertexBuffer)
 {
 	vkWaitForFences(graphics.device, 1, &vertexBuffer.uploadFence, VK_TRUE, UINT64_MAX);
 	vkDestroyFence(graphics.device, vertexBuffer.uploadFence, NULL);
