@@ -1,11 +1,43 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <shaderc/shaderc.h>
 #include "Pipeline.h"
 #include "Graphics.h"
 
-ShaderData ShaderCompile(ShaderType type, const char * source)
+ShaderCode ShaderCompile(ShaderType type, const char * source)
 {
-	return (ShaderData){ 0 };
+	shaderc_compiler_t compiler = shaderc_compiler_initialize();
+	
+	shaderc_shader_kind stage = 0;
+	switch (type)
+	{
+		case ShaderTypeVertex: stage = shaderc_vertex_shader; break;
+		case ShaderTypeFragment: stage = shaderc_fragment_shader; break;
+		case ShaderTypeCompute: stage = shaderc_compute_shader; break;
+		default: break;
+	}
+	shaderc_compilation_result_t result = shaderc_compile_into_spv(compiler, source, strlen(source), stage, "", "main", NULL);
+	shaderc_compilation_status status = shaderc_result_get_compilation_status(result);
+	if (status != shaderc_compilation_status_success)
+	{
+		printf("[Fatal] failed to compile shader: %s\n", shaderc_result_get_error_message(result));
+	}
+	
+	ShaderCode shader =
+	{
+		.type = type,
+		.codeSize = shaderc_result_get_length(result),
+	};
+	memcpy(shader.code, shaderc_result_get_bytes(result), shader.codeSize);
+	
+	shaderc_result_release(result);
+	shaderc_compiler_release(compiler);
+	return shader;
+}
+
+void ShaderCodeFree(ShaderCode shader)
+{
+	free(shader.code);
 }
 
 static void CreateReflectModules(Pipeline pipeline, PipelineConfig config)
@@ -16,7 +48,7 @@ static void CreateReflectModules(Pipeline pipeline, PipelineConfig config)
 	for (int32_t i = 0; i < pipeline.stageCount; i++)
 	{
 		pipeline.stages[i].shaderType = config.shaders[i].type;
-		spvReflectCreateShaderModule(config.shaders[i].dataSize, config.shaders[i].data, &pipeline.stages[i].module);
+		spvReflectCreateShaderModule(config.shaders[i].codeSize, config.shaders[i].code, &pipeline.stages[i].module);
 	}
 }
 
@@ -187,8 +219,8 @@ Pipeline PipelineCreate(PipelineConfig config)
 		VkShaderModuleCreateInfo moduleInfo =
 		{
 			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-			.codeSize = config.shaders[i].dataSize,
-			.pCode = config.shaders[i].data,
+			.codeSize = config.shaders[i].codeSize,
+			.pCode = config.shaders[i].code,
 		};
 		vkCreateShaderModule(graphics.device, &moduleInfo, NULL, modules + i);
 		

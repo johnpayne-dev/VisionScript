@@ -49,20 +49,20 @@ typedef enum CompareOperation
 	CompareOperationNotEqual = VK_COMPARE_OP_NOT_EQUAL,
 } CompareOperation;
 
-typedef struct ShaderData
+typedef struct ShaderCode
 {
 	ShaderType type;
-	uint32_t dataSize;
-	void * data;
-} ShaderData;
+	uint64_t codeSize;
+	void * code;
+} ShaderCode;
 
-ShaderData ShaderCompile(ShaderType type, const char * source);
+ShaderCode ShaderCompile(ShaderType type, const char * source);
 
 typedef struct PipelineConfig
 {
 	VertexLayout vertexLayout;
 	int32_t shaderCount;
-	ShaderData shaders[5];
+	ShaderCode shaders[5];
 	VertexPrimitive primitive;
 	PolygonMode polygonMode;
 	CullMode cullMode;
@@ -101,7 +101,7 @@ void PipelineFree(Pipeline pipeline);
 
 typedef Pipeline ComputePipeline;
 
-ComputePipeline ComputePipelineCreate(ShaderData shader);
+ComputePipeline ComputePipelineCreate(ShaderCode shader);
 
 void ComputePipelineFree(ComputePipeline pipeline);
 
