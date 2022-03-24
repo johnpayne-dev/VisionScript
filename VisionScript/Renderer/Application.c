@@ -74,9 +74,15 @@ static bool AppDelegate_applicationShouldTerminateAfterLastWindowClosed(id self,
 	return true;
 }
 
+static void AppDelegate_applicationWillTerminate(id self, SEL method, id notification)
+{
+	if (config.shutdown != NULL) { config.shutdown(); }
+}
+
 static void CreateAppDelegateClass()
 {
 	AppDelegateClass = objc_allocateClassPair(objc_getClass("NSObject"), "AppDelegate", 0);
+	class_addMethod(AppDelegateClass, sel_registerName("applicationWillTerminate:"), (IMP)AppDelegate_applicationWillTerminate, "v@:@");
 	class_addMethod(AppDelegateClass, sel_registerName("applicationDidFinishLaunching:"), (IMP)AppDelegate_applicationDidFinishLaunching, "v@:@");
 	class_addMethod(AppDelegateClass, sel_registerName("applicationShouldTerminateAfterLastWindowClosed:"), (IMP)AppDelegate_applicationShouldTerminateAfterLastWindowClosed, "i@:@");
 	objc_registerClassPair(AppDelegateClass);
@@ -89,16 +95,10 @@ static void WindowDelegate_windowDidResize(id self, SEL method, id notification)
 	if (config.resize != NULL) { config.resize(rect.size.width, rect.size.height); }
 }
 
-static void WindowDelegate_windowWillClose(id self, SEL method, id notification)
-{
-	if (config.shutdown != NULL) { config.shutdown(); }
-}
-
 static void CreateWindowDelegateClass()
 {
 	WindowDelegateClass = objc_allocateClassPair(objc_getClass("NSObject"), "WindowDelegate", 0);
 	class_addMethod(WindowDelegateClass, sel_registerName("windowDidResize:"), (IMP)WindowDelegate_windowDidResize, "v@:@");
-	class_addMethod(WindowDelegateClass, sel_registerName("windowWillClose:"), (IMP)WindowDelegate_windowWillClose, "v@:@");
 	objc_registerClassPair(WindowDelegateClass);
 }
 

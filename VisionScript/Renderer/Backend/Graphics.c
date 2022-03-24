@@ -1,50 +1,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <math.h>
-#include <vulkan/vulkan.h>
-#include "Backend.h"
-#include "Application.h"
+#include "Graphics.h"
+#include "Renderer/Application.h"
 
 #ifdef __APPLE__
 	#include <vulkan/vulkan_macos.h>
 	static const char * requiredExtensionNames[] = { VK_KHR_SURFACE_EXTENSION_NAME, VK_MVK_MACOS_SURFACE_EXTENSION_NAME };
 	static uint32_t requiredExtensionCount = sizeof(requiredExtensionNames) / sizeof(requiredExtensionNames[0]);
 #endif
-
-static VkInstance instance;
-static VkSurfaceKHR surface;
-static VkPhysicalDevice physicalDevice;
-static VkDevice device;
-static bool computeShadersSupported;
-static int32_t computeQueueIndex, graphicsQueueIndex, presentQueueIndex;
-static VkQueue computeQueue, graphicsQueue, presentQueue;
-static VkRenderPass renderPass;
-static VkCommandPool commandPool;
-static const int32_t frameCount = 3;
-static struct FrameInFlight
-{
-	VkCommandBuffer commandBuffer;
-	VkSemaphore imageAvailable;
-	VkSemaphore renderFinished;
-	VkFence frameReady;
-	VkCommandBuffer computeCommandBuffer;
-	VkSemaphore computeFinished;
-	VkFence computeFence;
-} frames[frameCount];
-static int32_t frameIndex;
-static struct Swapchain
-{
-	VkSwapchainKHR instance;
-	VkPresentModeKHR presentMode;
-	VkExtent2D targetExtent;
-	VkExtent2D extent;
-	VkFormat colorFormat;
-	uint32_t imageCount;
-	VkImage * images;
-	uint32_t imageIndex;
-} swapchain;
 
 static void CheckExtensionSupport()
 {
@@ -128,43 +93,43 @@ static void CreateInstance(bool useValidations)
 	}
 	
 	// create VkInstance
-	VkResult result = vkCreateInstance(&createInfo, NULL, &instance);
+	VkResult result = vkCreateInstance(&createInfo, NULL, &graphics.instance);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Vulkan, but failed to create VkInstance: %i\n", result); }
 }
 
 static void CreateSurface()
 {
 #ifdef __APPLE__
-	PFN_vkCreateMacOSSurfaceMVK vkCreateMacOSSurfaceMVK = (PFN_vkCreateMacOSSurfaceMVK)vkGetInstanceProcAddr((VkInstance)instance, "vkCreateMacOSSurfaceMVK");
+	PFN_vkCreateMacOSSurfaceMVK vkCreateMacOSSurfaceMVK = (PFN_vkCreateMacOSSurfaceMVK)vkGetInstanceProcAddr((VkInstance)graphics.instance, "vkCreateMacOSSurfaceMVK");
 	VkMacOSSurfaceCreateInfoMVK createInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK,
 		.pView = ApplicationMacOSView(),
 	};
-	VkResult result = vkCreateMacOSSurfaceMVK(instance, &createInfo, NULL, &surface);
+	VkResult result = vkCreateMacOSSurfaceMVK(graphics.instance, &createInfo, NULL, &graphics.surface);
 #endif
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Vulkan, but failed to create VkSurfaceKHR\n"); }
 }
 
 static void ChoosePhysicalDevice()
 {
-	physicalDevice = VK_NULL_HANDLE;
+	graphics.physicalDevice = VK_NULL_HANDLE;
 	
 	// get the list of available GPUs
 	uint32_t deviceCount = 0;
-	vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
+	vkEnumeratePhysicalDevices(graphics.instance, &deviceCount, NULL);
 	if (deviceCount == 0) { printf("[Fatal] Trying to initialize Vulkan, but there is no GPU with Vulkan support\n"); }
 	VkPhysicalDevice * devices = malloc(deviceCount * sizeof(VkPhysicalDevice));
-	vkEnumeratePhysicalDevices(instance, &deviceCount, devices);
+	vkEnumeratePhysicalDevices(graphics.instance, &deviceCount, devices);
 	
 	// default as the first available gpu
-	physicalDevice = devices[0];
+	graphics.physicalDevice = devices[0];
 	
 	// check each gpu to make sure it is suitable
 	// the requirements for a suitable gpu are the availability of a graphics and present queue (compute is optional) and the support for a swapchain.
 	// will prefer a dedicated gpu
 	bool graphicsFound = false, presentFound = false, computeFound = false;
-	int32_t graphics = 0, present = 0, compute = 0;
+	int32_t graphicsIndex = 0, presentIndex = 0, computeIndex = 0;
 	bool foundSuitableDevice = false;
 	for (int32_t i = 0; i < deviceCount; i++)
 	{
@@ -180,19 +145,19 @@ static void ChoosePhysicalDevice()
 			if (queueFamilies[j].queueCount > 0 && queueFamilies[j].queueFlags & VK_QUEUE_GRAPHICS_BIT && !graphicsFound)
 			{
 				graphicsFound = true;
-				graphics = j;
+				graphicsIndex = j;
 			}
 			if (queueFamilies[j].queueCount > 0 && queueFamilies[j].queueFlags & VK_QUEUE_COMPUTE_BIT && !computeFound)
 			{
 				computeFound = true;
-				compute = j;
+				computeIndex = j;
 			}
 			VkBool32 presentSupported = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], j, surface, &presentSupported);
+			vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], j, graphics.surface, &presentSupported);
 			if (queueFamilies[j].queueCount > 0 && presentSupported && !presentFound)
 			{
 				presentFound = true;
-				present = j;
+				presentIndex = j;
 			}
 		}
 		free(queueFamilies);
@@ -216,11 +181,11 @@ static void ChoosePhysicalDevice()
 		if (graphicsFound && presentFound && swapchainSupported)
 		{
 			foundSuitableDevice = true;
-			computeShadersSupported = computeFound;
-			computeQueueIndex = compute;
-			graphicsQueueIndex = graphics;
-			presentQueueIndex = present;
-			physicalDevice = devices[i];
+			graphics.computeShadersSupported = computeFound;
+			graphics.computeQueueIndex = computeIndex;
+			graphics.graphicsQueueIndex = graphicsIndex;
+			graphics.presentQueueIndex = presentIndex;
+			graphics.physicalDevice = devices[i];
 			
 			// if the device is a dedicated gpu then stop search immediately
 			VkPhysicalDeviceProperties deviceProperties;
@@ -231,7 +196,7 @@ static void ChoosePhysicalDevice()
 	if (!foundSuitableDevice) { printf("[Fatal] trying to initialize Vulkan, but there is no suitable device found for Vulkan\n"); }
 	
 	VkPhysicalDeviceProperties deviceProperties;
-	vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+	vkGetPhysicalDeviceProperties(graphics.physicalDevice, &deviceProperties);
 	printf("[Info] using graphics device: %s\n", deviceProperties.deviceName);
 	free(devices);
 }
@@ -245,7 +210,7 @@ static void CreateLogicalDevice()
 	VkDeviceQueueCreateInfo graphicsQueueInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		.queueFamilyIndex = graphicsQueueIndex,
+		.queueFamilyIndex = graphics.graphicsQueueIndex,
 		.queueCount = 1,
 		.pQueuePriorities = &(float){ 1.0 },
 	};
@@ -254,22 +219,22 @@ static void CreateLogicalDevice()
 	VkDeviceQueueCreateInfo presentQueueInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		.queueFamilyIndex = presentQueueIndex,
+		.queueFamilyIndex = graphics.presentQueueIndex,
 		.queueCount = 1,
 		.pQueuePriorities = &(float){ 1.0 },
 	};
-	if (presentQueueIndex != graphicsQueueIndex) { queueInfos[queueCount++] = presentQueueInfo; }
+	if (graphics.presentQueueIndex != graphics.graphicsQueueIndex) { queueInfos[queueCount++] = presentQueueInfo; }
 	
-	if (computeShadersSupported)
+	if (graphics.computeShadersSupported)
 	{
 		VkDeviceQueueCreateInfo computeQueueInfo =
 		{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-			.queueFamilyIndex = computeQueueIndex,
+			.queueFamilyIndex = graphics.computeQueueIndex,
 			.queueCount = 1,
 			.pQueuePriorities = &(float){ 1.0 },
 		};
-		if (computeQueueIndex != graphicsQueueIndex && computeQueueIndex != presentQueueIndex) { queueInfos[queueCount++] = computeQueueInfo; }
+		if (graphics.computeQueueIndex != graphics.graphicsQueueIndex && graphics.computeQueueIndex != graphics.presentQueueIndex) { queueInfos[queueCount++] = computeQueueInfo; }
 	}
 	
 	// enable specific device features that are required (both features enabled below are supported by all GPUs that support Vulkan)
@@ -292,13 +257,13 @@ static void CreateLogicalDevice()
 		.enabledLayerCount = 0,
 		.ppEnabledLayerNames = NULL,
 	};
-	VkResult result = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
+	VkResult result = vkCreateDevice(graphics.physicalDevice, &deviceInfo, NULL, &graphics.device);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Vulkan, but failed to create VkDevice: %i\n", result); }
 	
 	// get the queues that were automatically created after creating the VkDevice
-	vkGetDeviceQueue(device, graphicsQueueIndex, 0, &graphicsQueue);
-	vkGetDeviceQueue(device, presentQueueIndex, 0, &presentQueue);
-	if (computeShadersSupported) { vkGetDeviceQueue(device, computeQueueIndex, 0, &computeQueue); }
+	vkGetDeviceQueue(graphics.device, graphics.graphicsQueueIndex, 0, &graphics.graphicsQueue);
+	vkGetDeviceQueue(graphics.device, graphics.presentQueueIndex, 0, &graphics.presentQueue);
+	if (graphics.computeShadersSupported) { vkGetDeviceQueue(graphics.device, graphics.computeQueueIndex, 0, &graphics.computeQueue); }
 }
 
 static void CreateRenderPass()
@@ -357,7 +322,7 @@ static void CreateRenderPass()
 		.dependencyCount = 0,
 		.pDependencies = NULL,
 	};
-	VkResult result = vkCreateRenderPass(device, &renderPassInfo, NULL, &renderPass);
+	VkResult result = vkCreateRenderPass(graphics.device, &renderPassInfo, NULL, &graphics.renderPass);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VkRenderPass: %i\n", result); }
 }
 
@@ -368,36 +333,36 @@ static void CreateCommandPool()
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 		.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-		.queueFamilyIndex = graphicsQueueIndex,
+		.queueFamilyIndex = graphics.graphicsQueueIndex,
 	};
-	VkResult result = vkCreateCommandPool(device, &createInfo, NULL, &commandPool);
+	VkResult result = vkCreateCommandPool(graphics.device, &createInfo, NULL, &graphics.commandPool);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VkCommandPool: %i\n", result); }
 }
 
 static void CreateFramesInFlight()
 {
 	// create the frame resources that allow for asynchronous rendering
-	for (int32_t i = 0; i < frameCount; i++)
+	for (int32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 	{
 		// allocate the command buffers
 		VkCommandBufferAllocateInfo allocateInfo =
 		{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			.commandPool = commandPool,
+			.commandPool = graphics.commandPool,
 			.commandBufferCount = 1,
 		};
-		vkAllocateCommandBuffers(device, &allocateInfo, &frames[i].commandBuffer);
-		vkAllocateCommandBuffers(device, &allocateInfo, &frames[i].computeCommandBuffer);
+		vkAllocateCommandBuffers(graphics.device, &allocateInfo, &graphics.frames[i].commandBuffer);
+		vkAllocateCommandBuffers(graphics.device, &allocateInfo, &graphics.frames[i].computeCommandBuffer);
 		
 		// create the semaphores that sync the frame resources with each other on the GPU
 		VkSemaphoreCreateInfo semaphoreInfo =
 		{
 			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 		};
-		vkCreateSemaphore(device, &semaphoreInfo, NULL, &frames[i].imageAvailable);
-		vkCreateSemaphore(device, &semaphoreInfo, NULL, &frames[i].renderFinished);
-		vkCreateSemaphore(device, &semaphoreInfo, NULL, &frames[i].computeFinished);
+		vkCreateSemaphore(graphics.device, &semaphoreInfo, NULL, &graphics.frames[i].imageAvailable);
+		vkCreateSemaphore(graphics.device, &semaphoreInfo, NULL, &graphics.frames[i].renderFinished);
+		vkCreateSemaphore(graphics.device, &semaphoreInfo, NULL, &graphics.frames[i].computeFinished);
 		
 		// create the fences that sync the GPU with the CPU
 		VkFenceCreateInfo fenceInfo =
@@ -405,25 +370,25 @@ static void CreateFramesInFlight()
 			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 		};
-		vkCreateFence(device, &fenceInfo, NULL, &frames[i].frameReady);
-		vkCreateFence(device, &fenceInfo, NULL, &frames[i].computeFence);
+		vkCreateFence(graphics.device, &fenceInfo, NULL, &graphics.frames[i].frameReady);
+		vkCreateFence(graphics.device, &fenceInfo, NULL, &graphics.frames[i].computeFence);
 	}
-	frameIndex = 0;
+	graphics.frameIndex = 0;
 }
 
 static void CreateSwapchain(int32_t width, int32_t height)
 {
-	swapchain.targetExtent = (VkExtent2D){ .width = width, .height = height };
+	graphics.swapchain.targetExtent = (VkExtent2D){ .width = width, .height = height };
 	
 	// get the available capabilities of the window surface
 	VkSurfaceCapabilitiesKHR availableCapabilities;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &availableCapabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(graphics.physicalDevice, graphics.surface, &availableCapabilities);
 	
 	// get the list of supported surface formats
 	uint32_t availableFormatCount = 0;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &availableFormatCount, NULL);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(graphics.physicalDevice, graphics.surface, &availableFormatCount, NULL);
 	VkSurfaceFormatKHR * availableFormats = malloc(availableFormatCount * sizeof(VkSurfaceFormatKHR));
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &availableFormatCount, availableFormats);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(graphics.physicalDevice, graphics.surface, &availableFormatCount, availableFormats);
 	
 	// set the surface format to VK_FORMAT_B8G8R8A8_UNORM if it's supported
 	VkSurfaceFormatKHR surfaceFormat = availableFormats[0];
@@ -439,15 +404,15 @@ static void CreateSwapchain(int32_t width, int32_t height)
 	
 	// get the list of supported present modes
 	uint32_t availablePresentModeCount = 0;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &availablePresentModeCount, NULL);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(graphics.physicalDevice, graphics.surface, &availablePresentModeCount, NULL);
 	VkPresentModeKHR * availablePresentModes = malloc(availablePresentModeCount * sizeof(VkPresentModeKHR));
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &availablePresentModeCount, availablePresentModes);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(graphics.physicalDevice, graphics.surface, &availablePresentModeCount, availablePresentModes);
 	
 	// set the present mode to the target present mode if it's available (VK_PRESENT_MODE_FIFO_KHR is guarenteed to be supported)
-	swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	graphics.swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
 	for (int32_t i = 0; i < availablePresentModeCount; i++)
 	{
-		if (availablePresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) { swapchain.presentMode = availablePresentModes[i]; }
+		if (availablePresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) { graphics.swapchain.presentMode = availablePresentModes[i]; }
 	}
 	free(availablePresentModes);
 	
@@ -472,7 +437,7 @@ static void CreateSwapchain(int32_t width, int32_t height)
 	VkSwapchainCreateInfoKHR createInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		.surface = surface,
+		.surface = graphics.surface,
 		.minImageCount = imageCount,
 		.imageFormat = surfaceFormat.format,
 		.imageColorSpace = surfaceFormat.colorSpace,
@@ -481,12 +446,12 @@ static void CreateSwapchain(int32_t width, int32_t height)
 		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.preTransform = availableCapabilities.currentTransform,
 		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		.presentMode = swapchain.presentMode,
+		.presentMode = graphics.swapchain.presentMode,
 		.clipped = VK_TRUE,
 		.oldSwapchain = VK_NULL_HANDLE,
 	};
-	const uint32_t queueFamilyIndices[] = { graphicsQueueIndex, presentQueueIndex };
-	if (graphicsQueueIndex != presentQueueIndex)
+	const uint32_t queueFamilyIndices[] = { graphics.graphicsQueueIndex, graphics.presentQueueIndex };
+	if (graphics.graphicsQueueIndex != graphics.presentQueueIndex)
 	{
 		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 		createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -495,19 +460,19 @@ static void CreateSwapchain(int32_t width, int32_t height)
 	else { createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; }
 	
 	// Create the swapchain
-	VkResult result = vkCreateSwapchainKHR(device, &createInfo, NULL, &swapchain.instance);
+	VkResult result = vkCreateSwapchainKHR(graphics.device, &createInfo, NULL, &graphics.swapchain.instance);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to create swapchain, but failed to create VkSwapchainKHR: %i\n", result); }
 
-	swapchain.extent = extent;
-	swapchain.colorFormat = surfaceFormat.format;
+	graphics.swapchain.extent = extent;
+	graphics.swapchain.colorFormat = surfaceFormat.format;
 }
 
 static void GetSwapchainImages()
 {
 	// get the list of swapchain images
-	vkGetSwapchainImagesKHR(device, swapchain.instance, &swapchain.imageCount, NULL);
-	swapchain.images = malloc(swapchain.imageCount * sizeof(VkImage));
-	vkGetSwapchainImagesKHR(device, swapchain.instance, &swapchain.imageCount, swapchain.images);
+	vkGetSwapchainImagesKHR(graphics.device, graphics.swapchain.instance, &graphics.swapchain.imageCount, NULL);
+	graphics.swapchain.images = malloc(graphics.swapchain.imageCount * sizeof(VkImage));
+	vkGetSwapchainImagesKHR(graphics.device, graphics.swapchain.instance, &graphics.swapchain.imageCount, graphics.swapchain.images);
 	
 	// allocate a commandbuffer to queue the layout conversion of each iamge
 	VkCommandBuffer commandBuffer;
@@ -515,10 +480,10 @@ static void GetSwapchainImages()
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandPool = commandPool,
+		.commandPool = graphics.commandPool,
 		.commandBufferCount = 1,
 	};
-	vkAllocateCommandBuffers(device, &commandAllocateInfo, &commandBuffer);
+	vkAllocateCommandBuffers(graphics.device, &commandAllocateInfo, &commandBuffer);
 	VkCommandBufferBeginInfo beginInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -527,7 +492,7 @@ static void GetSwapchainImages()
 	
 	// record the commands that convert each image layout to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 	vkBeginCommandBuffer(commandBuffer, &beginInfo);
-	for (int32_t i = 0; i < swapchain.imageCount; i++)
+	for (int32_t i = 0; i < graphics.swapchain.imageCount; i++)
 	{
 		VkImageMemoryBarrier memoryBarrier =
 		{
@@ -536,7 +501,7 @@ static void GetSwapchainImages()
 			.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = swapchain.images[i],
+			.image = graphics.swapchain.images[i],
 			.subresourceRange =
 			{
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -559,13 +524,13 @@ static void GetSwapchainImages()
 		.commandBufferCount = 1,
 		.pCommandBuffers = &commandBuffer,
 	};
-	vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkDeviceWaitIdle(device);
+	vkQueueSubmit(graphics.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkDeviceWaitIdle(graphics.device);
 	
-	vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+	vkFreeCommandBuffers(graphics.device, graphics.commandPool, 1, &commandBuffer);
 }
 
-void InitializeGraphicsBackend(int32_t width, int32_t height)
+void GraphicsInitialize(int32_t width, int32_t height)
 {
 	printf("[Info] initializing the graphics backend...\n");
 	CheckExtensionSupport();
@@ -581,12 +546,12 @@ void InitializeGraphicsBackend(int32_t width, int32_t height)
 	printf("[Info] successfully initialized the graphics backend\n");
 }
 
-void RecreateSwapchain(int32_t width, int32_t height)
+void GraphicsRecreateSwapchain(int32_t width, int32_t height)
 {
 	// destroy old swapchain
-	vkDeviceWaitIdle(device);
-	free(swapchain.images);
-	vkDestroySwapchainKHR(device, swapchain.instance, NULL);
+	vkDeviceWaitIdle(graphics.device);
+	free(graphics.swapchain.images);
+	vkDestroySwapchainKHR(graphics.device, graphics.swapchain.instance, NULL);
 	
 	printf("[Info] creating the swapchain...\n");
 	CreateSwapchain(width, height);
@@ -594,34 +559,34 @@ void RecreateSwapchain(int32_t width, int32_t height)
 	printf("[Info] successfully created the swapchain\n");
 }
 
-void UpdateBackend()
+void GraphicsUpdate()
 {
 	// advance to the next frame resource
-	frameIndex = (frameIndex + 1) % frameCount;
-	vkWaitForFences(device, 1, &frames[frameIndex].frameReady, VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &frames[frameIndex].frameReady);
+	graphics.frameIndex = (graphics.frameIndex + 1) % FRAMES_IN_FLIGHT;
+	vkWaitForFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].frameReady, VK_TRUE, UINT64_MAX);
+	vkResetFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].frameReady);
 }
 
-void StartCompute()
+void GraphicsStartCompute()
 {
 	// sync the frame resource from last compute operation
-	vkWaitForFences(device, 1, &frames[frameIndex].computeFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &frames[frameIndex].computeFence);
+	vkWaitForFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].computeFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].computeFence);
 	
 	// begin recording commands for the next compute operation
-	vkResetCommandBuffer(frames[frameIndex].computeCommandBuffer, 0);
+	vkResetCommandBuffer(graphics.frames[graphics.frameIndex].computeCommandBuffer, 0);
 	VkCommandBufferBeginInfo beginInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	};
-	vkBeginCommandBuffer(frames[frameIndex].computeCommandBuffer, &beginInfo);
+	vkBeginCommandBuffer(graphics.frames[graphics.frameIndex].computeCommandBuffer, &beginInfo);
 }
 
-void EndCompute()
+void GraphicsEndCompute()
 {
 	// end command recording for the compute operation
-	VkResult result = vkEndCommandBuffer(frames[frameIndex].computeCommandBuffer);
+	VkResult result = vkEndCommandBuffer(graphics.frames[graphics.frameIndex].computeCommandBuffer);
 	if (result != VK_SUCCESS)
 	{
 		printf("[Fatal] trying to end compute recording, but failed to record compute command buffer: %i\n", result);
@@ -635,46 +600,46 @@ void EndCompute()
 		.pWaitSemaphores = NULL,
 		.pWaitDstStageMask = NULL,
 		.commandBufferCount = 1,
-		.pCommandBuffers = &frames[frameIndex].computeCommandBuffer,
+		.pCommandBuffers = &graphics.frames[graphics.frameIndex].computeCommandBuffer,
 		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &frames[frameIndex].computeFinished,
+		.pSignalSemaphores = &graphics.frames[graphics.frameIndex].computeFinished,
 	};
-	result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[frameIndex].computeFence);
+	result = vkQueueSubmit(graphics.graphicsQueue, 1, &submitInfo, graphics.frames[graphics.frameIndex].computeFence);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to send compute operations, but failed to submit queue: %i\n", result); }
 	
 	// add the compute operation to the list of prerender semaphores
 	//Graphics.PreRenderSemaphores = ListPush(Graphics.PreRenderSemaphores, &Graphics.FrameResources[Graphics.FrameIndex].ComputeFinished);
 }
 
-void AquireNextSwapchainImage()
+void GraphicsAquireNextSwapchainImage()
 {
 	// acquire next image (and try again if unsuccesful)
-	VkResult result = vkAcquireNextImageKHR(device, swapchain.instance, UINT64_MAX, frames[frameIndex].imageAvailable, VK_NULL_HANDLE, &swapchain.imageIndex);
+	VkResult result = vkAcquireNextImageKHR(graphics.device, graphics.swapchain.instance, UINT64_MAX, graphics.frames[graphics.frameIndex].imageAvailable, VK_NULL_HANDLE, &graphics.swapchain.imageIndex);
 	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) { printf("[Warning] unsuccessful aquire image: %i, trying again until successful...\n", result); }
 	while (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 	{
-		result = vkAcquireNextImageKHR(device, swapchain.instance, UINT64_MAX, frames[frameIndex].imageAvailable, VK_NULL_HANDLE, &swapchain.imageIndex);
+		result = vkAcquireNextImageKHR(graphics.device, graphics.swapchain.instance, UINT64_MAX, graphics.frames[graphics.frameIndex].imageAvailable, VK_NULL_HANDLE, &graphics.swapchain.imageIndex);
 		if (result == VK_SUCCESS) { printf("[Info] Succefully aquired image, continuing operations\n"); }
 	}
 	
 	// begin recording commands
-	vkResetCommandBuffer(frames[frameIndex].commandBuffer, 0);
+	vkResetCommandBuffer(graphics.frames[graphics.frameIndex].commandBuffer, 0);
 	VkCommandBufferBeginInfo beginInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	};
-	result = vkBeginCommandBuffer(frames[frameIndex].commandBuffer, &beginInfo);
+	result = vkBeginCommandBuffer(graphics.frames[graphics.frameIndex].commandBuffer, &beginInfo);
 }
 
-void PresentSwapchainImage()
+void GraphicsPresentSwapchainImage()
 {
 	// end command recording
-	VkResult result = vkEndCommandBuffer(frames[frameIndex].commandBuffer);
+	VkResult result = vkEndCommandBuffer(graphics.frames[graphics.frameIndex].commandBuffer);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to end graphics recording, but failed to record command buffer: %i\n", result); }
 	
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
-	VkSemaphore waitSemaphores[] = { frames[frameIndex].imageAvailable };
+	VkSemaphore waitSemaphores[] = { graphics.frames[graphics.frameIndex].imageAvailable };
 	
 	// submit the command buffer to the graphics queue
 	VkSubmitInfo submitInfo =
@@ -684,11 +649,11 @@ void PresentSwapchainImage()
 		.pWaitSemaphores = waitSemaphores,
 		.pWaitDstStageMask = waitStages,
 		.commandBufferCount = 1,
-		.pCommandBuffers = &frames[frameIndex].commandBuffer,
+		.pCommandBuffers = &graphics.frames[graphics.frameIndex].commandBuffer,
 		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &frames[frameIndex].renderFinished,
+		.pSignalSemaphores = &graphics.frames[graphics.frameIndex].renderFinished,
 	};
-	result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[frameIndex].frameReady);
+	result = vkQueueSubmit(graphics.graphicsQueue, 1, &submitInfo, graphics.frames[graphics.frameIndex].frameReady);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to send graphics commands, but failed to submit queue: %i\n", result); }
 	
 	// submit the swapchain to the present queue
@@ -696,10 +661,32 @@ void PresentSwapchainImage()
 	{
 		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &frames[frameIndex].renderFinished,
+		.pWaitSemaphores = &graphics.frames[graphics.frameIndex].renderFinished,
 		.swapchainCount = 1,
-		.pSwapchains = &swapchain.instance,
-		.pImageIndices = &swapchain.imageIndex,
+		.pSwapchains = &graphics.swapchain.instance,
+		.pImageIndices = &graphics.swapchain.imageIndex,
 	};
-	vkQueuePresentKHR(presentQueue, &presentInfo);
+	vkQueuePresentKHR(graphics.presentQueue, &presentInfo);
+}
+
+void GraphicsShutdown()
+{
+	vkDeviceWaitIdle(graphics.device);
+	free(graphics.swapchain.images);
+	vkDestroySwapchainKHR(graphics.device, graphics.swapchain.instance, NULL);
+	for (int32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+	{
+		vkDestroyFence(graphics.device, graphics.frames[i].frameReady, NULL);
+		vkDestroyFence(graphics.device, graphics.frames[i].computeFence, NULL);
+		vkDestroySemaphore(graphics.device, graphics.frames[i].renderFinished, NULL);
+		vkDestroySemaphore(graphics.device, graphics.frames[i].imageAvailable, NULL);
+		vkDestroySemaphore(graphics.device, graphics.frames[i].computeFinished, NULL);
+		vkFreeCommandBuffers(graphics.device, graphics.commandPool, 1, &graphics.frames[i].commandBuffer);
+		vkFreeCommandBuffers(graphics.device, graphics.commandPool, 1, &graphics.frames[i].computeCommandBuffer);
+	}
+	vkDestroyCommandPool(graphics.device, graphics.commandPool, NULL);
+	vkDestroyRenderPass(graphics.device, graphics.renderPass, NULL);
+	vkDestroyDevice(graphics.device, NULL);
+	vkDestroySurfaceKHR(graphics.instance, graphics.surface, NULL);
+	vkDestroyInstance(graphics.instance, NULL);
 }

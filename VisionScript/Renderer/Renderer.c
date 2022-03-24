@@ -1,7 +1,7 @@
 #include "Application.h"
 #include "Camera.h"
 #include "Renderer.h"
-#include "Backend.h"
+#include "Backend/Graphics.h"
 
 static struct Renderer
 {
@@ -14,28 +14,28 @@ static struct Renderer
 
 static void Startup()
 {
-	InitializeGraphicsBackend(renderer.width, renderer.height);
+	GraphicsInitialize(renderer.width, renderer.height);
 }
 
 static void Update()
 {
-	UpdateBackend();
+	GraphicsUpdate();
 }
 
 static void Render()
 {
-	AquireNextSwapchainImage();
-	PresentSwapchainImage();
+	GraphicsAquireNextSwapchainImage();
+	GraphicsPresentSwapchainImage();
 }
 
 static void Resize(int32_t width, int32_t height)
 {
-	RecreateSwapchain(width, height);
+	GraphicsRecreateSwapchain(width, height);
 }
 
 static void Shutdown()
 {
-	
+	GraphicsShutdown();
 }
 
 void RenderScript(Script * script, RendererType type, bool debug)
