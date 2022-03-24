@@ -19,10 +19,13 @@ static void Startup()
 
 static void Update()
 {
+	UpdateBackend();
 }
 
 static void Render()
 {
+	AquireNextSwapchainImage();
+	PresentSwapchainImage();
 }
 
 static void Shutdown()

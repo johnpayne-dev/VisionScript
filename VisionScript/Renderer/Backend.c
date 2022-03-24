@@ -509,7 +509,7 @@ static void GetSwapchainImages()
 	swapchain.images = malloc(swapchain.imageCount * sizeof(VkImage));
 	vkGetSwapchainImagesKHR(device, swapchain.instance, &swapchain.imageCount, swapchain.images);
 	
-	// Allocate a commandbuffer to queue the layout conversion of each iamge
+	// allocate a commandbuffer to queue the layout conversion of each iamge
 	VkCommandBuffer commandBuffer;
 	VkCommandBufferAllocateInfo commandAllocateInfo =
 	{
@@ -525,9 +525,9 @@ static void GetSwapchainImages()
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	};
 	
-	// Record the commands that convert each image layout to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+	// record the commands that convert each image layout to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 	vkBeginCommandBuffer(commandBuffer, &beginInfo);
-	for (int i = 0; i < swapchain.imageCount; i++)
+	for (int32_t i = 0; i < swapchain.imageCount; i++)
 	{
 		VkImageMemoryBarrier memoryBarrier =
 		{
@@ -552,7 +552,7 @@ static void GetSwapchainImages()
 	}
 	vkEndCommandBuffer(commandBuffer);
 	
-	// Submit the command buffer
+	// submit the command buffer
 	VkSubmitInfo submitInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -579,4 +579,127 @@ void InitializeGraphicsBackend(int32_t width, int32_t height)
 	CreateSwapchain(width, height);
 	GetSwapchainImages();
 	printf("[Info] successfully initialized the graphics backend\n");
+}
+
+void RecreateSwapchain(int32_t width, int32_t height)
+{
+	// destroy old swapchain
+	vkDeviceWaitIdle(device);
+	free(swapchain.images);
+	vkDestroySwapchainKHR(device, swapchain.instance, NULL);
+	
+	printf("[Info] creating the swapchain...\n");
+	CreateSwapchain(width, height);
+	GetSwapchainImages();
+	printf("[Info] successfully created the swapchain\n");
+}
+
+void UpdateBackend()
+{
+	// advance to the next frame resource
+	frameIndex = (frameIndex + 1) % frameCount;
+	vkWaitForFences(device, 1, &frames[frameIndex].frameReady, VK_TRUE, UINT64_MAX);
+	vkResetFences(device, 1, &frames[frameIndex].frameReady);
+}
+
+void StartCompute()
+{
+	// sync the frame resource from last compute operation
+	vkWaitForFences(device, 1, &frames[frameIndex].computeFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device, 1, &frames[frameIndex].computeFence);
+	
+	// begin recording commands for the next compute operation
+	vkResetCommandBuffer(frames[frameIndex].computeCommandBuffer, 0);
+	VkCommandBufferBeginInfo beginInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+	vkBeginCommandBuffer(frames[frameIndex].computeCommandBuffer, &beginInfo);
+}
+
+void EndCompute()
+{
+	// end command recording for the compute operation
+	VkResult result = vkEndCommandBuffer(frames[frameIndex].computeCommandBuffer);
+	if (result != VK_SUCCESS)
+	{
+		printf("[Fatal] trying to end compute recording, but failed to record compute command buffer: %i\n", result);
+	}
+	
+	// submit command buffer
+	VkSubmitInfo submitInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = 0,
+		.pWaitSemaphores = NULL,
+		.pWaitDstStageMask = NULL,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &frames[frameIndex].computeCommandBuffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &frames[frameIndex].computeFinished,
+	};
+	result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[frameIndex].computeFence);
+	if (result != VK_SUCCESS) { printf("[Fatal] trying to send compute operations, but failed to submit queue: %i\n", result); }
+	
+	// add the compute operation to the list of prerender semaphores
+	//Graphics.PreRenderSemaphores = ListPush(Graphics.PreRenderSemaphores, &Graphics.FrameResources[Graphics.FrameIndex].ComputeFinished);
+}
+
+void AquireNextSwapchainImage()
+{
+	// acquire next image (and try again if unsuccesful)
+	VkResult result = vkAcquireNextImageKHR(device, swapchain.instance, UINT64_MAX, frames[frameIndex].imageAvailable, VK_NULL_HANDLE, &swapchain.imageIndex);
+	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) { printf("[Warning] unsuccessful aquire image: %i, trying again until successful...\n", result); }
+	while (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+	{
+		result = vkAcquireNextImageKHR(device, swapchain.instance, UINT64_MAX, frames[frameIndex].imageAvailable, VK_NULL_HANDLE, &swapchain.imageIndex);
+		if (result == VK_SUCCESS) { printf("[Info] Succefully aquired image, continuing operations\n"); }
+	}
+	
+	// begin recording commands
+	vkResetCommandBuffer(frames[frameIndex].commandBuffer, 0);
+	VkCommandBufferBeginInfo beginInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+	result = vkBeginCommandBuffer(frames[frameIndex].commandBuffer, &beginInfo);
+}
+
+void PresentSwapchainImage()
+{
+	// end command recording
+	VkResult result = vkEndCommandBuffer(frames[frameIndex].commandBuffer);
+	if (result != VK_SUCCESS) { printf("[Fatal] trying to end graphics recording, but failed to record command buffer: %i\n", result); }
+	
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
+	VkSemaphore waitSemaphores[] = { frames[frameIndex].imageAvailable };
+	
+	// submit the command buffer to the graphics queue
+	VkSubmitInfo submitInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = sizeof(waitSemaphores) / sizeof(waitSemaphores[0]),
+		.pWaitSemaphores = waitSemaphores,
+		.pWaitDstStageMask = waitStages,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &frames[frameIndex].commandBuffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &frames[frameIndex].renderFinished,
+	};
+	result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[frameIndex].frameReady);
+	if (result != VK_SUCCESS) { printf("[Fatal] trying to send graphics commands, but failed to submit queue: %i\n", result); }
+	
+	// submit the swapchain to the present queue
+	VkPresentInfoKHR presentInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &frames[frameIndex].renderFinished,
+		.swapchainCount = 1,
+		.pSwapchains = &swapchain.instance,
+		.pImageIndices = &swapchain.imageIndex,
+	};
+	vkQueuePresentKHR(presentQueue, &presentInfo);
 }
