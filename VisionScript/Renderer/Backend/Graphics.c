@@ -266,66 +266,6 @@ static void CreateLogicalDevice()
 	if (graphics.computeShadersSupported) { vkGetDeviceQueue(graphics.device, graphics.computeQueueIndex, 0, &graphics.computeQueue); }
 }
 
-static void CreateRenderPass()
-{
-	// create the single render pass that is used for all drawing operations
-	VkAttachmentDescription colorAttachment =
-	{
-		.format = VK_FORMAT_R8G8B8A8_UNORM,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.initialLayout = VK_IMAGE_LAYOUT_GENERAL,
-		.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
-	};
-	VkAttachmentReference colorAttachmentReference =
-	{
-		.attachment = 0,
-		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	};
-	
-	VkAttachmentDescription depthAttachment =
-	{
-		.format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.initialLayout = VK_IMAGE_LAYOUT_GENERAL,
-		.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
-	};
-	VkAttachmentReference depthAttachmentReference =
-	{
-		.attachment = 1,
-		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-	};
-	
-	VkSubpassDescription subpass =
-	{
-		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.colorAttachmentCount = 1,
-		.pColorAttachments = &colorAttachmentReference,
-		.pDepthStencilAttachment = &depthAttachmentReference,
-	};
-	
-	VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment };
-	VkRenderPassCreateInfo renderPassInfo =
-	{
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount = sizeof(attachments) / sizeof(attachments[0]),
-		.pAttachments = attachments,
-		.subpassCount = 1,
-		.pSubpasses = &subpass,
-		.dependencyCount = 0,
-		.pDependencies = NULL,
-	};
-	VkResult result = vkCreateRenderPass(graphics.device, &renderPassInfo, NULL, &graphics.renderPass);
-	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VkRenderPass: %i\n", result); }
-}
-
 static void CreateCommandPool()
 {
 	// create the command pool that's used to allocate all of the command buffers
@@ -376,7 +316,7 @@ static void CreateFramesInFlight()
 	graphics.frameIndex = 0;
 }
 
-static void CreateSwapchain(int32_t width, int32_t height)
+static void CreateSwapchainKHR(int32_t width, int32_t height)
 {
 	graphics.swapchain.targetExtent = (VkExtent2D){ .width = width, .height = height };
 	
@@ -390,9 +330,9 @@ static void CreateSwapchain(int32_t width, int32_t height)
 	VkSurfaceFormatKHR * availableFormats = malloc(availableFormatCount * sizeof(VkSurfaceFormatKHR));
 	vkGetPhysicalDeviceSurfaceFormatsKHR(graphics.physicalDevice, graphics.surface, &availableFormatCount, availableFormats);
 	
-	// set the surface format to VK_FORMAT_B8G8R8A8_UNORM if it's supported
+	// set the surface format to VK_FORMAT_R8G8B8A8_UNORM if it's supported
 	VkSurfaceFormatKHR surfaceFormat = availableFormats[0];
-	VkFormat targetFormat = VK_FORMAT_B8G8R8A8_UNORM;
+	VkFormat targetFormat = VK_FORMAT_R8G8B8A8_UNORM;
 	for (int32_t i = 0; i < availableFormatCount; i++)
 	{
 		if (availableFormats[i].format == targetFormat)
@@ -467,67 +407,135 @@ static void CreateSwapchain(int32_t width, int32_t height)
 	graphics.swapchain.colorFormat = surfaceFormat.format;
 }
 
-static void GetSwapchainImages()
+static void CreateSwapchainRenderPass()
+{
+	// create the single render pass that is used for all drawing operations
+	VkAttachmentDescription colorAttachment =
+	{
+		.format = graphics.swapchain.colorFormat,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	};
+	VkAttachmentReference colorAttachmentReference =
+	{
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	};
+	
+	/*VkAttachmentDescription depthAttachment =
+	{
+		.format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.initialLayout = VK_IMAGE_LAYOUT_GENERAL,
+		.finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+	};
+	VkAttachmentReference depthAttachmentReference =
+	{
+		.attachment = 1,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	};*/
+	
+	VkSubpassDescription subpass =
+	{
+		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &colorAttachmentReference,
+	};
+	
+	VkAttachmentDescription attachments[] = { colorAttachment };
+	VkRenderPassCreateInfo renderPassInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount = sizeof(attachments) / sizeof(attachments[0]),
+		.pAttachments = attachments,
+		.subpassCount = 1,
+		.pSubpasses = &subpass,
+		.dependencyCount = 0,
+		.pDependencies = NULL,
+	};
+	VkResult result = vkCreateRenderPass(graphics.device, &renderPassInfo, NULL, &graphics.swapchain.renderPass);
+	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VkRenderPass: %i\n", result); }
+}
+
+static void CreateSwapchainFramebuffers()
 {
 	// get the list of swapchain images
 	vkGetSwapchainImagesKHR(graphics.device, graphics.swapchain.instance, &graphics.swapchain.imageCount, NULL);
 	graphics.swapchain.images = malloc(graphics.swapchain.imageCount * sizeof(VkImage));
 	vkGetSwapchainImagesKHR(graphics.device, graphics.swapchain.instance, &graphics.swapchain.imageCount, graphics.swapchain.images);
 	
-	// allocate a commandbuffer to queue the layout conversion of each iamge
-	VkCommandBuffer commandBuffer;
-	VkCommandBufferAllocateInfo commandAllocateInfo =
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandPool = graphics.commandPool,
-		.commandBufferCount = 1,
-	};
-	vkAllocateCommandBuffers(graphics.device, &commandAllocateInfo, &commandBuffer);
-	VkCommandBufferBeginInfo beginInfo =
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	
-	// record the commands that convert each image layout to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+	// create color imageViews
+	graphics.swapchain.imageViews = malloc(graphics.swapchain.imageCount * sizeof(VkImageView));
 	for (int32_t i = 0; i < graphics.swapchain.imageCount; i++)
 	{
-		VkImageMemoryBarrier memoryBarrier =
+		VkImageViewCreateInfo createInfo =
 		{
-			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.image = graphics.swapchain.images[i],
+			.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
+			.format = graphics.swapchain.colorFormat,
 			.subresourceRange =
 			{
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0,
-				.levelCount = 1,
 				.baseArrayLayer = 0,
+				.baseMipLevel = 0,
 				.layerCount = 1,
+				.levelCount = 1,
 			},
-			.srcAccessMask = 0,
-			.dstAccessMask = 0,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
 		};
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &memoryBarrier);
+		VkResult result = vkCreateImageView(graphics.device, &createInfo, NULL, graphics.swapchain.imageViews + i);
+		if (result != VK_SUCCESS) { printf("[Fatal] trying to create swapchain image views, but failed to create VkImageView: %i\n", result); }
 	}
-	vkEndCommandBuffer(commandBuffer);
 	
-	// submit the command buffer
-	VkSubmitInfo submitInfo =
+	// create framebuffers
+	graphics.swapchain.framebuffers = malloc(graphics.swapchain.imageCount * sizeof(VkFramebuffer));
+	for (int32_t i = 0; i < graphics.swapchain.imageCount; i++)
 	{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &commandBuffer,
-	};
-	vkQueueSubmit(graphics.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		VkImageView attachments[] = { graphics.swapchain.imageViews[i] };
+		VkFramebufferCreateInfo createInfo =
+		{
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.width = graphics.swapchain.extent.width,
+			.height = graphics.swapchain.extent.height,
+			.attachmentCount = sizeof(attachments) / sizeof(attachments[0]),
+			.pAttachments = attachments,
+			.layers = 1,
+			.renderPass = graphics.swapchain.renderPass,
+		};
+		VkResult result = vkCreateFramebuffer(graphics.device, &createInfo, NULL, graphics.swapchain.framebuffers + i);
+		if (result != VK_SUCCESS) { printf("[Fatal] trying to create swapchain framebuffers, but failed to create VkFramebuffer: %i\n", result); }
+	}
+}
+
+static void CreateSwapchain(int32_t width, int32_t height)
+{
+	CreateSwapchainKHR(width, height);
+	CreateSwapchainRenderPass();
+	CreateSwapchainFramebuffers();
+}
+
+static void DestroySwapchain()
+{
 	vkDeviceWaitIdle(graphics.device);
-	
-	vkFreeCommandBuffers(graphics.device, graphics.commandPool, 1, &commandBuffer);
+	vkDestroyRenderPass(graphics.device, graphics.swapchain.renderPass, NULL);
+	free(graphics.swapchain.images);
+	for (int32_t i = 0; i < graphics.swapchain.imageCount; i++)
+	{
+		vkDestroyImageView(graphics.device, graphics.swapchain.imageViews[i], NULL);
+		vkDestroyFramebuffer(graphics.device, graphics.swapchain.framebuffers[i], NULL);
+	}
+	free(graphics.swapchain.imageViews);
+	vkDestroySwapchainKHR(graphics.device, graphics.swapchain.instance, NULL);
 }
 
 void GraphicsInitialize(int32_t width, int32_t height)
@@ -538,24 +546,17 @@ void GraphicsInitialize(int32_t width, int32_t height)
 	CreateSurface();
 	ChoosePhysicalDevice();
 	CreateLogicalDevice();
-	CreateRenderPass();
 	CreateCommandPool();
 	CreateFramesInFlight();
 	CreateSwapchain(width, height);
-	GetSwapchainImages();
 	printf("[Info] successfully initialized the graphics backend\n");
 }
 
 void GraphicsRecreateSwapchain(int32_t width, int32_t height)
 {
-	// destroy old swapchain
-	vkDeviceWaitIdle(graphics.device);
-	free(graphics.swapchain.images);
-	vkDestroySwapchainKHR(graphics.device, graphics.swapchain.instance, NULL);
-	
+	DestroySwapchain();
 	printf("[Info] creating the swapchain...\n");
 	CreateSwapchain(width, height);
-	GetSwapchainImages();
 	printf("[Info] successfully created the swapchain\n");
 }
 
@@ -567,51 +568,7 @@ void GraphicsUpdate()
 	vkResetFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].frameReady);
 }
 
-void GraphicsStartCompute()
-{
-	// sync the frame resource from last compute operation
-	vkWaitForFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].computeFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(graphics.device, 1, &graphics.frames[graphics.frameIndex].computeFence);
-	
-	// begin recording commands for the next compute operation
-	vkResetCommandBuffer(graphics.frames[graphics.frameIndex].computeCommandBuffer, 0);
-	VkCommandBufferBeginInfo beginInfo =
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	vkBeginCommandBuffer(graphics.frames[graphics.frameIndex].computeCommandBuffer, &beginInfo);
-}
-
-void GraphicsEndCompute()
-{
-	// end command recording for the compute operation
-	VkResult result = vkEndCommandBuffer(graphics.frames[graphics.frameIndex].computeCommandBuffer);
-	if (result != VK_SUCCESS)
-	{
-		printf("[Fatal] trying to end compute recording, but failed to record compute command buffer: %i\n", result);
-	}
-	
-	// submit command buffer
-	VkSubmitInfo submitInfo =
-	{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.waitSemaphoreCount = 0,
-		.pWaitSemaphores = NULL,
-		.pWaitDstStageMask = NULL,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &graphics.frames[graphics.frameIndex].computeCommandBuffer,
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &graphics.frames[graphics.frameIndex].computeFinished,
-	};
-	result = vkQueueSubmit(graphics.graphicsQueue, 1, &submitInfo, graphics.frames[graphics.frameIndex].computeFence);
-	if (result != VK_SUCCESS) { printf("[Fatal] trying to send compute operations, but failed to submit queue: %i\n", result); }
-	
-	// add the compute operation to the list of prerender semaphores
-	//Graphics.PreRenderSemaphores = ListPush(Graphics.PreRenderSemaphores, &Graphics.FrameResources[Graphics.FrameIndex].ComputeFinished);
-}
-
-void GraphicsAquireNextSwapchainImage()
+void GraphicsBegin()
 {
 	// acquire next image (and try again if unsuccesful)
 	VkResult result = vkAcquireNextImageKHR(graphics.device, graphics.swapchain.instance, UINT64_MAX, graphics.frames[graphics.frameIndex].imageAvailable, VK_NULL_HANDLE, &graphics.swapchain.imageIndex);
@@ -630,10 +587,45 @@ void GraphicsAquireNextSwapchainImage()
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	};
 	result = vkBeginCommandBuffer(graphics.frames[graphics.frameIndex].commandBuffer, &beginInfo);
+	
+	// begin renderpass
+	VkRenderPassBeginInfo renderPassBegin =
+	{
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = graphics.swapchain.renderPass,
+		.framebuffer = graphics.swapchain.framebuffers[graphics.swapchain.imageIndex],
+		.renderArea = (VkRect2D)
+		{
+			.offset = { 0, 0 },
+			.extent = { graphics.swapchain.extent.width, graphics.swapchain.extent.height },
+		},
+		.clearValueCount = 0,
+		.pClearValues = NULL,
+	};
+	vkCmdBeginRenderPass(graphics.frames[graphics.frameIndex].commandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void GraphicsPresentSwapchainImage()
+void GraphicsClearColor(float r, float g, float b, float a)
 {
+	VkClearRect rect =
+	{
+		.baseArrayLayer = 0,
+		.layerCount = 1,
+		.rect = { .offset = { 0, 0 }, .extent = graphics.swapchain.extent, },
+	};
+	VkClearAttachment clear = (VkClearAttachment)
+	{
+		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.clearValue = { .color = { r, g, b, a } },
+	};
+	vkCmdClearAttachments(graphics.frames[graphics.frameIndex].commandBuffer, 1, &clear, 1, &rect);
+}
+
+void GraphicsEnd()
+{
+	// end the render pass
+	vkCmdEndRenderPass(graphics.frames[graphics.frameIndex].commandBuffer);
+	
 	// end command recording
 	VkResult result = vkEndCommandBuffer(graphics.frames[graphics.frameIndex].commandBuffer);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to end graphics recording, but failed to record command buffer: %i\n", result); }
@@ -671,9 +663,7 @@ void GraphicsPresentSwapchainImage()
 
 void GraphicsShutdown()
 {
-	vkDeviceWaitIdle(graphics.device);
-	free(graphics.swapchain.images);
-	vkDestroySwapchainKHR(graphics.device, graphics.swapchain.instance, NULL);
+	DestroySwapchain();
 	for (int32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 	{
 		vkDestroyFence(graphics.device, graphics.frames[i].frameReady, NULL);
@@ -685,7 +675,6 @@ void GraphicsShutdown()
 		vkFreeCommandBuffers(graphics.device, graphics.commandPool, 1, &graphics.frames[i].computeCommandBuffer);
 	}
 	vkDestroyCommandPool(graphics.device, graphics.commandPool, NULL);
-	vkDestroyRenderPass(graphics.device, graphics.renderPass, NULL);
 	vkDestroyDevice(graphics.device, NULL);
 	vkDestroySurfaceKHR(graphics.instance, graphics.surface, NULL);
 	vkDestroyInstance(graphics.instance, NULL);

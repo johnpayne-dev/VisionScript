@@ -24,8 +24,9 @@ static void Update()
 
 static void Render()
 {
-	GraphicsAquireNextSwapchainImage();
-	GraphicsPresentSwapchainImage();
+	GraphicsBegin();
+	GraphicsClearColor(1.0, 1.0, 1.0, 1.0);
+	GraphicsEnd();
 }
 
 static void Resize(int32_t width, int32_t height)

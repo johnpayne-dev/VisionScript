@@ -15,7 +15,6 @@ static struct Graphics
 	bool computeShadersSupported;
 	int32_t computeQueueIndex, graphicsQueueIndex, presentQueueIndex;
 	VkQueue computeQueue, graphicsQueue, presentQueue;
-	VkRenderPass renderPass;
 	VkCommandPool commandPool;
 	struct FrameInFlight
 	{
@@ -35,8 +34,11 @@ static struct Graphics
 		VkExtent2D targetExtent;
 		VkExtent2D extent;
 		VkFormat colorFormat;
+		VkRenderPass renderPass;
 		uint32_t imageCount;
 		VkImage * images;
+		VkImageView * imageViews;
+		VkFramebuffer * framebuffers;
 		uint32_t imageIndex;
 	} swapchain;
 } graphics;
@@ -47,13 +49,11 @@ void GraphicsRecreateSwapchain(int32_t width, int32_t height);
 
 void GraphicsUpdate(void);
 
-void GraphicsStartCompute(void);
+void GraphicsBegin(void);
 
-void GraphicsEndCompute(void);
+void GraphicsClearColor(float r, float g, float b, float a);
 
-void GraphicsAquireNextSwapchainImage(void);
-
-void GraphicsPresentSwapchainImage(void);
+void GraphicsEnd(void);
 
 void GraphicsShutdown(void);
 
