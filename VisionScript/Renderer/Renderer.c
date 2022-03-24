@@ -28,6 +28,11 @@ static void Render()
 	PresentSwapchainImage();
 }
 
+static void Resize(int32_t width, int32_t height)
+{
+	RecreateSwapchain(width, height);
+}
+
 static void Shutdown()
 {
 	
@@ -50,6 +55,7 @@ void RenderScript(Script * script, RendererType type, bool debug)
 		.startup = Startup,
 		.update = Update,
 		.render = Render,
+		.resize = Resize,
 		.shutdown = Shutdown,
 	};
 	RunApplication(config);

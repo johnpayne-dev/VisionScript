@@ -20,18 +20,11 @@ static id app;
 static id window;
 static id view;
 static AppConfig config;
-static CVDisplayLinkRef displayLink;
+static id timer;
 
 static Class AppDelegateClass;
 static Class WindowDelegateClass;
 static Class ViewClass;
-
-static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp * now, const CVTimeStamp * outputTime, CVOptionFlags flagsIn, CVOptionFlags * flagsOut, void * target)
-{
-	if (config.update != NULL) { config.update(); }
-	if (config.render != NULL) { config.render(); }
-	return kCVReturnSuccess;
-}
 
 static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id notification)
 {
@@ -65,10 +58,15 @@ static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id no
 	
 	if (config.startup != NULL) { config.startup(); }
 	
-	// start the display link
-	CVDisplayLinkCreateWithActiveCGDisplays(&displayLink);
-	CVDisplayLinkSetOutputCallback(displayLink, DisplayLinkCallback, NULL);
-	CVDisplayLinkStart(displayLink);
+	// setup the timer to update every frame
+	// timer = [NSTimer timerWithTimeInterval:0.001 target:view selector:@selector(timerFired) userInfo:nil repeats:YES];
+	timer = ((id (*)(Class, SEL, double, id, SEL, id, bool))objc_msgSend)(objc_getClass("NSTimer"), sel_getUid("timerWithTimeInterval:target:selector:userInfo:repeats:"), 0.001, view, sel_getUid("timerFired"), nil, true);
+		// id runLoop = [NSRunLoop currentRunLoop];
+	id runLoop = ((id (*)(Class, SEL))objc_msgSend)(objc_getClass("NSRunLoop"), sel_getUid("currentRunLoop"));
+	// [runLoop addTimer:timer forMode:NSDefaultRunLoopMode];
+	((void (*)(id, SEL, id, NSRunLoopMode))objc_msgSend)(runLoop, sel_getUid("addTimer:forMode:"), timer, NSDefaultRunLoopMode);
+	// [runLoop addTimer:timer forMode:NSEventTrackingRunLoopMode]; //Ensure timer fires during resize
+	((void (*)(id, SEL, id, NSRunLoopMode))objc_msgSend)(runLoop, sel_getUid("addTimer:forMode:"), timer, NSEventTrackingRunLoopMode);
 }
 
 static bool AppDelegate_applicationShouldTerminateAfterLastWindowClosed(id self, SEL method, id sender)
@@ -84,6 +82,13 @@ static void CreateAppDelegateClass()
 	objc_registerClassPair(AppDelegateClass);
 }
 
+static void WindowDelegate_windowDidResize(id self, SEL method, id notification)
+{
+	// CGRect rect = [view frame];
+	CGRect rect = ((CGRect (*)(id, SEL))objc_msgSend)(view, sel_getUid("frame"));
+	if (config.resize != NULL) { config.resize(rect.size.width, rect.size.height); }
+}
+
 static void WindowDelegate_windowWillClose(id self, SEL method, id notification)
 {
 	if (config.shutdown != NULL) { config.shutdown(); }
@@ -92,8 +97,20 @@ static void WindowDelegate_windowWillClose(id self, SEL method, id notification)
 static void CreateWindowDelegateClass()
 {
 	WindowDelegateClass = objc_allocateClassPair(objc_getClass("NSObject"), "WindowDelegate", 0);
+	class_addMethod(WindowDelegateClass, sel_registerName("windowDidResize:"), (IMP)WindowDelegate_windowDidResize, "v@:@");
 	class_addMethod(WindowDelegateClass, sel_registerName("windowWillClose:"), (IMP)WindowDelegate_windowWillClose, "v@:@");
 	objc_registerClassPair(WindowDelegateClass);
+}
+
+void View_timerFired(id self, SEL method)
+{
+	if (config.update != NULL) { config.update(); }
+	if (config.render != NULL) { config.render(); }
+}
+
+static bool View_wantsUpdateLayer(id self, SEL method)
+{
+	return true;
 }
 
 static Class View_layerClass(id self, SEL method)
@@ -106,18 +123,13 @@ static id View_makeBackingLayer(id self, SEL mthod)
 {
 	// id layer = [CAMetalLayer layer];
 	return ((id (*)(Class, SEL))objc_msgSend)(objc_getClass("CAMetalLayer"), sel_getUid("layer"));
-	//CGSize viewScale = ((CGSize (*)(id, SEL, CGSize))objc_msgSend)(self, sel_getUid("convertSizeToBacking:"), CGSizeMake(1.0, 1.0));
-	/*
-	 CALayer* layer = [self.class.layerClass layer];
-	     CGSize viewScale = [self convertSizeToBacking: CGSizeMake(1.0, 1.0)];
-	     layer.contentsScale = MIN(viewScale.width, viewScale.height);
-	     return layer;
-	 */
 }
 
 static void CreateViewClass()
 {
 	ViewClass = objc_allocateClassPair(objc_getClass("NSView"), "View", 0);
+	class_addMethod(ViewClass, sel_registerName("timerFired"), (IMP)View_timerFired, "v@:");
+	class_addMethod(ViewClass, sel_registerName("wantsUpdateLayer"), (IMP)View_wantsUpdateLayer, "i@:");
 	class_addMethod(ViewClass, sel_registerName("layerClass"), (IMP)View_layerClass, "#@:");
 	class_addMethod(ViewClass, sel_registerName("makeBackingLayer"), (IMP)View_makeBackingLayer, "@@:");
 	objc_registerClassPair(ViewClass);

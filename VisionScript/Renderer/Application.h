@@ -12,6 +12,7 @@ typedef struct WindowConfig
 	void (*update)(void);
 	void (*render)(void);
 	void (*shutdown)(void);
+	void (*resize)(int32_t width, int32_t height);
 } AppConfig;
 
 void RunApplication(AppConfig config);

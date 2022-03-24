@@ -28,6 +28,11 @@ typedef enum NSBackingStoreType
 	NSBackingStoreBuffered = 2,
 } NSBackingStoreType;
 
+typedef id NSRunLoopMode;
+
+ extern NSRunLoopMode const NSDefaultRunLoopMode;
+ extern NSRunLoopMode NSEventTrackingRunLoopMode;
+
 #endif
 
 #endif
