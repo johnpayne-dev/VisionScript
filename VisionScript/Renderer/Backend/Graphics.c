@@ -11,6 +11,8 @@
 	static uint32_t requiredExtensionCount = sizeof(requiredExtensionNames) / sizeof(requiredExtensionNames[0]);
 #endif
 
+struct Graphics graphics = { 0 };
+
 static void CheckExtensionSupport()
 {
 	// get the list of supported extensions
@@ -277,6 +279,20 @@ static void CreateCommandPool()
 	};
 	VkResult result = vkCreateCommandPool(graphics.device, &createInfo, NULL, &graphics.commandPool);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VkCommandPool: %i\n", result); }
+}
+
+static void CreateAllocator()
+{
+	// create the allocator that's used to manage any GPU memory allocations
+	VmaAllocatorCreateInfo allocatorInfo =
+	{
+		.physicalDevice = graphics.physicalDevice,
+		.device = graphics.device,
+		.preferredLargeHeapBlockSize = 16 * 1024 * 1024, // 16mb
+		.instance = graphics.instance,
+	};
+	VkResult result = vmaCreateAllocator(&allocatorInfo, &graphics.allocator);
+	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VmaAllocator: %i\n", result); }
 }
 
 static void CreateFramesInFlight()
@@ -547,6 +563,7 @@ void GraphicsInitialize(int32_t width, int32_t height)
 	ChoosePhysicalDevice();
 	CreateLogicalDevice();
 	CreateCommandPool();
+	CreateAllocator();
 	CreateFramesInFlight();
 	CreateSwapchain(width, height);
 	printf("[Info] successfully initialized the graphics backend\n");

@@ -3,10 +3,11 @@
 
 #include <stdbool.h>
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 
 #define FRAMES_IN_FLIGHT 3
 
-static struct Graphics
+extern struct Graphics
 {
 	VkInstance instance;
 	VkSurfaceKHR surface;
@@ -16,6 +17,7 @@ static struct Graphics
 	int32_t computeQueueIndex, graphicsQueueIndex, presentQueueIndex;
 	VkQueue computeQueue, graphicsQueue, presentQueue;
 	VkCommandPool commandPool;
+	VmaAllocator allocator;
 	struct FrameInFlight
 	{
 		VkCommandBuffer commandBuffer;
