@@ -4,7 +4,7 @@
 #include "Pipeline.h"
 #include "Graphics.h"
 
-ShaderCode ShaderCompile(ShaderType type, const char * source)
+Shader ShaderCompile(ShaderType type, const char * source)
 {
 	shaderc_compiler_t compiler = shaderc_compiler_initialize();
 	
@@ -23,11 +23,12 @@ ShaderCode ShaderCompile(ShaderType type, const char * source)
 		printf("[Fatal] failed to compile shader: %s\n", shaderc_result_get_error_message(result));
 	}
 	
-	ShaderCode shader =
+	Shader shader =
 	{
 		.type = type,
 		.codeSize = shaderc_result_get_length(result),
 	};
+	shader.code = malloc(shader.codeSize);
 	memcpy(shader.code, shaderc_result_get_bytes(result), shader.codeSize);
 	
 	shaderc_result_release(result);
@@ -35,31 +36,31 @@ ShaderCode ShaderCompile(ShaderType type, const char * source)
 	return shader;
 }
 
-void ShaderCodeFree(ShaderCode shader)
+void ShaderCodeFree(Shader shader)
 {
 	free(shader.code);
 }
 
-static void CreateReflectModules(Pipeline pipeline, PipelineConfig config)
+static void CreateReflectModules(Pipeline * pipeline, PipelineConfig config)
 {
 	// allocate and set the information for each stage in the pipeline
-	pipeline.stageCount = config.shaderCount;
-	pipeline.stages = malloc(pipeline.stageCount * sizeof(struct PipelineStage));
-	for (int32_t i = 0; i < pipeline.stageCount; i++)
+	pipeline->stageCount = config.shaderCount;
+	pipeline->stages = malloc(pipeline->stageCount * sizeof(struct PipelineStage));
+	for (int32_t i = 0; i < pipeline->stageCount; i++)
 	{
-		pipeline.stages[i].shaderType = config.shaders[i].type;
-		spvReflectCreateShaderModule(config.shaders[i].codeSize, config.shaders[i].code, &pipeline.stages[i].module);
+		pipeline->stages[i].shaderType = config.shaders[i].type;
+		spvReflectCreateShaderModule(config.shaders[i].codeSize, config.shaders[i].code, &pipeline->stages[i].module);
 	}
 }
 
-static void CreateDescriptorLayout(Pipeline pipeline, int32_t * uboCount, int32_t * samplerCount, int32_t * storageCount)
+static void CreateDescriptorLayout(Pipeline * pipeline, int32_t * uboCount, int32_t * samplerCount, int32_t * storageCount)
 {
 	// go through each pipeline stage to look for a descriptor set (currently only supports handling 1 descriptor set)
 	uint32_t bindingCount = 0;
-	pipeline.usesDescriptors = false;
-	for (int32_t i = 0; i < pipeline.stageCount; i++)
+	pipeline->usesDescriptors = false;
+	for (int32_t i = 0; i < pipeline->stageCount; i++)
 	{
-		struct PipelineStage * stage = pipeline.stages + i;
+		struct PipelineStage * stage = pipeline->stages + i;
 		stage->bindingCount = 0;
 		
 		// get a list of descriptor sets
@@ -72,20 +73,20 @@ static void CreateDescriptorLayout(Pipeline pipeline, int32_t * uboCount, int32_
 		if (setCount > 0)
 		{
 			if (setCount > 1) { printf("[Fatal] backend currently only supports 1 descriptor set in shaders\n"); }
-			pipeline.usesDescriptors = true;
+			pipeline->usesDescriptors = true;
 			stage->descriptorInfo = sets[0];
 			stage->bindingCount = stage->descriptorInfo.binding_count;
 			bindingCount += stage->descriptorInfo.binding_count;
 		}
 	}
 	
-	if (pipeline.usesDescriptors)
+	if (pipeline->usesDescriptors)
 	{
 		// go through each stage and fill out the information for each binding
 		VkDescriptorSetLayoutBinding * layoutBindings = malloc(bindingCount * sizeof(VkDescriptorSetLayoutBinding));
-		for (int32_t i = 0, c = 0; i < pipeline.stageCount; i++)
+		for (int32_t i = 0, c = 0; i < pipeline->stageCount; i++)
 		{
-			struct PipelineStage * stage = pipeline.stages + i;
+			struct PipelineStage * stage = pipeline->stages + i;
 			
 			// get the list of descriptors sets again
 			uint32_t setCount = 0;
@@ -121,14 +122,14 @@ static void CreateDescriptorLayout(Pipeline pipeline, int32_t * uboCount, int32_
 			.bindingCount = bindingCount,
 			.pBindings = layoutBindings,
 		};
-		vkCreateDescriptorSetLayout(graphics.device, &layoutInfo, NULL, &pipeline.descriptorLayout);
+		vkCreateDescriptorSetLayout(graphics.device, &layoutInfo, NULL, &pipeline->descriptorLayout);
 		free(layoutBindings);
 	}
 }
 
-static void CreateDescriptorPool(Pipeline pipeline, int32_t uboCount, int32_t samplerCount, int32_t storageCount)
+static void CreateDescriptorPool(Pipeline * pipeline, int32_t uboCount, int32_t samplerCount, int32_t storageCount)
 {
-	if (pipeline.usesDescriptors)
+	if (pipeline->usesDescriptors)
 	{
 		// go through each binding type and allocate the pool size for it
 		VkDescriptorPoolSize poolSizes[3];
@@ -155,45 +156,45 @@ static void CreateDescriptorPool(Pipeline pipeline, int32_t uboCount, int32_t sa
 			.poolSizeCount = c,
 			.pPoolSizes = poolSizes,
 		};
-		vkCreateDescriptorPool(graphics.device, &poolInfo, NULL, &pipeline.descriptorPool);
+		vkCreateDescriptorPool(graphics.device, &poolInfo, NULL, &pipeline->descriptorPool);
 	}
 }
 
-static void CreateDescriptorSets(Pipeline pipeline)
+static void CreateDescriptorSets(Pipeline * pipeline)
 {
-	if (pipeline.usesDescriptors)
+	if (pipeline->usesDescriptors)
 	{
 		// create a descriptor set for each frame in flight
-		pipeline.descriptorSet = malloc(FRAMES_IN_FLIGHT * sizeof(VkDescriptorSet));
+		pipeline->descriptorSet = malloc(FRAMES_IN_FLIGHT * sizeof(VkDescriptorSet));
 		for (int32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
 			VkDescriptorSetAllocateInfo allocateInfo =
 			{
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-				.descriptorPool = pipeline.descriptorPool,
+				.descriptorPool = pipeline->descriptorPool,
 				.descriptorSetCount = 1,
-				.pSetLayouts = &pipeline.descriptorLayout,
+				.pSetLayouts = &pipeline->descriptorLayout,
 			};
-			vkAllocateDescriptorSets(graphics.device, &allocateInfo, pipeline.descriptorSet + i);
+			vkAllocateDescriptorSets(graphics.device, &allocateInfo, pipeline->descriptorSet + i);
 		}
 	}
 }
 
-static void CreatePipelineLayout(Pipeline pipeline)
+static void CreatePipelineLayout(Pipeline * pipeline)
 {
 	// create the pipeline layout
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount = pipeline.usesDescriptors ? 1 : 0,
-		.pSetLayouts = &pipeline.descriptorLayout,
+		.setLayoutCount = pipeline->usesDescriptors ? 1 : 0,
+		.pSetLayouts = &pipeline->descriptorLayout,
 		.pushConstantRangeCount = 0,
 		.pPushConstantRanges = NULL,
 	};
-	vkCreatePipelineLayout(graphics.device, &pipelineLayoutCreateInfo, NULL, &pipeline.layout);
+	vkCreatePipelineLayout(graphics.device, &pipelineLayoutCreateInfo, NULL, &pipeline->layout);
 }
 
-static void CreateLayout(Pipeline pipeline, PipelineConfig config)
+static void CreateLayout(Pipeline * pipeline, PipelineConfig config)
 {
 	CreateReflectModules(pipeline, config);
 	int32_t samplerCount = 0, uboCount = 0, storageCount = 0;
@@ -222,7 +223,8 @@ Pipeline PipelineCreate(PipelineConfig config)
 			.codeSize = config.shaders[i].codeSize,
 			.pCode = config.shaders[i].code,
 		};
-		vkCreateShaderModule(graphics.device, &moduleInfo, NULL, modules + i);
+		VkResult result = vkCreateShaderModule(graphics.device, &moduleInfo, NULL, modules + i);
+		if (result != VK_SUCCESS) { printf("[Fatal] failed to create shader module: %i\n", result); }
 		
 		shaderInfos[i] = (VkPipelineShaderStageCreateInfo)
 		{
@@ -316,21 +318,8 @@ Pipeline PipelineCreate(PipelineConfig config)
 		.stencilTestEnable = VK_FALSE,
 	};
 	
-	VkDynamicState dynamicStates[] =
-	{
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR,
-		VK_DYNAMIC_STATE_STENCIL_REFERENCE,
-	};
-	VkPipelineDynamicStateCreateInfo dynamicState =
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-		.dynamicStateCount = 3,
-		.pDynamicStates = dynamicStates,
-	};
-	
 	// create the VkPipeline
-	CreateLayout(pipeline, config);
+	CreateLayout(&pipeline, config);
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -343,7 +332,6 @@ Pipeline PipelineCreate(PipelineConfig config)
 		.pMultisampleState = &multisampleState,
 		.pDepthStencilState = &depthStencilState,
 		.pColorBlendState = &colorBlendState,
-		.pDynamicState = &dynamicState,
 		.layout = pipeline.layout,
 		.renderPass = graphics.swapchain.renderPass,
 		.subpass = 0,

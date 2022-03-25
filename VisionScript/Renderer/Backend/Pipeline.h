@@ -54,15 +54,15 @@ typedef struct ShaderCode
 	ShaderType type;
 	uint64_t codeSize;
 	void * code;
-} ShaderCode;
+} Shader;
 
-ShaderCode ShaderCompile(ShaderType type, const char * source);
+Shader ShaderCompile(ShaderType type, const char * source);
 
 typedef struct PipelineConfig
 {
 	VertexLayout vertexLayout;
 	int32_t shaderCount;
-	ShaderCode shaders[5];
+	Shader shaders[5];
 	VertexPrimitive primitive;
 	PolygonMode polygonMode;
 	CullMode cullMode;
@@ -101,7 +101,7 @@ void PipelineFree(Pipeline pipeline);
 
 typedef Pipeline ComputePipeline;
 
-ComputePipeline ComputePipelineCreate(ShaderCode shader);
+ComputePipeline ComputePipelineCreate(Shader shader);
 
 void ComputePipelineFree(ComputePipeline pipeline);
 
