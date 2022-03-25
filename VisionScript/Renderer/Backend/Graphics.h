@@ -1,13 +1,13 @@
 #ifndef Graphics_h
 #define Graphics_h
 
+#define FRAMES_IN_FLIGHT 3
+
 #include <stdbool.h>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include "Pipeline.h"
 #include "VertexBuffer.h"
-
-#define FRAMES_IN_FLIGHT 3
 
 extern struct Graphics
 {

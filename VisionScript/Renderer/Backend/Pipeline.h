@@ -73,6 +73,26 @@ typedef struct PipelineConfig
 	CompareOperation depthCompare;
 } PipelineConfig;
 
+typedef struct UniformBuffer
+{
+	uint64_t size;
+	VkBuffer buffer;
+	VmaAllocation allocation;
+} UniformBuffer;
+
+typedef struct StorageBuffer
+{
+	uint64_t size;
+	VkBuffer stagingBuffer;
+	VmaAllocation stagingAllocation;
+	VkBuffer buffer;
+	VmaAllocation allocation;
+	VkCommandBuffer uploadCommandBuffer;
+	VkCommandBuffer downloadCommandBuffer;
+	VkFence uploadFence;
+	VkFence downloadFence;
+} StorageBuffer;
+
 typedef struct Pipeline
 {
 	bool isCompute;
@@ -80,22 +100,24 @@ typedef struct Pipeline
 	VkPipelineLayout layout;
 	VertexLayout vertexLayout;
 	
-	int32_t stageCount;
-	struct PipelineStage
-	{
-		ShaderType shaderType;
-		SpvReflectShaderModule module;
-		int32_t bindingCount;
-		SpvReflectDescriptorSet descriptorInfo;
-	} * stages;
-	bool usesDescriptors;
-	VkDescriptorSetLayout descriptorLayout;
+	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorPool descriptorPool;
-	int32_t descriptorPoolCapacity;
-	VkDescriptorSet * descriptorSet;
+	VkDescriptorSet descriptorSets[FRAMES_IN_FLIGHT];
+	int32_t bindingCount;
+	struct PipelineBinding
+	{
+		SpvReflectDescriptorBinding info;
+		union
+		{
+			UniformBuffer uniform;
+			StorageBuffer storage;
+		};
+	} * bindings;
 } Pipeline;
 
 Pipeline PipelineCreate(PipelineConfig config);
+
+void PipelineSetUniformMember(Pipeline pipeline, const char * name, int32_t index, const char * member, void * value);
 
 void PipelineFree(Pipeline pipeline);
 

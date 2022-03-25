@@ -661,9 +661,9 @@ void GraphicsBindPipeline(Pipeline pipeline)
 
 void GraphicsRenderVertexBuffer(VertexBuffer buffer)
 {
-	if (graphics.boundPipeline.usesDescriptors)
+	if (graphics.boundPipeline.bindingCount > 0)
 	{
-		vkCmdBindDescriptorSets(graphics.frames[graphics.frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.boundPipeline.layout, 0, 1, &graphics.boundPipeline.descriptorSet[graphics.frameIndex], 0, NULL);
+		vkCmdBindDescriptorSets(graphics.frames[graphics.frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.boundPipeline.layout, 0, 1, &graphics.boundPipeline.descriptorSets[graphics.frameIndex], 0, NULL);
 	}
 	
 	VkDeviceSize offset = 0;
