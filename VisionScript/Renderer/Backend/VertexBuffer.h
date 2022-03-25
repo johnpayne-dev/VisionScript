@@ -21,14 +21,13 @@ typedef struct VertexLayout
 	uint32_t size;
 } VertexLayout;
 
-VertexLayout VertexLayoutCreate(int32_t attributeCount, VertexAttribute attributes[], int32_t * offsets);
+VertexLayout VertexLayoutCreate(int32_t attributeCount, VertexAttribute attributes[]);
 void VertexLayoutFree(VertexLayout layout);
 
 typedef struct VertexBuffer
 {
 	VertexLayout layout;
 	int32_t vertexCount;
-	int32_t indexCount;
 	VkBuffer stagingBuffer;
 	VmaAllocation stagingAllocation;
 	VkBuffer vertexBuffer;
@@ -37,9 +36,9 @@ typedef struct VertexBuffer
 	VkFence uploadFence;
 } VertexBuffer;
 
-VertexBuffer VertexBufferCreate(VertexLayout vertexLayout, int32_t vertexCount, int32_t indexCount);
+VertexBuffer VertexBufferCreate(VertexLayout vertexLayout, int32_t vertexCount);
 
-void * VertexBufferMapVertices(VertexBuffer vertexBuffer, uint32_t ** indices);
+void * VertexBufferMapVertices(VertexBuffer vertexBuffer);
 
 void VertexBufferUnmapVertices(VertexBuffer vertexBuffer);
 

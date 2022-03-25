@@ -334,6 +334,8 @@ static void CreateFramesInFlight()
 
 static void CreateSwapchainKHR(int32_t width, int32_t height)
 {
+	width *= ApplicationDPIScale();
+	height *= ApplicationDPIScale();
 	graphics.swapchain.targetExtent = (VkExtent2D){ .width = width, .height = height };
 	
 	// get the available capabilities of the window surface
@@ -387,7 +389,6 @@ static void CreateSwapchainKHR(int32_t width, int32_t height)
 	
 	// target the number of swapchain images to 3
 	uint32_t imageCount = fmaxf(availableCapabilities.minImageCount, fminf(3, availableCapabilities.maxImageCount));
-	printf("[Info] initializing swapchain with %i images\n", imageCount);
 	
 	// setup swapchain create info
 	VkSwapchainCreateInfoKHR createInfo =
@@ -572,9 +573,7 @@ void GraphicsInitialize(int32_t width, int32_t height)
 void GraphicsRecreateSwapchain(int32_t width, int32_t height)
 {
 	DestroySwapchain();
-	printf("[Info] creating the swapchain...\n");
 	CreateSwapchain(width, height);
-	printf("[Info] successfully created the swapchain\n");
 }
 
 void GraphicsUpdate()
@@ -636,6 +635,40 @@ void GraphicsClearColor(float r, float g, float b, float a)
 		.clearValue = { .color = { r, g, b, a } },
 	};
 	vkCmdClearAttachments(graphics.frames[graphics.frameIndex].commandBuffer, 1, &clear, 1, &rect);
+}
+
+void GraphicsBindPipeline(Pipeline pipeline)
+{	
+	graphics.boundPipeline = pipeline;
+	vkCmdBindPipeline(graphics.frames[graphics.frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.instance);
+	VkViewport viewport =
+	{
+		.x = 0.0f,
+		.y = 0.0f,
+		.width = graphics.swapchain.extent.width,
+		.height = graphics.swapchain.extent.height,
+		.minDepth = 0.0f,
+		.maxDepth = 1.0f,
+	};
+	VkRect2D scissor =
+	{
+		.offset = { 0, 0 },
+		.extent = graphics.swapchain.extent,
+	};
+	vkCmdSetViewport(graphics.frames[graphics.frameIndex].commandBuffer, 0, 1, &viewport);
+	vkCmdSetScissor(graphics.frames[graphics.frameIndex].commandBuffer, 0, 1, &scissor);
+}
+
+void GraphicsRenderVertexBuffer(VertexBuffer buffer)
+{
+	if (graphics.boundPipeline.usesDescriptors)
+	{
+		vkCmdBindDescriptorSets(graphics.frames[graphics.frameIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics.boundPipeline.layout, 0, 1, &graphics.boundPipeline.descriptorSet[graphics.frameIndex], 0, NULL);
+	}
+	
+	VkDeviceSize offset = 0;
+	vkCmdBindVertexBuffers(graphics.frames[graphics.frameIndex].commandBuffer, 0, 1, &buffer.vertexBuffer, &offset);
+	vkCmdDraw(graphics.frames[graphics.frameIndex].commandBuffer, buffer.vertexCount, 1, 0, 0);
 }
 
 void GraphicsEnd()

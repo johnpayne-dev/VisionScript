@@ -7,6 +7,11 @@ void RunApplication(AppConfig config)
 {
 }
 
+float ApplicationDPIScale()
+{
+	return 1.0;
+}
+
 #endif
 
 #ifdef __APPLE__
@@ -160,12 +165,24 @@ void RunApplication(AppConfig windowConfig)
 	((void (*)(id, SEL))objc_msgSend)(app, sel_getUid("run"));
 }
 
+float ApplicationDPIScale()
+{
+	// CGSize viewScale = [self convertSizeToBacking: CGSizeMake(1.0, 1.0)];
+	CGSize viewScale = ((CGSize (*)(id, SEL, CGSize))objc_msgSend)(view, sel_getUid("convertSizeToBacking:"), CGSizeMake(1.0, 1.0));
+	return fminf(viewScale.width, viewScale.height);
+}
+
 #endif
 
 #ifdef __linux__
 
 void RunApplication(AppConfig config)
 {
+}
+
+float ApplicationDPIScale()
+{
+	return 1.0;
 }
 
 #endif

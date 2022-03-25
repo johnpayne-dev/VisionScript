@@ -99,10 +99,4 @@ Pipeline PipelineCreate(PipelineConfig config);
 
 void PipelineFree(Pipeline pipeline);
 
-typedef Pipeline ComputePipeline;
-
-ComputePipeline ComputePipelineCreate(Shader shader);
-
-void ComputePipelineFree(ComputePipeline pipeline);
-
 #endif

@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include "Pipeline.h"
+#include "VertexBuffer.h"
 
 #define FRAMES_IN_FLIGHT 3
 
@@ -43,6 +45,7 @@ extern struct Graphics
 		VkFramebuffer * framebuffers;
 		uint32_t imageIndex;
 	} swapchain;
+	Pipeline boundPipeline;
 } graphics;
 
 void GraphicsInitialize(int32_t width, int32_t height);
@@ -54,6 +57,10 @@ void GraphicsUpdate(void);
 void GraphicsBegin(void);
 
 void GraphicsClearColor(float r, float g, float b, float a);
+
+void GraphicsBindPipeline(Pipeline pipeline);
+
+void GraphicsRenderVertexBuffer(VertexBuffer buffer);
 
 void GraphicsEnd(void);
 

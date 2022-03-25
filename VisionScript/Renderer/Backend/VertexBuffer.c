@@ -2,7 +2,7 @@
 #include "VertexBuffer.h"
 #include "Graphics.h"
 
-VertexLayout VertexLayoutCreate(int32_t attributeCount, VertexAttribute * attributes, int32_t * offsets)
+VertexLayout VertexLayoutCreate(int32_t attributeCount, VertexAttribute * attributes)
 {
 	VertexLayout layout = (VertexLayout)
 	{
@@ -19,7 +19,7 @@ VertexLayout VertexLayoutCreate(int32_t attributeCount, VertexAttribute * attrib
 			.binding = 0,
 			.format = (VkFormat)attributes[i],
 			.location = i,
-			.offset = offsets == NULL ? size : offsets[i],
+			.offset = size,
 		};
 		switch (attributes[i])
 		{
@@ -35,7 +35,7 @@ VertexLayout VertexLayoutCreate(int32_t attributeCount, VertexAttribute * attrib
 	layout.binding = (VkVertexInputBindingDescription)
 	{
 		.binding = 0,
-		.stride = offsets == NULL ? size : offsets[attributeCount],
+		.stride = size,
 		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
 	};
 	layout.size = layout.binding.stride;
@@ -48,16 +48,15 @@ void VertexLayoutFree(VertexLayout layout)
 	free(layout.attributes);
 }
 
-VertexBuffer VertexBufferCreate(VertexLayout layout, int32_t vertexCount, int32_t indexCount)
+VertexBuffer VertexBufferCreate(VertexLayout layout, int32_t vertexCount)
 {
 	VertexBuffer vertexBuffer = (VertexBuffer)
 	{
 		.layout = layout,
 		.vertexCount = vertexCount,
-		.indexCount = indexCount,
 	};
 	
-	uint64_t size = vertexCount * layout.size + indexCount * sizeof(int32_t);
+	uint64_t size = vertexCount * layout.size;
 	
 	// create the staging buffer
 	VkBufferCreateInfo stagingInfo =
@@ -81,7 +80,6 @@ VertexBuffer VertexBufferCreate(VertexLayout layout, int32_t vertexCount, int32_
 		.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
-	if (indexCount > 0) { bufferInfo.usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
 	VmaAllocationCreateInfo allocationInfo =
 	{
 		.usage = VMA_MEMORY_USAGE_GPU_ONLY,
@@ -109,17 +107,11 @@ VertexBuffer VertexBufferCreate(VertexLayout layout, int32_t vertexCount, int32_
 	return vertexBuffer;
 }
 
-void * VertexBufferMapVertices(VertexBuffer vertexBuffer, uint32_t ** indices)
+void * VertexBufferMapVertices(VertexBuffer vertexBuffer)
 {
 	// grab the pointer to the staging buffer
 	void * data;
 	vmaMapMemory(graphics.allocator, vertexBuffer.stagingAllocation, &data);
-	
-	// if the buffer uses indices then also grab the pointer to the index area in the staging buffer
-	if (vertexBuffer.indexCount > 0 && indices != NULL)
-	{
-		*indices = (uint32_t *)((uint8_t *)data + vertexBuffer.vertexCount * vertexBuffer.layout.size);
-	}
 	return data;
 }
 
@@ -147,7 +139,7 @@ void VertexBufferUpload(VertexBuffer vertexBuffer)
 	{
 		.srcOffset = 0,
 		.dstOffset = 0,
-		.size = vertexBuffer.vertexCount * vertexBuffer.layout.size + 4 * vertexBuffer.indexCount,
+		.size = vertexBuffer.vertexCount * vertexBuffer.layout.size,
 	};
 	vkCmdCopyBuffer(vertexBuffer.commandBuffer, vertexBuffer.stagingBuffer, vertexBuffer.vertexBuffer, 1, &copyInfo);
 	

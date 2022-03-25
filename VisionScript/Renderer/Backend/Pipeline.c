@@ -317,7 +317,13 @@ Pipeline PipelineCreate(PipelineConfig config)
 		.depthBoundsTestEnable = VK_FALSE,
 		.stencilTestEnable = VK_FALSE,
 	};
-	
+	VkPipelineDynamicStateCreateInfo dynamicState =
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = 2,
+		.pDynamicStates = (VkDynamicState[]){ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR },
+	};
+
 	// create the VkPipeline
 	CreateLayout(&pipeline, config);
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo =
@@ -332,6 +338,7 @@ Pipeline PipelineCreate(PipelineConfig config)
 		.pMultisampleState = &multisampleState,
 		.pDepthStencilState = &depthStencilState,
 		.pColorBlendState = &colorBlendState,
+		.pDynamicState = &dynamicState,
 		.layout = pipeline.layout,
 		.renderPass = graphics.swapchain.renderPass,
 		.subpass = 0,

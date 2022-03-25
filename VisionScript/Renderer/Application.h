@@ -17,6 +17,8 @@ typedef struct WindowConfig
 
 void RunApplication(AppConfig config);
 
+float ApplicationDPIScale(void);
+
 const void * ApplicationMacOSView(void);
 
 #endif
