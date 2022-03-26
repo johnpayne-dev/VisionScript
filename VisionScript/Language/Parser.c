@@ -15,7 +15,7 @@ const char * SyntaxErrorToString(SyntaxErrorCode code)
 		case SyntaxErrorInvalidFunctionDeclaration: return "invalid function declaration";
 		case SyntaxErrorMissingExpression: return "missing expression";
 		case SyntaxErrorMissingBracket: return "missing corresponding bracket";
-		case SyntaxErrorMissingOperator: return "missing operator";
+		case SyntaxErrorNonsenseExpression: return "unable to understand expression";
 		case SyntaxErrorMissingOperon: return "missing operon";
 		case SyntaxErrorTooManyVectorElements: return "too many elements in vector initialization";
 		case SyntaxErrorInvalidCommaPlacement: return "unexpected comma placement";
@@ -408,8 +408,8 @@ static SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t en
 		Operon operon = { 0 };
 		if (operonType == OperonTypeExpression)
 		{
-			// if it occurs that the operon is an expression yet it isn't surrounded by (), then it isn't a single factor and there's an operator missing somewhere within
-			if (tokens[start].value[0] != '(' || FindCorrespondingBracket(tokens, start, end, start) != end) { return (SyntaxError){ SyntaxErrorMissingOperator, start, end }; }
+			// if it occurs that the operon is an expression yet it isn't surrounded by (), then it's not a comprehensible expression
+			if (tokens[start].value[0] != '(' || FindCorrespondingBracket(tokens, start, end, start) != end) { return (SyntaxError){ SyntaxErrorNonsenseExpression, start, end }; }
 			error = ReadOperon(tokens, start + 1, end - 1, operonType, &operon);
 		}
 		else { error = ReadOperon(tokens, start, end, operonType, &operon); }

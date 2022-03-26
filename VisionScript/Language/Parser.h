@@ -63,7 +63,7 @@ typedef enum SyntaxErrorCode
 	SyntaxErrorInvalidFunctionDeclaration,
 	SyntaxErrorMissingExpression,
 	SyntaxErrorMissingBracket,
-	SyntaxErrorMissingOperator,
+	SyntaxErrorNonsenseExpression,
 	SyntaxErrorMissingOperon,
 	SyntaxErrorTooManyVectorElements,
 	SyntaxErrorInvalidCommaPlacement,
