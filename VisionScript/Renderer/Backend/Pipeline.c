@@ -429,6 +429,19 @@ void PipelineSetUniformMember(Pipeline pipeline, const char * name, int32_t inde
 void PipelineFree(Pipeline pipeline)
 {
 	vkDeviceWaitIdle(graphics.device);
+	if (pipeline.bindingCount > 0)
+	{
+		vkDestroyDescriptorSetLayout(graphics.device, pipeline.descriptorSetLayout, NULL);
+		vkDestroyDescriptorPool(graphics.device, pipeline.descriptorPool, NULL);
+	}
+	for (int32_t i = 0; i < pipeline.bindingCount; i++)
+	{
+		if (pipeline.bindings[i].info.descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+		{
+			vmaDestroyBuffer(graphics.allocator, pipeline.bindings[i].uniform.buffer, pipeline.bindings[i].uniform.allocation);
+		}
+	}
+	free(pipeline.bindings);
 	vkDestroyPipelineLayout(graphics.device, pipeline.layout, NULL);
 	vkDestroyPipeline(graphics.device, pipeline.instance, NULL);
 }
