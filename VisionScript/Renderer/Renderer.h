@@ -9,6 +9,6 @@ typedef enum RendererType
 	RendererType3D,
 } RendererType;
 
-void RenderScript(Script * script, RendererType type, bool debug);
+void RenderScript(Script * script, RendererType type, bool testMode);
 
 #endif

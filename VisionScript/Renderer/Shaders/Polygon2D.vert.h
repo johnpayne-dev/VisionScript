@@ -6,11 +6,10 @@ static const char * vert_Polygon2D =
 
 "layout (binding = 0) uniform Camera"
 "{"
-"	float aspectRatio;"
 "	mat4 matrix;"
 "} camera;"
 
 "void main()"
 "{"
-"	gl_Position = camera.matrix * vec4(position / vec2(camera.aspectRatio, 1.0), 0.0, 1.0);"
+"	gl_Position = camera.matrix * vec4(position, 0.0, 1.0);"
 "}";
