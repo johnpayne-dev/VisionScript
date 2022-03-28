@@ -4,6 +4,8 @@
 #include "Backend/Graphics.h"
 #include "Backend/Pipeline.h"
 
+#define SCROLL_ZOOM_FACTOR 100.0
+
 static struct Renderer
 {
 	Script * script;
@@ -113,6 +115,29 @@ static void Resize(int32_t width, int32_t height)
 	GraphicsRecreateSwapchain(width, height);
 }
 
+static void MouseDragged(float x, float y, float dx, float dy)
+{
+	if (renderer.testMode)
+	{
+		vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera._2d.angle), (vec4_t){ dx, dy, 0.0, 1.0 });
+		renderer.camera._2d.position.x -= dir.x / (renderer.width * renderer.camera._2d.scale.x);
+		renderer.camera._2d.position.y -= dir.y / (renderer.height * renderer.camera._2d.scale.y);
+	}
+}
+
+static void ScrollWheel(float x, float y, float ds)
+{
+	if (renderer.testMode)
+	{
+		renderer.camera._2d.scale.x *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
+		renderer.camera._2d.scale.y *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
+		vec4_t mousePos = { 2.0 * x / renderer.width - 1.0, -(2.0 * y / renderer.height - 1.0), 0.0, 1.0 };
+		vec4_t camMousePos = mat4_mulv(Camera2DInverseTransform(renderer.camera._2d), mousePos);
+		vec2_t diff = vec2_sub(vec4_to_vec2(camMousePos), renderer.camera._2d.position);
+		renderer.camera._2d.position = vec2_add(renderer.camera._2d.position, vec2_mulf(diff, ds / SCROLL_ZOOM_FACTOR));
+	}
+}
+
 static void Shutdown()
 {
 	GraphicsShutdown();
@@ -136,6 +161,8 @@ void RenderScript(Script * script, RendererType type, bool testMode)
 		.update = Update,
 		.render = Render,
 		.resize = Resize,
+		.mouseDragged = MouseDragged,
+		.scrollWheel = ScrollWheel,
 		.shutdown = Shutdown,
 	};
 	RunApplication(config);

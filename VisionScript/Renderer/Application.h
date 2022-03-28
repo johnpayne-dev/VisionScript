@@ -11,8 +11,10 @@ typedef struct WindowConfig
 	void (*startup)(void);
 	void (*update)(void);
 	void (*render)(void);
-	void (*shutdown)(void);
 	void (*resize)(int32_t width, int32_t height);
+	void (*mouseDragged)(float x, float y, float dx, float dy);
+	void (*scrollWheel)(float x, float y, float ds);
+	void (*shutdown)(void);
 } AppConfig;
 
 void RunApplication(AppConfig config);

@@ -52,6 +52,8 @@ static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id no
 	((void (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("makeKeyAndOrderFront:"), nil);
 	// [window setDelegate:delegate];
 	((void (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("setDelegate:"), (id)delegate);
+	// [window setAcceptsMouseMovedEvents:YES];
+	((void (*)(id, SEL, bool))objc_msgSend)(window, sel_getUid("setAcceptsMouseMovedEvents:"), true);
 	
 	// initialize the view assign it to the window
 	// view = [[View alloc] initWithFrame:dimensions];
@@ -60,6 +62,8 @@ static void AppDelegate_applicationDidFinishLaunching(id self, SEL method, id no
 	((void (*)(id, SEL, bool))objc_msgSend)(view, sel_getUid("setWantsLayer:"), true);
 	// [window setContentView:view];
 	((void (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("setContentView:"), view);
+	// [window makeFirstResponder:view];
+	((bool (*)(id, SEL, id))objc_msgSend)(window, sel_getUid("makeFirstResponder:"), view);
 	
 	if (config.startup != NULL) { config.startup(); }
 	
@@ -107,10 +111,45 @@ static void CreateWindowDelegateClass()
 	objc_registerClassPair(WindowDelegateClass);
 }
 
-void View_timerFired(id self, SEL method)
+static void View_timerFired(id self, SEL method)
 {
 	if (config.update != NULL) { config.update(); }
 	if (config.render != NULL) { config.render(); }
+}
+
+static CGPoint lastMousePosition = { 0, 0 };
+
+static void View_mouseDown(id self, SEL method, id event)
+{
+	// lastMousePosition = [NSEvent mouseLocation];
+	lastMousePosition = ((CGPoint (*)(Class, SEL))objc_msgSend)(objc_getClass("NSEvent"), sel_getUid("mouseLocation"));
+	// CGRect rect = [window frame];
+	CGRect rect = ((CGRect (*)(id, SEL))objc_msgSend)(window, sel_getUid("frame"));
+	lastMousePosition.x -= rect.origin.x;
+	lastMousePosition.y -= rect.origin.y;
+}
+
+static void View_mouseDragged(id self, SEL method, id event)
+{
+	// CGPoint pos = [NSEvent mouseLocation];
+	CGPoint pos = ((CGPoint (*)(Class, SEL))objc_msgSend)(objc_getClass("NSEvent"), sel_getUid("mouseLocation"));
+	// CGRect rect = [window frame];
+	CGRect rect = ((CGRect (*)(id, SEL))objc_msgSend)(window, sel_getUid("frame"));
+	pos.x -= rect.origin.x;
+	pos.y -= rect.origin.y;
+	if (config.mouseDragged != NULL) { config.mouseDragged(pos.x, pos.y, (pos.x - lastMousePosition.x) * ApplicationDPIScale(), (pos.y - lastMousePosition.y) * ApplicationDPIScale()); }
+	lastMousePosition = pos;
+}
+
+static void View_scrollWheel(id self, SEL method, id event)
+{
+	// CGPoint pos = [NSEvent mouseLocation];
+	CGPoint pos = ((CGPoint (*)(Class, SEL))objc_msgSend)(objc_getClass("NSEvent"), sel_getUid("mouseLocation"));
+	// CGRect rect = [window frame];
+	CGRect rect = ((CGRect (*)(id, SEL))objc_msgSend)(window, sel_getUid("frame"));
+	// float ds = [event deltaY];
+	float ds = ((CGFloat (*)(id, SEL))objc_msgSend)(event, sel_getUid("deltaY"));
+	if (config.scrollWheel != NULL) { config.scrollWheel(pos.x - rect.origin.x, pos.y - rect.origin.y, ds); }
 }
 
 static bool View_wantsUpdateLayer(id self, SEL method)
@@ -137,6 +176,9 @@ static void CreateViewClass()
 	class_addMethod(ViewClass, sel_registerName("wantsUpdateLayer"), (IMP)View_wantsUpdateLayer, "i@:");
 	class_addMethod(ViewClass, sel_registerName("layerClass"), (IMP)View_layerClass, "#@:");
 	class_addMethod(ViewClass, sel_registerName("makeBackingLayer"), (IMP)View_makeBackingLayer, "@@:");
+	class_addMethod(ViewClass, sel_registerName("mouseDown:"), (IMP)View_mouseDown, "v@:@");
+	class_addMethod(ViewClass, sel_registerName("mouseDragged:"), (IMP)View_mouseDragged, "v@:@");
+	class_addMethod(ViewClass, sel_registerName("scrollWheel:"), (IMP)View_scrollWheel, "v@:@");
 	objc_registerClassPair(ViewClass);
 }
 
