@@ -25,6 +25,7 @@ const char * RuntimeErrorToString(RuntimeErrorCode code)
 		case RuntimeErrorDifferingLengthVectors: return "operating on differing length vectors";
 		case RuntimeErrorInvalidSwizzling: return "accessing nonexistent vector component";
 		case RuntimeErrorNotImplemented: return "not implemented";
+		case RuntimeErrorInvalidPolygonDimensionality: return "invalid polygon dimensionality";
 		default: return "unknown error";
 	}
 }

@@ -5,8 +5,8 @@ static list(String) SplitCodeIntoStatements(String code)
 {
 	code = StringCreate(code); // create a copy of the original code
 	list(String) statements = ListCreate(sizeof(String), 16);
-	int lastStatementStart = 0;
-	for (int i = 0; i < StringLength(code); i++)
+	int32_t lastStatementStart = 0;
+	for (int32_t i = 0; i < StringLength(code); i++)
 	{
 		if (code[i] == ';') { code[i] = '\n'; } // semicolons are treated as newlines
 		if (code[i] == '\n')
@@ -22,6 +22,9 @@ static list(String) SplitCodeIntoStatements(String code)
 			lastStatementStart = i + 1;
 		}
 	}
+	String statement = StringSub(code, lastStatementStart, StringLength(code) - 1);
+	ListPush((void **)&statements, &statement); // add last line if it doesn't end with '\n'
+	
 	StringFree(code);
 	return statements;
 }

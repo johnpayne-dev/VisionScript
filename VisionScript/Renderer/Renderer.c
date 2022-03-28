@@ -1,8 +1,9 @@
+#include "Backend/Graphics.h"
+#include "Backend/Pipeline.h"
 #include "Application.h"
 #include "Camera.h"
 #include "Renderer.h"
-#include "Backend/Graphics.h"
-#include "Backend/Pipeline.h"
+#include "Sampler.h"
 
 #define SCROLL_ZOOM_FACTOR 100.0
 
@@ -15,6 +16,7 @@ static struct Renderer
 	int32_t width, height;
 	VertexLayout layout2d;
 	VertexBuffer quad;
+	list(VertexBuffer) polygons2d;
 } renderer = { 0 };
 
 static struct Pipelines
@@ -39,7 +41,7 @@ static void CreatePipelines()
 		.vertexLayout = renderer.layout2d,
 	};
 	pipelines.polygon2d = PipelineCreate(config);
-	PipelineSetUniformMember(pipelines.polygon2d, "properties", 0, "color", &(vec3_t){ 0.0, 0.0, 1.0 });
+	PipelineSetUniformMember(pipelines.polygon2d, "properties", 0, "color", &(vec3_t){ 0.0, 0.0, 0.0 });
 	
 #include "Shaders/Grid2D.vert.h"
 #include "Shaders/Grid2D.frag.h"
@@ -81,6 +83,29 @@ static void Startup()
 	VertexBufferUnmapVertices(renderer.quad);
 	VertexBufferUpload(renderer.quad);
 	
+	renderer.polygons2d = ListCreate(sizeof(VertexBuffer), 1);
+	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
+	{
+		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePolygon)
+		{
+			VectorArray result;
+			RuntimeError error = SamplePolygon(renderer.script, renderer.script->renderList[i], &result);
+			if (error.code != RuntimeErrorNone) { continue; }
+			if (result.dimensions == 2)
+			{
+				VertexBuffer buffer = VertexBufferCreate(renderer.layout2d, result.length);
+				vec2_t * vertices = VertexBufferMapVertices(buffer);
+				for (int32_t j = 0; j < result.length; j++)
+				{
+					vertices[j] = (vec2_t){ result.xyzw[0][j], result.xyzw[1][j] };
+				}
+				VertexBufferUnmapVertices(buffer);
+				VertexBufferUpload(buffer);
+				ListPush((void **)&renderer.polygons2d, &buffer);
+			}
+		}
+	}
+	
 	CreatePipelines();
 }
 
@@ -103,6 +128,11 @@ static void Render()
 	{
 		GraphicsBindPipeline(pipelines.grid);
 		GraphicsRenderVertexBuffer(renderer.quad);
+	}
+	GraphicsBindPipeline(pipelines.polygon2d);
+	for (int32_t i = 0; i < ListLength(renderer.polygons2d); i++)
+	{
+		GraphicsRenderVertexBuffer(renderer.polygons2d[i]);
 	}
 	GraphicsEnd();
 }
