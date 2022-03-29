@@ -113,7 +113,7 @@ static void CreateSurface()
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Vulkan, but failed to create VkSurfaceKHR\n"); }
 }
 
-static void ChoosePhysicalDevice()
+static void ChoosePhysicalDevice(int32_t msaa)
 {
 	graphics.physicalDevice = VK_NULL_HANDLE;
 	
@@ -200,6 +200,25 @@ static void ChoosePhysicalDevice()
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(graphics.physicalDevice, &deviceProperties);
 	printf("[Info] using graphics device: %s\n", deviceProperties.deviceName);
+	
+	// get max msaa samples available
+	vkGetPhysicalDeviceProperties(graphics.physicalDevice, &deviceProperties);
+	VkSampleCountFlagBits maxSamples = VK_SAMPLE_COUNT_1_BIT;
+	VkSampleCountFlags counts = deviceProperties.limits.framebufferColorSampleCounts & deviceProperties.limits.framebufferDepthSampleCounts;
+	if (counts & VK_SAMPLE_COUNT_64_BIT) { maxSamples = VK_SAMPLE_COUNT_64_BIT; }
+	else if (counts & VK_SAMPLE_COUNT_32_BIT) { maxSamples = VK_SAMPLE_COUNT_32_BIT; }
+	else if (counts & VK_SAMPLE_COUNT_16_BIT) { maxSamples = VK_SAMPLE_COUNT_16_BIT; }
+	else if (counts & VK_SAMPLE_COUNT_8_BIT) { maxSamples = VK_SAMPLE_COUNT_8_BIT; }
+	else if (counts & VK_SAMPLE_COUNT_4_BIT) { maxSamples = VK_SAMPLE_COUNT_4_BIT; }
+	else if (counts & VK_SAMPLE_COUNT_2_BIT) { maxSamples = VK_SAMPLE_COUNT_2_BIT; }
+	
+	graphics.samples = msaa;
+	if (graphics.samples > maxSamples)
+	{
+		graphics.samples = maxSamples;
+		printf("[Warning] requested number of samples not suppported\n");
+	}
+	
 	free(devices);
 }
 
@@ -430,17 +449,34 @@ static void CreateSwapchainRenderPass()
 	VkAttachmentDescription colorAttachment =
 	{
 		.format = graphics.swapchain.colorFormat,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.samples = graphics.samples,
 		.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	};
 	VkAttachmentReference colorAttachmentReference =
 	{
 		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	};
+	
+	VkAttachmentDescription resolveAttachment =
+	{
+		.format = graphics.swapchain.colorFormat,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	};
+	VkAttachmentReference resolveReference =
+	{
+		.attachment = 1,
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	};
 	
@@ -466,9 +502,10 @@ static void CreateSwapchainRenderPass()
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.colorAttachmentCount = 1,
 		.pColorAttachments = &colorAttachmentReference,
+		.pResolveAttachments = &resolveReference,
 	};
 	
-	VkAttachmentDescription attachments[] = { colorAttachment };
+	VkAttachmentDescription attachments[] = { colorAttachment, resolveAttachment };
 	VkRenderPassCreateInfo renderPassInfo =
 	{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -479,6 +516,13 @@ static void CreateSwapchainRenderPass()
 		.dependencyCount = 0,
 		.pDependencies = NULL,
 	};
+	if (graphics.samples == 1)
+	{
+		subpass.pResolveAttachments = NULL;
+		VkAttachmentDescription attachments[] = { colorAttachment };
+		renderPassInfo.attachmentCount = sizeof(attachments) / sizeof(attachments[0]);
+		renderPassInfo.pAttachments = attachments;
+	}
 	VkResult result = vkCreateRenderPass(graphics.device, &renderPassInfo, NULL, &graphics.swapchain.renderPass);
 	if (result != VK_SUCCESS) { printf("[Fatal] trying to initialize Graphics, but failed to create VkRenderPass: %i\n", result); }
 }
@@ -518,7 +562,7 @@ static void CreateSwapchainFramebuffers()
 	graphics.swapchain.framebuffers = malloc(graphics.swapchain.imageCount * sizeof(VkFramebuffer));
 	for (int32_t i = 0; i < graphics.swapchain.imageCount; i++)
 	{
-		VkImageView attachments[] = { graphics.swapchain.imageViews[i] };
+		VkImageView attachments[] = { graphics.swapchain.msaaImageView, graphics.swapchain.imageViews[i] };
 		VkFramebufferCreateInfo createInfo =
 		{
 			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -529,21 +573,78 @@ static void CreateSwapchainFramebuffers()
 			.layers = 1,
 			.renderPass = graphics.swapchain.renderPass,
 		};
+		if (graphics.samples == 1)
+		{
+			VkImageView attachments[] = { graphics.swapchain.imageViews[i] };
+			createInfo.attachmentCount = sizeof(attachments) / sizeof(attachments[0]);
+			createInfo.pAttachments = attachments;
+		}
 		VkResult result = vkCreateFramebuffer(graphics.device, &createInfo, NULL, graphics.swapchain.framebuffers + i);
 		if (result != VK_SUCCESS) { printf("[Fatal] trying to create swapchain framebuffers, but failed to create VkFramebuffer: %i\n", result); }
 	}
+}
+
+static void CreateSwapchainMSAA()
+{
+	VkImageCreateInfo imageCreateInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.format = graphics.swapchain.colorFormat,
+		.arrayLayers = 1,
+		.extent = { .width = graphics.swapchain.extent.width, .height = graphics.swapchain.extent.height, 1 },
+		.imageType = VK_IMAGE_TYPE_2D,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.mipLevels = 1,
+		.queueFamilyIndexCount = 1,
+		.pQueueFamilyIndices = (const uint32_t []){ graphics.graphicsQueueIndex },
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
+		.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		.samples = graphics.samples,
+	};
+	VmaAllocationCreateInfo allocationInfo =
+	{
+		.usage = VMA_MEMORY_USAGE_GPU_ONLY,
+	};
+	VkResult result = vmaCreateImage(graphics.allocator, &imageCreateInfo, &allocationInfo, &graphics.swapchain.msaaImage, &graphics.swapchain.msaaImageAllocation, NULL);
+	if (result != VK_SUCCESS) { printf("[Fatal] failed to create msaaImage: %i\n", result); }
+	
+	VkImageViewCreateInfo imageViewCreateInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = graphics.swapchain.msaaImage,
+		.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
+		.format = graphics.swapchain.colorFormat,
+		.subresourceRange =
+		{
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseArrayLayer = 0,
+			.baseMipLevel = 0,
+			.layerCount = 1,
+			.levelCount = 1,
+		},
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+	};
+	result = vkCreateImageView(graphics.device, &imageViewCreateInfo, NULL, &graphics.swapchain.msaaImageView);
+	if (result != VK_SUCCESS) { printf("[Fatal] trying to create swapchain image views, but failed to create VkImageView: %i\n", result); }
 }
 
 static void CreateSwapchain(int32_t width, int32_t height)
 {
 	CreateSwapchainKHR(width, height);
 	CreateSwapchainRenderPass();
+	if (graphics.samples > 1) { CreateSwapchainMSAA(); }
 	CreateSwapchainFramebuffers();
 }
 
 static void DestroySwapchain()
 {
 	vkDeviceWaitIdle(graphics.device);
+	if (graphics.samples > 1)
+	{
+		vkDestroyImageView(graphics.device, graphics.swapchain.msaaImageView, NULL);
+		vmaDestroyImage(graphics.allocator, graphics.swapchain.msaaImage, graphics.swapchain.msaaImageAllocation);
+	}
 	vkDestroyRenderPass(graphics.device, graphics.swapchain.renderPass, NULL);
 	free(graphics.swapchain.images);
 	for (int32_t i = 0; i < graphics.swapchain.imageCount; i++)
@@ -555,13 +656,13 @@ static void DestroySwapchain()
 	vkDestroySwapchainKHR(graphics.device, graphics.swapchain.instance, NULL);
 }
 
-void GraphicsInitialize(int32_t width, int32_t height)
+void GraphicsInitialize(int32_t width, int32_t height, int32_t msaa)
 {
 	printf("[Info] initializing the graphics backend...\n");
 	CheckExtensionSupport();
 	CreateInstance(true);
 	CreateSurface();
-	ChoosePhysicalDevice();
+	ChoosePhysicalDevice(msaa);
 	CreateLogicalDevice();
 	CreateCommandPool();
 	CreateAllocator();

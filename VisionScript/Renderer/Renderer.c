@@ -67,7 +67,7 @@ static void CreatePipelines()
 
 static void Startup()
 {
-	GraphicsInitialize(renderer.width, renderer.height);
+	GraphicsInitialize(renderer.width, renderer.height, 4);
 	
 	VertexAttribute attributes[] = { VertexAttributeVec2 };
 	renderer.layout2d = VertexLayoutCreate(sizeof(attributes) / sizeof(attributes[0]), attributes);

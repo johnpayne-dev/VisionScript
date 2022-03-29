@@ -428,7 +428,6 @@ static RuntimeErrorCode _gamma(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-#include <stdio.h>
 static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result)
 {
 	// takes n arguments of same dimensionality

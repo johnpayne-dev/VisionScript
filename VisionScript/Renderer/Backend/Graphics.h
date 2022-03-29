@@ -14,6 +14,7 @@ extern struct Graphics
 	VkInstance instance;
 	VkSurfaceKHR surface;
 	VkPhysicalDevice physicalDevice;
+	VkSampleCountFlagBits samples;
 	VkDevice device;
 	bool computeShadersSupported;
 	int32_t computeQueueIndex, graphicsQueueIndex, presentQueueIndex;
@@ -44,11 +45,14 @@ extern struct Graphics
 		VkImageView * imageViews;
 		VkFramebuffer * framebuffers;
 		uint32_t imageIndex;
+		VkImage msaaImage;
+		VmaAllocation msaaImageAllocation;
+		VkImageView msaaImageView;
 	} swapchain;
 	Pipeline boundPipeline;
 } graphics;
 
-void GraphicsInitialize(int32_t width, int32_t height);
+void GraphicsInitialize(int32_t width, int32_t height, int32_t msaa);
 
 void GraphicsRecreateSwapchain(int32_t width, int32_t height);
 
