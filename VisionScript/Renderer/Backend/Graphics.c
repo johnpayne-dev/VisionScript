@@ -258,11 +258,11 @@ static void CreateLogicalDevice()
 		if (graphics.computeQueueIndex != graphics.graphicsQueueIndex && graphics.computeQueueIndex != graphics.presentQueueIndex) { queueInfos[queueCount++] = computeQueueInfo; }
 	}
 	
-	// enable specific device features that are required (both features enabled below are supported by all GPUs that support Vulkan)
+	// enable specific device features that are required
 	VkPhysicalDeviceFeatures deviceFeatures =
 	{
 		.fillModeNonSolid = true,
-		.samplerAnisotropy = true,
+		.largePoints = true,
 	};
 	const char * extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 	

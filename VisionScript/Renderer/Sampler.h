@@ -4,6 +4,8 @@
 #include "Language/Evaluator.h"
 #include "Language/Script.h"
 
-RuntimeError SamplePolygon(Script * script, Statement * statement, VectorArray * result);
+RuntimeError SamplePolygons(Script * script, Statement * statement, VectorArray * result);
+
+RuntimeError SamplePoints(Script * script, Statement * statement, VectorArray * result);
 
 #endif

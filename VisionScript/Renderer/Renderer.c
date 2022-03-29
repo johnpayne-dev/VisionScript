@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "Backend/Graphics.h"
 #include "Backend/Pipeline.h"
 #include "Application.h"
@@ -16,14 +17,23 @@ static struct Renderer
 	int32_t width, height;
 	VertexLayout layout2d;
 	VertexBuffer quad;
-	list(VertexBuffer) polygons2d;
+	list(VertexBuffer) buffers;
+	list(StatementRenderType) renderTypes;
 } renderer = { 0 };
 
 static struct Pipelines
 {
 	Pipeline polygon2d;
 	Pipeline grid;
+	Pipeline points2d;
 } pipelines;
+
+typedef struct vertex2d
+{
+	vec2_t position;
+	vec4_t color;
+	float size;
+} vertex2d_t;
 
 static void CreatePipelines()
 {
@@ -41,7 +51,6 @@ static void CreatePipelines()
 		.vertexLayout = renderer.layout2d,
 	};
 	pipelines.polygon2d = PipelineCreate(config);
-	PipelineSetUniformMember(pipelines.polygon2d, "properties", 0, "color", &(vec3_t){ 0.0, 0.0, 0.0 });
 	
 #include "Shaders/Grid2D.vert.h"
 #include "Shaders/Grid2D.frag.h"
@@ -63,45 +72,101 @@ static void CreatePipelines()
 	PipelineSetUniformMember(pipelines.grid, "properties", 0, "majorWidth", &(float){ 0.002 });
 	PipelineSetUniformMember(pipelines.grid, "properties", 0, "minorColor", &(vec4_t){ 0.0, 0.0, 0.0, 1.0 / 6.0 });
 	PipelineSetUniformMember(pipelines.grid, "properties", 0, "minorWidth", &(float){ 0.0015 });
+	
+#include "Shaders/Points2D.vert.h"
+#include "Shaders/Points2D.frag.h"
+	vert = ShaderCompile(ShaderTypeVertex, vert_Points2D);
+	frag = ShaderCompile(ShaderTypeFragment, frag_Points2D);
+	config = (PipelineConfig)
+	{
+		.alphaBlend = true,
+		.polygonMode = PolygonModePoint,
+		.primitive = VertexPrimitivePointList,
+		.shaderCount = 2,
+		.shaders = { vert, frag },
+		.vertexLayout = renderer.layout2d,
+	};
+	pipelines.points2d = PipelineCreate(config);
+}
+
+static void UpdatePipelines()
+{
+	mat4_t matrix = Camera2DTransform(renderer.camera._2d);
+	PipelineSetUniformMember(pipelines.polygon2d, "camera", 0, "matrix", &matrix);
+	PipelineSetUniformMember(pipelines.points2d, "camera", 0, "matrix", &matrix);
+	matrix = Camera2DInverseTransform(renderer.camera._2d);
+	PipelineSetUniformMember(pipelines.grid, "camera", 0, "invMatrix", &matrix);
+	PipelineSetUniformMember(pipelines.grid, "camera", 0, "scale", &renderer.camera._2d.scale);
+	PipelineSetUniformMember(pipelines.grid, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
 }
 
 static void Startup()
 {
 	GraphicsInitialize(renderer.width, renderer.height, 4);
 	
-	VertexAttribute attributes[] = { VertexAttributeVec2 };
+	VertexAttribute attributes[] = { VertexAttributeVec2, VertexAttributeVec4, VertexAttributeFloat };
 	renderer.layout2d = VertexLayoutCreate(sizeof(attributes) / sizeof(attributes[0]), attributes);
 	
 	renderer.quad = VertexBufferCreate(renderer.layout2d, 6);
-	vec2_t * vertices = VertexBufferMapVertices(renderer.quad);
-	vertices[0] = (vec2_t){ -1.0, -1.0 };
-	vertices[1] = (vec2_t){ 1.0, -1.0 };
-	vertices[2] = (vec2_t){ 1.0, 1.0 };
-	vertices[3] = (vec2_t){ -1.0, -1.0 };
-	vertices[4] = (vec2_t){ 1.0, 1.0 };
-	vertices[5] = (vec2_t){ -1.0, 1.0 };
+	vertex2d_t * vertices = VertexBufferMapVertices(renderer.quad);
+	vertices[0].position = (vec2_t){ -1.0, -1.0 };
+	vertices[1].position = (vec2_t){ 1.0, -1.0 };
+	vertices[2].position = (vec2_t){ 1.0, 1.0 };
+	vertices[3].position = (vec2_t){ -1.0, -1.0 };
+	vertices[4].position = (vec2_t){ 1.0, 1.0 };
+	vertices[5].position = (vec2_t){ -1.0, 1.0 };
 	VertexBufferUnmapVertices(renderer.quad);
 	VertexBufferUpload(renderer.quad);
 	
-	renderer.polygons2d = ListCreate(sizeof(VertexBuffer), 1);
+	renderer.buffers = ListCreate(sizeof(VertexBuffer), 1);
+	renderer.renderTypes = ListCreate(sizeof(StatementRenderType), 1);
 	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
 	{
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePolygon)
 		{
 			VectorArray result;
-			RuntimeError error = SamplePolygon(renderer.script, renderer.script->renderList[i], &result);
+			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &result);
 			if (error.code != RuntimeErrorNone) { continue; }
 			if (result.dimensions == 2)
 			{
 				VertexBuffer buffer = VertexBufferCreate(renderer.layout2d, result.length);
-				vec2_t * vertices = VertexBufferMapVertices(buffer);
+				vertex2d_t * vertices = VertexBufferMapVertices(buffer);
 				for (int32_t j = 0; j < result.length; j++)
 				{
-					vertices[j] = (vec2_t){ result.xyzw[0][j], result.xyzw[1][j] };
+					vertices[j] = (vertex2d_t)
+					{
+						.position = { result.xyzw[0][j], result.xyzw[1][j] },
+						.color = { 0.0, 0.0, 0.0, 1.0 },
+					};
 				}
 				VertexBufferUnmapVertices(buffer);
 				VertexBufferUpload(buffer);
-				ListPush((void **)&renderer.polygons2d, &buffer);
+				ListPush((void **)&renderer.buffers, &buffer);
+				ListPush((void **)&renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygon });
+			}
+		}
+		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePoint)
+		{
+			VectorArray result;
+			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &result);
+			if (error.code != RuntimeErrorNone) { continue; }
+			if (result.dimensions == 2)
+			{
+				VertexBuffer buffer = VertexBufferCreate(renderer.layout2d, result.length);
+				vertex2d_t * vertices = VertexBufferMapVertices(buffer);
+				for (int32_t j = 0; j < result.length; j++)
+				{
+					vertices[j] = (vertex2d_t)
+					{
+						.position = { result.xyzw[0][j], result.xyzw[1][j] },
+						.color = { 0.0, 0.0, 0.0, 1.0 },
+						.size = 4.0,
+					};
+				}
+				VertexBufferUnmapVertices(buffer);
+				VertexBufferUpload(buffer);
+				ListPush((void **)&renderer.buffers, &buffer);
+				ListPush((void **)&renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoint });
 			}
 		}
 	}
@@ -112,12 +177,7 @@ static void Startup()
 static void Update()
 {
 	GraphicsUpdate();
-	mat4_t matrix = Camera2DTransform(renderer.camera._2d);
-	PipelineSetUniformMember(pipelines.polygon2d, "camera", 0, "matrix", &matrix);
-	matrix = Camera2DInverseTransform(renderer.camera._2d);
-	PipelineSetUniformMember(pipelines.grid, "camera", 0, "invMatrix", &matrix);
-	PipelineSetUniformMember(pipelines.grid, "camera", 0, "scale", &renderer.camera._2d.scale);
-	PipelineSetUniformMember(pipelines.grid, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
+	UpdatePipelines();
 }
 
 static void Render()
@@ -129,10 +189,11 @@ static void Render()
 		GraphicsBindPipeline(pipelines.grid);
 		GraphicsRenderVertexBuffer(renderer.quad);
 	}
-	GraphicsBindPipeline(pipelines.polygon2d);
-	for (int32_t i = 0; i < ListLength(renderer.polygons2d); i++)
+	for (int32_t i = 0; i < ListLength(renderer.buffers); i++)
 	{
-		GraphicsRenderVertexBuffer(renderer.polygons2d[i]);
+		if (renderer.renderTypes[i] == StatementRenderTypePolygon) { GraphicsBindPipeline(pipelines.polygon2d); }
+		if (renderer.renderTypes[i] == StatementRenderTypePoint) { GraphicsBindPipeline(pipelines.points2d); }
+		GraphicsRenderVertexBuffer(renderer.buffers[i]);
 	}
 	GraphicsEnd();
 }
@@ -150,7 +211,7 @@ static void MouseDragged(float x, float y, float dx, float dy)
 	if (renderer.testMode)
 	{
 		vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera._2d.angle), (vec4_t){ dx, dy, 0.0, 1.0 });
-		renderer.camera._2d.position.x -= dir.x / (renderer.width * renderer.camera._2d.scale.x);
+		renderer.camera._2d.position.x -= dir.x / (renderer.width * renderer.camera._2d.scale.x) * renderer.camera._2d.aspectRatio;
 		renderer.camera._2d.position.y -= dir.y / (renderer.height * renderer.camera._2d.scale.y);
 	}
 }

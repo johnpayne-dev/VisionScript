@@ -25,7 +25,7 @@ typedef enum RuntimeErrorCode
 	RuntimeErrorIndexingWithVector,
 	RuntimeErrorDifferingLengthVectors,
 	RuntimeErrorInvalidSwizzling,
-	RuntimeErrorInvalidPolygonDimensionality,
+	RuntimeErrorInvalidRenderDimensionality,
 	RuntimeErrorNotImplemented,
 } RuntimeErrorCode;
 
