@@ -28,7 +28,7 @@ int main(int argc, const char * argv[])
 		"v1 = [(0,0) for i = [1...n]]\n"
 		"v2 = [(cos(i), sin(i)) for i = 2*pi*[0...n-1]/n]\n"
 		"v3 = [(cos(i), sin(i)) for i = 2*pi*[1...n]/n]\n"
-		"polygon join(v1, v2, v3)";
+		"polygon interleave(v1, v2, v3)";
 	
 	Script * script = LoadScript(code, VARIABLE_LIMIT);
 	RenderScript(script, RendererType2D, true); // doesn't return

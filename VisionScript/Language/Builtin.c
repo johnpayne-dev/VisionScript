@@ -12,7 +12,7 @@ static const char * builtinFunctions[] =
 	
 	"abs", "argmax", "argmin", "cbrt", "ceil", "corr",
 	"count", "cov", "erf", "exp", "factorial", "floor",
-	"gamma", "join", "ln", "log", "log10", "log2",
+	"gamma", "interleave", "join", "ln", "log", "log10", "log2",
 	"max", "mean", "median", "min", "prod", "quantile",
 	"rand", "round", "shuffle", "sign", "sort", "sqrt",
 	"stdev", "sum", "var",
@@ -425,6 +425,41 @@ static RuntimeErrorCode _floor(VectorArray * result)
 static RuntimeErrorCode _gamma(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++) { for (int32_t i = 0; i < result->length; i++) { result->xyzw[d][i] = tgammaf(result->xyzw[d][i]); } }
+	return RuntimeErrorNone;
+}
+
+#include <stdio.h>
+static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result)
+{
+	// takes n arguments of same dimensionality
+	result->dimensions = 0;
+	result->length = 0;
+	for (int32_t i = 0; i < ListLength(args); i++)
+	{
+		// first argument determines dimensionality of whole array
+		if (result->dimensions == 0) { result->dimensions = args[i].dimensions; }
+		if (args[i].dimensions != result->dimensions) { return RuntimeErrorInvalidArgumentType; }
+		result->length += args[i].length;
+	}
+	
+	// return error if array too large
+	if (result->length > MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
+	
+	// interleave the contents of each argument into a single array
+	for (int32_t d = 0; d < result->dimensions; d++)
+	{
+		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
+		int32_t * counters = calloc(ListLength(args), sizeof(int32_t));
+		int32_t c = 0;
+		while (c < result->length)
+		{
+			for (int32_t i = 0; i < ListLength(args); i++)
+			{
+				if (counters[i] < args[i].length) { result->xyzw[d][c++] = args[i].xyzw[d][counters[i]++]; }
+			}
+		}
+		free(counters);
+	}
 	return RuntimeErrorNone;
 }
 
@@ -986,6 +1021,7 @@ RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorAr
 		case BuiltinFunctionFACTORIAL: return _factorial(result);
 		case BuiltinFunctionFLOOR: return _floor(result);
 		case BuiltinFunctionGAMMA: return _gamma(result);
+		case BuiltinFunctionINTERLEAVE: return _interleave(arguments, result);
 		case BuiltinFunctionJOIN: return _join(arguments, result);
 		case BuiltinFunctionLN: return _ln(result);
 		case BuiltinFunctionLOG: return _log(arguments, result);

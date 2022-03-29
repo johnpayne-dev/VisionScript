@@ -43,6 +43,7 @@ typedef enum BuiltinFunction
 	BuiltinFunctionFACTORIAL,
 	BuiltinFunctionFLOOR,
 	BuiltinFunctionGAMMA,
+	BuiltinFunctionINTERLEAVE,
 	BuiltinFunctionJOIN,
 	BuiltinFunctionLN,
 	BuiltinFunctionLOG,
