@@ -2,13 +2,15 @@
 #define Renderer_h
 
 #include "Language/Script.h"
+#include "Utilities/Math3D.h"
 
-typedef enum RendererType
+typedef struct vertex
 {
-	RendererType2D,
-	RendererType3D,
-} RendererType;
+	vec2_t position;
+	vec4_t color;
+	float size;
+} vertex_t;
 
-void RenderScript(Script * script, RendererType type, bool testMode);
+void RenderScript(Script * script, bool testMode);
 
 #endif

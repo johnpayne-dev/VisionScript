@@ -11,7 +11,6 @@
 static struct Renderer
 {
 	Script * script;
-	RendererType type;
 	Camera camera;
 	bool testMode;
 	int32_t width, height;
@@ -27,13 +26,6 @@ static struct Pipelines
 	Pipeline grid;
 	Pipeline points;
 } pipelines;
-
-typedef struct vertex
-{
-	vec2_t position;
-	vec4_t color;
-	float size;
-} vertex_t;
 
 static void CreatePipelines()
 {
@@ -93,7 +85,10 @@ static void UpdatePipelines()
 {
 	mat4_t matrix = CameraTransform(renderer.camera);
 	PipelineSetUniformMember(pipelines.polygons, "camera", 0, "matrix", &matrix);
+	
 	PipelineSetUniformMember(pipelines.points, "camera", 0, "matrix", &matrix);
+	PipelineSetUniformMember(pipelines.points, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
+	
 	matrix = CameraInverseTransform(renderer.camera);
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "invMatrix", &matrix);
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "scale", &renderer.camera.scale);
@@ -124,42 +119,17 @@ static void Startup()
 	{
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePolygons)
 		{
-			VectorArray result;
-			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &result);
+			VertexBuffer buffer;
+			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], renderer.layout, &buffer);
 			if (error.code != RuntimeErrorNone) { continue; }
-			VertexBuffer buffer = VertexBufferCreate(renderer.layout, result.length);
-			vertex_t * vertices = VertexBufferMapVertices(buffer);
-			for (int32_t j = 0; j < result.length; j++)
-			{
-				vertices[j] = (vertex_t)
-				{
-					.position = { result.xyzw[0][j], result.xyzw[1][j] },
-					.color = { 0.0, 0.0, 0.0, 1.0 },
-				};
-			}
-			VertexBufferUnmapVertices(buffer);
-			VertexBufferUpload(buffer);
 			ListPush((void **)&renderer.buffers, &buffer);
 			ListPush((void **)&renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygons });
 		}
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePoints)
 		{
-			VectorArray result;
-			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &result);
+			VertexBuffer buffer;
+			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], renderer.layout, &buffer);
 			if (error.code != RuntimeErrorNone) { continue; }
-			VertexBuffer buffer = VertexBufferCreate(renderer.layout, result.length);
-			vertex_t * vertices = VertexBufferMapVertices(buffer);
-			for (int32_t j = 0; j < result.length; j++)
-			{
-				vertices[j] = (vertex_t)
-				{
-					.position = { result.xyzw[0][j], result.xyzw[1][j] },
-					.color = { 0.0, 0.0, 0.0, 1.0 },
-					.size = 4.0,
-				};
-			}
-			VertexBufferUnmapVertices(buffer);
-			VertexBufferUpload(buffer);
 			ListPush((void **)&renderer.buffers, &buffer);
 			ListPush((void **)&renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoints });
 		}
@@ -202,25 +172,19 @@ static void Resize(int32_t width, int32_t height)
 
 static void MouseDragged(float x, float y, float dx, float dy)
 {
-	if (renderer.testMode)
-	{
-		vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera.angle), (vec4_t){ dx, dy, 0.0, 1.0 });
-		renderer.camera.position.x -= dir.x / (renderer.width * renderer.camera.scale.x) * renderer.camera.aspectRatio;
-		renderer.camera.position.y -= dir.y / (renderer.height * renderer.camera.scale.y);
-	}
+	vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera.angle), (vec4_t){ dx, dy, 0.0, 1.0 });
+	renderer.camera.position.x -= dir.x / (renderer.width * renderer.camera.scale.x) * renderer.camera.aspectRatio;
+	renderer.camera.position.y -= dir.y / (renderer.height * renderer.camera.scale.y);
 }
 
 static void ScrollWheel(float x, float y, float ds)
 {
-	if (renderer.testMode)
-	{
-		renderer.camera.scale.x *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
-		renderer.camera.scale.y *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
-		vec4_t mousePos = { 2.0 * x / renderer.width - 1.0, -(2.0 * y / renderer.height - 1.0), 0.0, 1.0 };
-		vec4_t camMousePos = mat4_mulv(CameraInverseTransform(renderer.camera), mousePos);
-		vec2_t diff = vec2_sub(vec4_to_vec2(camMousePos), renderer.camera.position);
-		renderer.camera.position = vec2_add(renderer.camera.position, vec2_mulf(diff, ds / SCROLL_ZOOM_FACTOR));
-	}
+	renderer.camera.scale.x *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
+	renderer.camera.scale.y *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
+	vec4_t mousePos = { 2.0 * x / renderer.width - 1.0, -(2.0 * y / renderer.height - 1.0), 0.0, 1.0 };
+	vec4_t camMousePos = mat4_mulv(CameraInverseTransform(renderer.camera), mousePos);
+	vec2_t diff = vec2_sub(vec4_to_vec2(camMousePos), renderer.camera.position);
+	renderer.camera.position = vec2_add(renderer.camera.position, vec2_mulf(diff, ds / SCROLL_ZOOM_FACTOR));
 }
 
 static void Shutdown()
@@ -228,10 +192,9 @@ static void Shutdown()
 	GraphicsShutdown();
 }
 
-void RenderScript(Script * script, RendererType type, bool testMode)
+void RenderScript(Script * script, bool testMode)
 {
 	renderer.script = script;
-	renderer.type = type;
 	renderer.testMode = testMode;
 	renderer.width = 1080;
 	renderer.height = 720;

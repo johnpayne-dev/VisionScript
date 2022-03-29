@@ -8,5 +8,7 @@ static const char * frag_Points =
 
 "void main()"
 "{"
+"	vec2 uv = 2.0 * gl_PointCoord.xy - 1.0;"
 "	fragColor = vertexColor;"
+"	if (length(uv) > 1.0) { fragColor.a = 0.0; }"
 "}";
