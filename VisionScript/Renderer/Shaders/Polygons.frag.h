@@ -1,5 +1,5 @@
 
-static const char * frag_Polygon2D =
+static const char * frag_Polygons =
 "#version 450\n"
 
 "layout (location = 0) in vec4 vertexColor;"

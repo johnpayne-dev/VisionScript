@@ -86,7 +86,7 @@ static StatementType DetermineStatementType(list(Token) tokens)
 	// render declaration must start with a keyword
 	if (tokens[0].type == TokenTypeKeyword)
 	{
-		if (StringEquals(tokens[0].value, "point") || StringEquals(tokens[0].value, "parametric") || StringEquals(tokens[0].value, "polygon"))
+		if (StringEquals(tokens[0].value, "points") || StringEquals(tokens[0].value, "parametric") || StringEquals(tokens[0].value, "polygons"))
 		{
 			return StatementTypeRender;
 		}
@@ -125,9 +125,9 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, StatementDeclara
 
 static SyntaxError ParseRenderDeclaration(list(Token) tokens, StatementDeclaration * declaration, int32_t * declarationEndIndex)
 {
-	if (StringEquals(tokens[0].value, "point")) { declaration->render.type = StatementRenderTypePoint; }
+	if (StringEquals(tokens[0].value, "points")) { declaration->render.type = StatementRenderTypePoints; }
 	if (StringEquals(tokens[0].value, "parametric")) { declaration->render.type = StatementRenderTypeParametric; }
-	if (StringEquals(tokens[0].value, "polygon")) { declaration->render.type = StatementRenderTypePolygon; }
+	if (StringEquals(tokens[0].value, "polygons")) { declaration->render.type = StatementRenderTypePolygons; }
 	*declarationEndIndex = 0;
 	return (SyntaxError){ SyntaxErrorNone };
 }

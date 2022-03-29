@@ -1,5 +1,5 @@
 
-static const char * vert_Points2D =
+static const char * vert_Points =
 "#version 450\n"
 
 "layout (location = 0) in vec2 point;"

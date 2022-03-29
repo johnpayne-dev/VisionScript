@@ -3,15 +3,15 @@
 
 #include "Utilities/Math3D.h"
 
-typedef struct Camera2D
+typedef struct Camera
 {
 	float aspectRatio;
 	vec2_t position;
 	vec2_t scale;
 	float angle;
-} Camera2D;
+} Camera;
 
-static inline mat4_t Camera2DTransform(Camera2D camera)
+static inline mat4_t CameraTransform(Camera camera)
 {
 	mat4_t matrix = mat4_identity;
 	matrix = mat4_translate(matrix, vec2_to_vec3(vec2_neg(camera.position)));
@@ -21,7 +21,7 @@ static inline mat4_t Camera2DTransform(Camera2D camera)
 	return matrix;
 }
 
-static inline mat4_t Camera2DInverseTransform(Camera2D camera)
+static inline mat4_t CameraInverseTransform(Camera camera)
 {
 	mat4_t matrix = mat4_identity;
 	matrix = mat4_scale(matrix, (vec3_t){ camera.aspectRatio, 1.0, 1.0 });
@@ -30,12 +30,5 @@ static inline mat4_t Camera2DInverseTransform(Camera2D camera)
 	matrix = mat4_translate(matrix, vec2_to_vec3(camera.position));
 	return matrix;
 }
-
-typedef struct Camera3D
-{
-	vec3_t position;
-	vec3_t scale;
-	vec3_t angles;
-} Camera3D;
 
 #endif

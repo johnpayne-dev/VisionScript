@@ -99,7 +99,7 @@ static bool IsSymbol(String statement, int32_t i, int32_t * end)
 	return false;
 }
 
-static const char * keywords[] = { "point", "parametric", "polygon" };
+static const char * keywords[] = { "points", "parametric", "polygons" };
 
 static bool IsKeyword(String statement, int32_t i, int32_t * end)
 {

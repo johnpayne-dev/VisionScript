@@ -1,5 +1,5 @@
 
-static const char * vert_Polygon2D =
+static const char * vert_Polygons =
 "#version 450\n"
 
 "layout (location = 0) in vec2 position;"

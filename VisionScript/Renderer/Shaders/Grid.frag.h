@@ -1,5 +1,5 @@
 
-static const char * frag_Grid2D =
+static const char * frag_Grid =
 "#version 450\n"
 
 "layout (location = 0) in vec2 uv;"

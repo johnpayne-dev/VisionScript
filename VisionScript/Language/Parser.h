@@ -95,9 +95,9 @@ typedef enum StatementType
 
 typedef enum StatementRenderType
 {
-	StatementRenderTypePoint,
+	StatementRenderTypePoints,
 	StatementRenderTypeParametric,
-	StatementRenderTypePolygon,
+	StatementRenderTypePolygons,
 } StatementRenderType;
 
 typedef union StatementDeclaration

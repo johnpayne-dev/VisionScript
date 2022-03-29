@@ -4,7 +4,7 @@ RuntimeError SamplePolygons(Script * script, Statement * statement, VectorArray 
 {
 	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, NULL, statement->expression, result);
 	if (error.code != RuntimeErrorNone) { return error; }
-	if (result->dimensions != 2 && result->dimensions != 3) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
+	if (result->dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
@@ -12,6 +12,6 @@ RuntimeError SamplePoints(Script * script, Statement * statement, VectorArray * 
 {
 	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, NULL, statement->expression, result);
 	if (error.code != RuntimeErrorNone) { return error; }
-	if (result->dimensions != 2 && result->dimensions != 3) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
+	if (result->dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	return (RuntimeError){ RuntimeErrorNone };
 }
