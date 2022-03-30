@@ -350,7 +350,7 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 				ListFree(arguments);
 				return error;
 			}
-			ListPush((void **)&arguments, &parameter);
+			arguments = ListPush(arguments, &parameter);
 		}
 		// evaluate the function
 		RuntimeError error = EvaluateExpression(identifiers, cache, arguments, statement->expression, result);
@@ -379,7 +379,7 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 		list(VectorArray) arguments = ListCreate(sizeof(VectorArray), ListLength(expressions));
 		for (int32_t i = 0; i < ListLength(expressions); i++)
 		{
-			ListPush((void **)&arguments, &(VectorArray){ 0 });
+			arguments = ListPush(arguments, &(VectorArray){ 0 });
 			RuntimeError error = EvaluateExpression(identifiers, cache, parameters, expressions[i], &arguments[i]);
 			if (error.code != RuntimeErrorNone)
 			{
@@ -419,7 +419,7 @@ static RuntimeError EvaluateFor(HashMap identifiers, HashMap cache, list(Paramet
 	if (parameters == NULL) { parameters = ListCreate(sizeof(Parameter), 1); }
 	else { parameters = ListClone(parameters); }
 	// add the assignment identifier to the front of the parameter list
-	ListInsert((void **)&parameters, &(Parameter){ .identifier = assignment.identifier }, 0);
+	parameters = ListInsert(parameters, &(Parameter){ .identifier = assignment.identifier }, 0);
 	parameters[0].value.length = 1;
 	parameters[0].value.dimensions = assignmentValue.dimensions;
 	

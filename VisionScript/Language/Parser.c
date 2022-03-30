@@ -112,7 +112,7 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, StatementDeclara
 	for (int32_t i = 2; i < argumentsEndIndex; i++)
 	{
 		if (tokens[i].type != TokenTypeIdentifier) { return (SyntaxError){ SyntaxErrorInvalidFunctionDeclaration, i, i }; }
-		ListPush((void **)&declaration->function.arguments, &(String){ StringCreate(tokens[i].value) });
+		declaration->function.arguments = ListPush(declaration->function.arguments, &(String){ StringCreate(tokens[i].value) });
 		i++;
 		
 		if (i == argumentsEndIndex) { break; }
@@ -277,7 +277,7 @@ static SyntaxError ReadOperon(list(Token) tokens, int32_t start, int32_t end, Op
 			// return error if vector literal contains more than 4 elements
 			if (type == OperonTypeVectorLiteral && elementIndex >= 3) { return (SyntaxError){ SyntaxErrorTooManyVectorElements, commaIndex, end }; }
 			
-			ListPush((void **)&operon->expressions, &(Expression *){ NULL });
+			operon->expressions = ListPush(operon->expressions, &(Expression *){ NULL });
 			SyntaxError error = ParseExpression(tokens, prevStart, commaIndex - 1, &operon->expressions[elementIndex]);
 			if (error.code != SyntaxErrorNone) { return error; }
 			
@@ -286,7 +286,7 @@ static SyntaxError ReadOperon(list(Token) tokens, int32_t start, int32_t end, Op
 			elementIndex++;
 		}
 		// add the last expression (since there's n-1 commas for n arguments)
-		ListPush((void **)&operon->expressions, &(Expression *){ NULL });
+		operon->expressions = ListPush(operon->expressions, &(Expression *){ NULL });
 		return ParseExpression(tokens, prevStart, end, &operon->expressions[elementIndex]);
 	}
 	return (SyntaxError){ SyntaxErrorNone };

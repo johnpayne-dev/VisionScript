@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "List.h"
 
-struct ListData
+struct ListInfo
 {
 	uint32_t elementSize;
 	uint32_t capacity;
@@ -11,7 +11,7 @@ struct ListData
 
 list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity)
 {
-	struct ListData * list = malloc(sizeof(struct ListData) + initialCapacity * elementSize);
+	struct ListInfo * list = malloc(sizeof(struct ListInfo) + initialCapacity * elementSize);
 	list->elementSize = elementSize;
 	list->capacity = initialCapacity;
 	list->length = 0;
@@ -20,69 +20,72 @@ list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity)
 
 uint32_t ListLength(list(void) list)
 {
-	return ((struct ListData *)list - 1)->length;
+	return ((struct ListInfo *)list - 1)->length;
 }
 
 uint32_t ListElementSize(list(void) list)
 {
-	return ((struct ListData *)list - 1)->elementSize;
+	return ((struct ListInfo *)list - 1)->elementSize;
 }
 
 uint32_t ListCapacity(list(void) list)
 {
-	return ((struct ListData *)list - 1)->capacity;
+	return ((struct ListInfo *)list - 1)->capacity;
 }
 
-void ListInsert(list(void) * list, void * element, int32_t index)
+list(void) ListInsert(list(void) list, void * element, int32_t index)
 {
-	struct ListData * data = (struct ListData *)*list - 1;
-	data->length++;
-	if (data->length == data->capacity)
+	struct ListInfo * info = (struct ListInfo *)list - 1;
+	info->length++;
+	if (info->length == info->capacity)
 	{
-		data->capacity *= 2;
-		data = realloc(data, sizeof(struct ListData) + data->capacity * data->elementSize);
-		*list = data + 1;
+		info->capacity *= 2;
+		info = realloc(info, sizeof(struct ListInfo) + info->capacity * info->elementSize);
+		list = info + 1;
 	}
-	memmove(*list + (index + 1) * data->elementSize, *list + index * data->elementSize, (data->length - 1 - index) * data->elementSize);
-	memcpy(*list + index * data->elementSize, element, data->elementSize);
+	memmove(list + (index + 1) * info->elementSize, list + index * info->elementSize, (info->length - 1 - index) * info->elementSize);
+	memcpy(list + index * info->elementSize, element, info->elementSize);
+	return list;
 }
 
-void ListRemove(list(void) * list, int32_t index)
+list(void) ListRemove(list(void) list, int32_t index)
 {
-	struct ListData * data = (struct ListData *)*list - 1;
-	for (uint32_t j = (index + 1) * data->elementSize; j < data->length * data->elementSize; j++)
+	struct ListInfo * info = (struct ListInfo *)list - 1;
+	for (uint32_t j = (index + 1) * info->elementSize; j < info->length * info->elementSize; j++)
 	{
-		((uint8_t *)*list)[j - data->elementSize] = ((uint8_t *)*list)[j];
+		((uint8_t *)list)[j - info->elementSize] = ((uint8_t *)list)[j];
 	}
-	data->length--;
-	if (data->length == data->capacity / 2 - 1)
+	info->length--;
+	if (info->length == info->capacity / 2 - 1)
 	{
-		data->capacity /= 2;
-		data = realloc(data, sizeof(struct ListData) + data->capacity * data->elementSize);
-		*list = data + 1;
+		info->capacity /= 2;
+		info = realloc(info, sizeof(struct ListInfo) + info->capacity * info->elementSize);
+		list = info + 1;
 	}
+	return list;
 }
 
-void ListPush(list(void) * list, void * value)
+list(void) ListPush(list(void) list, void * value)
 {
-	return ListInsert(list, value, ListLength(*list));
+	return ListInsert(list, value, ListLength(list));
 }
 
-void ListPop(list(void) * list)
+list(void) ListPop(list(void) list)
 {
-	return ListRemove(list, ListLength(*list) - 1);
+	return ListRemove(list, ListLength(list) - 1);
 }
 
-void ListRemoveAll(list(void) * list, void * value)
+list(void) ListRemoveAll(list(void) list, void * value)
 {
-	for (uint32_t i = 0; i < ListLength(*list); i++)
+	for (uint32_t i = 0; i < ListLength(list); i++)
 	{
-		if (memcmp(*list + i * ListElementSize(*list), value, ListElementSize(*list)) == 0)
+		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0)
 		{
-			ListRemove(list, i);
+			list = ListRemove(list, i);
 			i--;
 		}
 	}
+	return list;
 }
 
 bool ListContains(list(void) list, void * value)
@@ -94,22 +97,22 @@ bool ListContains(list(void) list, void * value)
 	return false;
 }
 
-void ListClear(list(void) * list)
+list(void) ListClear(list(void) list)
 {
-	list(void) newList = ListCreate(ListElementSize(*list), ListCapacity(*list));
-	ListFree(*list);
-	*list = newList;
+	list(void) newList = ListCreate(ListElementSize(list), ListCapacity(list));
+	ListFree(list);
+	return newList;
 }
 
 list(void) ListClone(list(void) list)
 {
-	uint64_t size = sizeof(struct ListData) + ListElementSize(list) * ListCapacity(list);
-	struct ListData * clone = malloc(size);
-	memcpy(clone, (struct ListData *)list - 1, size);
+	uint64_t size = sizeof(struct ListInfo) + ListElementSize(list) * ListCapacity(list);
+	struct ListInfo * clone = malloc(size);
+	memcpy(clone, (struct ListInfo *)list - 1, size);
 	return clone + 1;
 }
 
 void ListFree(list(void) list)
 {
-	free((struct ListData *)list - 1);
+	free((struct ListInfo *)list - 1);
 }

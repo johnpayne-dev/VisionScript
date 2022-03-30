@@ -122,16 +122,16 @@ static void Startup()
 			VertexBuffer buffer;
 			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], renderer.layout, &buffer);
 			if (error.code != RuntimeErrorNone) { continue; }
-			ListPush((void **)&renderer.buffers, &buffer);
-			ListPush((void **)&renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygons });
+			renderer.buffers = ListPush(renderer.buffers, &buffer);
+			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygons });
 		}
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePoints)
 		{
 			VertexBuffer buffer;
 			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], renderer.layout, &buffer);
 			if (error.code != RuntimeErrorNone) { continue; }
-			ListPush((void **)&renderer.buffers, &buffer);
-			ListPush((void **)&renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoints });
+			renderer.buffers = ListPush(renderer.buffers, &buffer);
+			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoints });
 		}
 	}
 	

@@ -18,7 +18,7 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 	else { parameters = ListClone(parameters); }
 	
 	// if it's a for operator, add the assignment to the parameters list
-	if (expression->operator == OperatorFor) { ListPush((void **)&parameters, &expression->operons[1].assignment.identifier); }
+	if (expression->operator == OperatorFor) { parameters = ListPush(parameters, &expression->operons[1].assignment.identifier); }
 	
 	// go through one or both operons
 	int32_t operons = expression->operator == OperatorFor || expression->operator == OperatorNone || expression->operator == OperatorNegative || expression->operator == OperatorPositive ? 1 : 2;
@@ -30,7 +30,7 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 			for (int32_t j = 0; j < ListLength(expression->operons[i].expressions); j++)
 			{
 				list(Statement *) argDependents = FindParents(identifiers, expression->operons[i].expressions[j], parameters);
-				for (int32_t k = 0; k < ListLength(argDependents); k++) { ListPush((void **)&parents, &argDependents[k]); }
+				for (int32_t k = 0; k < ListLength(argDependents); k++) { parents = ListPush(parents, &argDependents[k]); }
 				ListFree(argDependents);
 			}
 		}
@@ -38,7 +38,7 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 		{
 			// recursively go through this expression and find its parents
 			list(Statement *) expDependents = FindParents(identifiers, expression->operons[i].expression, parameters);
-			for (int32_t k = 0; k < ListLength(expDependents); k++) { ListPush((void **)&parents, &expDependents[k]); }
+			for (int32_t k = 0; k < ListLength(expDependents); k++) { parents = ListPush(parents, &expDependents[k]); }
 			ListFree(expDependents);
 		}
 		else if (expression->operonTypes[i] == OperonTypeIdentifier)
@@ -55,14 +55,14 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 			if (statement != NULL)
 			{
 				// add the identifier's statement to the list if it's a variable and not already in the list
-				if (statement->type == StatementTypeVariable) { ListPush((void **)&parents, &statement); }
+				if (statement->type == StatementTypeVariable) { parents = ListPush(parents, &statement); }
 				// if it's a function, look for parents in there
 				if (statement->type == StatementTypeFunction)
 				{
-					for (int32_t j = 0; j < ListLength(statement->declaration.function.arguments); j++) { ListPush((void **)&parameters, &statement->declaration.function.arguments[j]); }
+					for (int32_t j = 0; j < ListLength(statement->declaration.function.arguments); j++) { parameters = ListPush(parameters, &statement->declaration.function.arguments[j]); }
 					
 					list(Statement *) funcParents = FindParents(identifiers, statement->expression, NULL);
-					for (int32_t j = 0; j < ListLength(funcParents); j++) { ListPush((void **)&parents, &funcParents[j]); }
+					for (int32_t j = 0; j < ListLength(funcParents); j++) { parents = ListPush(parents, &funcParents[j]); }
 					ListFree(funcParents);
 				}
 			}
@@ -78,7 +78,7 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 	{
 		if (i > 0 && strcmp(parents[i]->declaration.variable.identifier, parents[i - 1]->declaration.variable.identifier) == 0)
 		{
-			ListRemove((void **)&parents, i);
+			parents = ListRemove(parents, i);
 			i--;
 		}
 	}
@@ -128,22 +128,22 @@ Script * LoadScript(const char * code, int32_t varLimit)
 		Statement * statement = ParseTokenLine(script->tokenLines[i]);
 		if (statement->error.code != SyntaxErrorNone || statement->type == StatementTypeUnknown)
 		{
-			ListPush((void **)&script->errorList, &statement);
+			script->errorList = ListPush(script->errorList, &statement);
 			continue;
 		}
 		switch (statement->type)
 		{
 			case StatementTypeVariable:
-				ListPush((void **)&script->identifierList, &statement);
+				script->identifierList = ListPush(script->identifierList, &statement);
 				HashMapSet(script->identifiers, statement->declaration.variable.identifier, statement);
 				list(Statement *) dependents = ListCreate(sizeof(Statement *), 1);
 				HashMapSet(script->dependents, statement->declaration.variable.identifier, dependents);
 				break;
 			case StatementTypeFunction:
-				ListPush((void **)&script->identifierList, &statement);
+				script->identifierList = ListPush(script->identifierList, &statement);
 				HashMapSet(script->identifiers, statement->declaration.function.identifier, statement);
 				break;
-			case StatementTypeRender: ListPush((void **)&script->renderList, &statement); break;
+			case StatementTypeRender: script->renderList = ListPush(script->renderList, &statement); break;
 			default: break;
 		}
 	}
@@ -157,7 +157,7 @@ Script * LoadScript(const char * code, int32_t varLimit)
 			for (int32_t j = 0; j < ListLength(parents); j++)
 			{
 				list(Statement *) dependents = HashMapGet(script->dependents, parents[j]->declaration.variable.identifier);
-				ListPush((void **)&dependents, &script->identifierList[i]);
+				dependents = ListPush(dependents, &script->identifierList[i]);
 				HashMapSet(script->dependents, parents[j]->declaration.variable.identifier, dependents);
 			}
 			RuntimeError error = InitializeCache(script->identifiers, script->cache, script->identifierList[i]);

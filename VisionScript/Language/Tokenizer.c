@@ -18,12 +18,12 @@ static list(String) SplitCodeIntoStatements(String code)
 				continue;
 			}
 			String statement = StringSub(code, lastStatementStart, i - 1);
-			ListPush((void **)&statements, &statement);
+			statements = ListPush(statements, &statement);
 			lastStatementStart = i + 1;
 		}
 	}
 	String statement = StringSub(code, lastStatementStart, StringLength(code) - 1);
-	ListPush((void **)&statements, &statement); // add last line if it doesn't end with '\n'
+	statements = ListPush(statements, &statement); // add last line if it doesn't end with '\n'
 	
 	StringFree(code);
 	return statements;
@@ -151,7 +151,7 @@ list(Token) TokenizeLine(String line)
 		else if (IsBracket(line, i, &end)) { tokenType = TokenTypeBracket; }
 		else if (IsSymbol(line, i, &end)) { tokenType = TokenTypeSymbol; }
 		else if (IsWhitespace(line[i])) { i++; continue; }
-		ListPush((void **)&tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .line = StringCreate(line), .lineIndexStart = i, .lineIndexEnd = end });
+		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .line = StringCreate(line), .lineIndexStart = i, .lineIndexEnd = end });
 		i = end + 1;
 	}
 	return tokens;
@@ -165,7 +165,7 @@ list(list(Token)) TokenizeCode(String code)
 	for (int32_t i = 0; i < ListLength(statements); i++)
 	{
 		list(Token) tokenLine = TokenizeLine(statements[i]);
-		ListPush((void **)&tokenLines, &tokenLine);
+		tokenLines = ListPush(tokenLines, &tokenLine);
 	}
 	ListFree(statements);
 	return tokenLines;
