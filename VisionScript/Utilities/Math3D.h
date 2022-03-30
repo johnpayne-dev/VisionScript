@@ -19,6 +19,7 @@ static inline vec2_t vec2_divf(vec2_t a, float b) { return (vec2_t){ a.x / b, a.
 
 static inline float vec2_dot(vec2_t a, vec2_t b) { return a.x * b.x + a.y * b.y; }
 static inline float vec2_len(vec2_t a) { return sqrtf(vec2_dot(a, a)); }
+static inline float vec2_dist(vec2_t a, vec2_t b) { return vec2_len(vec2_sub(b, a)); }
 static inline vec2_t vec2_normalize(vec2_t a) { return vec2_divf(a, vec2_len(a)); }
 
 // vec3 operations
@@ -37,6 +38,7 @@ static inline vec3_t vec3_divf(vec3_t a, float b) { return (vec3_t){ a.x / b, a.
 
 static inline float vec3_dot(vec3_t a, vec3_t b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 static inline float vec3_len(vec3_t a) { return sqrtf(vec3_dot(a, a)); }
+static inline float vec3_dist(vec3_t a, vec3_t b) { return vec3_len(vec3_sub(b, a)); }
 static inline vec3_t vec3_normalize(vec3_t a) { return vec3_divf(a, vec3_len(a)); }
 static inline vec3_t vec3_cross(vec3_t a, vec3_t b) { return (vec3_t){ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; }
 
@@ -56,6 +58,7 @@ static inline vec4_t vec4_divf(vec4_t a, float b) { return (vec4_t){ a.x / b, a.
 
 static inline float vec4_dot(vec4_t a, vec4_t b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
 static inline float vec4_len(vec4_t a) { return sqrtf(vec4_dot(a, a)); }
+static inline float vec4_dist(vec4_t a, vec4_t b) { return vec4_len(vec4_sub(b, a)); }
 static inline vec4_t vec4_normalize(vec4_t a) { return vec4_divf(a, vec4_len(a)); }
 
 // vec casting (z -> 0.0f, w -> 1.0f for matrix mult purposes)

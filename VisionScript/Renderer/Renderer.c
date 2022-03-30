@@ -2,29 +2,19 @@
 #include "Backend/Graphics.h"
 #include "Backend/Pipeline.h"
 #include "Application.h"
-#include "Camera.h"
 #include "Renderer.h"
 #include "Sampler.h"
 
 #define SCROLL_ZOOM_FACTOR 100.0
 
-static struct Renderer
-{
-	Script * script;
-	Camera camera;
-	bool testMode;
-	int32_t width, height;
-	VertexLayout layout;
-	VertexBuffer quad;
-	list(VertexBuffer) buffers;
-	list(StatementRenderType) renderTypes;
-} renderer = { 0 };
+struct Renderer renderer = { 0 };
 
 static struct Pipelines
 {
 	Pipeline polygons;
 	Pipeline grid;
 	Pipeline points;
+	Pipeline parametric;
 } pipelines;
 
 static void CreatePipelines()
@@ -79,17 +69,34 @@ static void CreatePipelines()
 		.vertexLayout = renderer.layout,
 	};
 	pipelines.points = PipelineCreate(config);
+	
+#include "Shaders/Parametric.vert.h"
+#include "Shaders/Parametric.frag.h"
+	vert = ShaderCompile(ShaderTypeVertex, vert_Parametric);
+	frag = ShaderCompile(ShaderTypeFragment, frag_Parametric);
+	config = (PipelineConfig)
+	{
+		.alphaBlend = true,
+		.polygonMode = PolygonModeLine,
+		.primitive = VertexPrimitiveLineStrip,
+		.shaderCount = 2,
+		.shaders = { vert, frag },
+		.vertexLayout = renderer.layout,
+	};
+	pipelines.parametric = PipelineCreate(config);
 }
 
 static void UpdatePipelines()
 {
-	mat4_t matrix = CameraTransform(renderer.camera);
+	mat4_t matrix = CameraMatrix(renderer.camera);
 	PipelineSetUniformMember(pipelines.polygons, "camera", 0, "matrix", &matrix);
 	
 	PipelineSetUniformMember(pipelines.points, "camera", 0, "matrix", &matrix);
 	PipelineSetUniformMember(pipelines.points, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
 	
-	matrix = CameraInverseTransform(renderer.camera);
+	PipelineSetUniformMember(pipelines.parametric, "camera", 0, "matrix", &matrix);
+	
+	matrix = CameraInverseMatrix(renderer.camera);
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "invMatrix", &matrix);
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "scale", &renderer.camera.scale);
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
@@ -120,7 +127,7 @@ static void Startup()
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePolygons)
 		{
 			VertexBuffer buffer;
-			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], renderer.layout, &buffer);
+			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &buffer);
 			if (error.code != RuntimeErrorNone) { continue; }
 			renderer.buffers = ListPush(renderer.buffers, &buffer);
 			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygons });
@@ -128,10 +135,18 @@ static void Startup()
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePoints)
 		{
 			VertexBuffer buffer;
-			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], renderer.layout, &buffer);
+			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &buffer);
 			if (error.code != RuntimeErrorNone) { continue; }
 			renderer.buffers = ListPush(renderer.buffers, &buffer);
 			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoints });
+		}
+		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypeParametric)
+		{
+			VertexBuffer buffer;
+			RuntimeError error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &buffer);
+			if (error.code != RuntimeErrorNone) { continue; }
+			renderer.buffers = ListPush(renderer.buffers, &buffer);
+			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypeParametric });
 		}
 	}
 	
@@ -157,6 +172,7 @@ static void Render()
 	{
 		if (renderer.renderTypes[i] == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
 		if (renderer.renderTypes[i] == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
+		if (renderer.renderTypes[i] == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
 		GraphicsRenderVertexBuffer(renderer.buffers[i]);
 	}
 	GraphicsEnd();
@@ -182,7 +198,7 @@ static void ScrollWheel(float x, float y, float ds)
 	renderer.camera.scale.x *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
 	renderer.camera.scale.y *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
 	vec4_t mousePos = { 2.0 * x / renderer.width - 1.0, -(2.0 * y / renderer.height - 1.0), 0.0, 1.0 };
-	vec4_t camMousePos = mat4_mulv(CameraInverseTransform(renderer.camera), mousePos);
+	vec4_t camMousePos = mat4_mulv(CameraInverseMatrix(renderer.camera), mousePos);
 	vec2_t diff = vec2_sub(vec4_to_vec2(camMousePos), renderer.camera.position);
 	renderer.camera.position = vec2_add(renderer.camera.position, vec2_mulf(diff, ds / SCROLL_ZOOM_FACTOR));
 }
