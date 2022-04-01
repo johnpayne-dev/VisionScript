@@ -4,7 +4,7 @@
 #include "Renderer.h"
 #include "Camera.h"
 
-#define MAX_PARAMETRICS 8192
+#define MAX_PARAMETRIC_VERTICES 1048576
 
 RuntimeError SamplePolygons(Script * script, Statement * statement, VertexBuffer * buffer)
 {
@@ -59,31 +59,59 @@ typedef struct Sample
 {
 	float t;
 	int32_t length;
-		vec2_t value;
-		vec2_t position;
-		vec4_t color;
-		struct Sample * next;
+	vec2_t value;
+	vec2_t position;
+	vec4_t color;
+	struct Sample * next;
 } Sample;
 
-static RuntimeError CreateSample(Script * script, Statement * statement, list(Parameter) parameters, float t, int32_t length, Sample * sample)
+static RuntimeError ReadSamples(Script * script, Statement * statement, list(Parameter) parameters, float t, Sample ** samples, int32_t * length)
 {
-	sample->next = NULL;
-	sample->t = t;
 	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
-	
-	VectorArray value;
-	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, parameters, statement->expression, &value);
+	VectorArray result;
+	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, parameters, statement->expression, &result);
 	if (error.code != RuntimeErrorNone) { return error; }
-	if (value.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
-	if (value.length > MAX_PARAMETRICS) { return (RuntimeError){ RuntimeErrorNotImplemented }; }
-	if (length > 0 && value.length != length) { return (RuntimeError){ RuntimeErrorNotImplemented }; }
+	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
+	*length = result.length;
 	
-	if (length == 0) { sample->length = value.length; }
-	sample->position = (vec2_t){ value.xyzw[0][0], value.xyzw[1][0] };
-	sample->color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 };
-	sample->value = CameraTransformPoint(renderer.camera, sample->position);
+	*samples = malloc(sizeof(Sample) * result.length);
+	for (int32_t i = 0; i < result.length; i++)
+	{
+		(*samples)[i] = (Sample)
+		{
+			.position = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] },
+			.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
+			.t = t,
+			.next = NULL,
+		};
+		(*samples)[i].value = CameraTransformPoint(renderer.camera, (*samples)[i].position);
+		(*samples)[i].value = vec2_mul((*samples)[i].value, (vec2_t){ renderer.camera.aspectRatio, 1.0 });
+	}
 	
-	FreeVectorArray(value);
+	FreeVectorArray(result);
+	return (RuntimeError){ RuntimeErrorNone };
+}
+
+static RuntimeError ReadSample(Script * script, Statement * statement, list(Parameter) parameters, float t, int32_t i, Sample ** sample)
+{
+	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
+	VectorArray result;
+	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, parameters, statement->expression, &result);
+	if (error.code != RuntimeErrorNone) { return error; }
+	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
+	
+	*sample = malloc(sizeof(Sample));
+	**sample = (Sample)
+	{
+		.position = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] },
+		.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
+		.t = t,
+		.next = NULL,
+	};
+	(*sample)->value = CameraTransformPoint(renderer.camera, (*sample)->position);
+	(*sample)->value = vec2_mul((*sample)->value, (vec2_t){ renderer.camera.aspectRatio, 1.0 });
+	
+	FreeVectorArray(result);
 	return error;
 }
 
@@ -91,60 +119,82 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 {
 	list(Parameter) parameters = ListPush(ListCreate(sizeof(Parameter), 1), &(Parameter){ .identifier = "t" });
 	
-	Sample start;
-	RuntimeError error = CreateSample(script, statement, parameters, lower, 0, &start);
+	// get initial start sample
+	Sample * starts;
+	int32_t length;
+	RuntimeError error = ReadSamples(script, statement, parameters, lower, &starts, &length);
 	
+	// create 128 base samples across the lower-upper range
 	int32_t baseSampleCount = 128;
-	
-	Sample * sample = &start;
-	for (int32_t j = 0; j < baseSampleCount; j++)
+	Sample * samples = starts;
+	for (int32_t i = 0; i < baseSampleCount; i++)
 	{
-		sample->next = malloc(sizeof(Sample));
-		RuntimeError sampleError = CreateSample(script, statement, parameters, (upper - lower) * (float)(j + 1) / baseSampleCount + lower, start.length, sample->next);
-		if (sampleError.code != RuntimeErrorNone) { error = sampleError; }
-		sample = sample->next;
+		Sample * nexts;
+		int32_t nextLength;
+		RuntimeError sampleError = ReadSamples(script, statement, parameters, (upper - lower) * (float)(i + 1) / baseSampleCount + lower, &nexts, &nextLength);
+		if (nextLength != length) { error = (RuntimeError){ RuntimeErrorNotImplemented }; }
+		if (sampleError.code != RuntimeErrorNone){ error = sampleError; }
+		
+		for (int32_t j = 0; j < length; j++) { samples[j].next = nexts + j; }
+		samples = nexts;
 	}
 	
-	int32_t vertexCount = baseSampleCount;
-	while (vertexCount < 8192)
+	// subdivide based on visibility
+	int32_t totalVertexCount = 0;
+	for (int32_t i = 0; i < length; i++)
 	{
-		int32_t prevVertexCount = vertexCount;
-		Sample * left = &start;
-		while (left->next != NULL)
+		int32_t vertexCount = baseSampleCount + 1;
+		while (true)
 		{
-			Sample * right = left->next;
-			float ds = vec2_dist(left->value, right->value);
-			float radius = vec2_len((vec2_t){ renderer.camera.aspectRatio, 1.0 });
-			if (ds > 5.0 / renderer.height && (vec2_len(left->value) < radius || vec2_len(right->value) < radius))
+			if (totalVertexCount > MAX_PARAMETRIC_VERTICES)
 			{
-				Sample * sample = malloc(sizeof(Sample));
-				RuntimeError sampleError = CreateSample(script, statement, parameters, (left->t + right->t) / 2.0, start.length, sample);
-				if (sampleError.code != RuntimeErrorNone) { error = sampleError; }
-				left->next = sample;
-				sample->next = right;
-				vertexCount++;
+				error = (RuntimeError){ RuntimeErrorNotImplemented };
+				break;
 			}
-			left = right;
+			int32_t prevVertexCount = vertexCount;
+			Sample * left = starts + i;
+			while (left->next != NULL)
+			{
+				Sample * right = left->next;
+				float ds = vec2_dist(left->value, right->value);
+				float radius = vec2_len((vec2_t){ renderer.camera.aspectRatio, 1.0 });
+				if (ds > 10.0 / renderer.height && (vec2_len(left->value) < radius || vec2_len(right->value) < radius))
+				{
+					Sample * sample;
+					RuntimeError sampleError = ReadSample(script, statement, parameters, (left->t + right->t) / 2.0, i, &sample);
+					if (sampleError.code != RuntimeErrorNone) { error = sampleError; }
+					left->next = sample;
+					sample->next = right;
+					vertexCount++;
+				}
+				left = right;
+			}
+			if (vertexCount == prevVertexCount){ break; }
 		}
-		if (vertexCount == prevVertexCount) { break; }
+		printf("%i\n", vertexCount);
+		totalVertexCount += vertexCount;
 	}
 	
 	if (error.code == RuntimeErrorNone)
 	{
-		printf("%i\n", vertexCount);
-		*buffer = VertexBufferCreate(renderer.layout, vertexCount);
+		printf("%i\n", totalVertexCount);
+		*buffer = VertexBufferCreate(renderer.layout, totalVertexCount);
 		vertex_t * vertices = VertexBufferMapVertices(*buffer);
-		int32_t i = 0;
-		sample = &start;
-		while (sample->next != NULL)
+		int32_t c = 0;
+		for (int32_t i = 0; i < length; i++)
 		{
-			vertices[i] = (vertex_t)
+			Sample * sample = starts + i;
+			while (sample != NULL)
 			{
-				.position = sample->position,
-				.color = { 0.0, 0.0, 0.0, 1.0 },
-			};
-			sample = sample->next;
-			i++;
+				vertices[c] = (vertex_t)
+				{
+					.position = sample->position,
+					.color = { 0.0, 0.0, 0.0, 1.0 },
+					.size = 8.0,
+				};
+				sample = sample->next;
+				c++;
+			}
 		}
 		VertexBufferUnmapVertices(*buffer);
 		VertexBufferUpload(*buffer);
