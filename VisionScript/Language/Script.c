@@ -86,26 +86,6 @@ static list(Statement *) FindParents(HashMap identifiers, Expression * expressio
 	return parents;
 }
 
-static RuntimeError InitializeCache(HashMap identifiers, HashMap cache, Statement * statement)
-{
-	// if there's a value already cached then return
-	VectorArray * value = HashMapGet(cache, statement->declaration.variable.identifier);
-	if (value != NULL) { return (RuntimeError){ RuntimeErrorNone }; }
-	
-	// initialize cache of parents first
-	list(Statement *) parents = FindParents(identifiers, statement->expression, NULL);
-	for (int32_t i = 0; i < ListLength(parents); i++)
-	{
-		RuntimeError error = InitializeCache(identifiers, cache, parents[i]);
-		if (error.code != RuntimeErrorNone) { return error; }
-	}
-	
-	value = malloc(sizeof(VectorArray));
-	RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, value);
-	if (error.code == RuntimeErrorNone) { HashMapSet(cache, statement->declaration.variable.identifier, value); }
-	return error;
-}
-
 Script * LoadScript(const char * code, int32_t varLimit)
 {
 	Script * script = malloc(sizeof(Script));
@@ -160,40 +140,9 @@ Script * LoadScript(const char * code, int32_t varLimit)
 				dependents = ListPush(dependents, &script->identifierList[i]);
 				HashMapSet(script->dependents, parents[j]->declaration.variable.identifier, dependents);
 			}
-			RuntimeError error = InitializeCache(script->identifiers, script->cache, script->identifierList[i]);
-			
-			// todo: handle runtime errors properly
-			if (error.code != RuntimeErrorNone) { abort(); }
-			else
-			{
-				printf("%s: ", script->identifierList[i]->declaration.variable.identifier);
-				PrintVectorArray(*(VectorArray *)HashMapGet(script->cache, script->identifierList[i]->declaration.variable.identifier));
-				printf("\n");
-				for (int32_t j = 0; j < ListLength(parents); j++)
-				{
-					printf("\t%s\n", parents[j]->declaration.variable.identifier);
-				}
-			}
-			
 			ListFree(parents);
 		}
 	}
-	
-	
-	/*
-	// print dependents of each variable
-	for (int32_t i = 0; i < ListLength(script->identifierList); i++)
-	{
-		if (script->identifierList[i]->type == StatementTypeVariable)
-		{
-			printf("%s:\n", script->identifierList[i]->declaration.variable.identifier);
-			list(Statement *) dependents = HashMapGet(script->dependents, script->identifierList[i]->declaration.variable.identifier);
-			for (int32_t j = 0; j < ListLength(dependents); j++)
-			{
-				printf("\t%s\n", dependents[j]->declaration.variable.identifier);
-			}
-		}
-	}*/
 	
 	return script;
 }

@@ -56,9 +56,180 @@ void PrintVectorArray(VectorArray value)
 	if (value.length > 1) { printf("]"); }
 }
 
+void CopyVectorArray(VectorArray value, VectorArray * result)
+{
+	result->length = value.length;
+	result->dimensions = value.dimensions;
+	for (int8_t d = 0; d < result->dimensions; d++)
+	{
+		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
+		memcpy(result->xyzw[d], value.xyzw[d], result->length * sizeof(scalar_t));
+	}
+}
+
 void FreeVectorArray(VectorArray value)
 {
 	for (int8_t d = 0; d < value.dimensions; d++) { free(value.xyzw[d]); }
+}
+
+static RuntimeError EvaluateIdentifier(HashMap identifiers, HashMap cache, list(Parameter) parameters, Operon operon, int32_t operonStart, int32_t operonEnd, VectorArray * result)
+{
+	// first check if the identifier was passed as a parameter
+	if (parameters != NULL)
+	{
+		for (int32_t i = 0; i < ListLength(parameters); i++)
+		{
+			if (strcmp(operon.identifier, parameters[i].identifier) == 0)
+			{
+				// copy the contents of parameter if there's a match
+				CopyVectorArray(parameters[i].value, result);
+				return (RuntimeError){ RuntimeErrorNone };
+			}
+		}
+	}
+	
+	// next check if the identifier was defined in another statement
+	Statement * statement = HashMapGet(identifiers, operon.identifier);
+	if (statement != NULL)
+	{
+		// return error if identifier was defined as a function
+		if (statement->type == StatementTypeFunction) { return (RuntimeError){ RuntimeErrorIdentifierNotVariable, operonStart, operonEnd }; }
+		// check if there's a cached value that can be used
+		VectorArray * value = HashMapGet(cache, operon.identifier);
+		if (value != NULL)
+		{
+			// copy contents if there is
+			CopyVectorArray(*value, result);
+			return (RuntimeError){ RuntimeErrorNone };
+		}
+		// otherwise evaluate the expression corresponding to the identifier
+		RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, result);
+		if (error.statement == NULL) { error.statement = statement; } // set the correct statement for error reporting
+		if (error.code != RuntimeErrorNone)
+		{
+			// cache the result if it was evaluated successfully
+			VectorArray * cached = malloc(sizeof(VectorArray));
+			CopyVectorArray(*result, cached);
+			HashMapSet(cache, operon.identifier, cached);
+		}
+		return error;
+	}
+
+	// finally, check if it's a builtin variable
+	BuiltinVariable builtin = DetermineBuiltinVariable(operon.identifier);
+	if (builtin != BuiltinVariableNone) { return (RuntimeError){ EvaluateBuiltinVariable(builtin, result), operonStart, operonEnd }; }
+	
+	// otherwise return an error
+	return (RuntimeError){ RuntimeErrorUndefinedIdentifier, operonStart, operonEnd };
+}
+
+static RuntimeError EvaluateConstant(Operon operon, VectorArray * result)
+{
+	result->dimensions = 1;
+	result->length = 1;
+	result->xyzw[0] = malloc(sizeof(scalar_t));
+	result->xyzw[0][0] = operon.constant;
+	return (RuntimeError){ RuntimeErrorNone };
+}
+
+static RuntimeError EvaluateVectorLiteral(HashMap identifiers, HashMap cache, list(Parameter) parameters, Operon operon, int32_t operonStart, int32_t operonEnd, VectorArray * result)
+{
+	result->dimensions = ListLength(operon.expressions);
+	result->length = -1;
+	
+	// evaluate each vector component
+	VectorArray components[4];
+	for (int32_t i = 0; i < result->dimensions; i++)
+	{
+		RuntimeError error = EvaluateExpression(identifiers, cache, parameters, operon.expressions[i], components + i);
+		if (error.code != RuntimeErrorNone) { return error; }
+		// make sure there's no vector inside vector
+		if (components[i].dimensions > 1) { return (RuntimeError){ RuntimeErrorVectorInsideVector, operonStart, operonEnd }; }
+		// length is set to the smallest length of each component not including length 1 (since length 1 will assume length of the rest of the vector)
+		if (components[i].length > 1) { result->length = components[i].length < result->length ? components[i].length : result->length; }
+		result->xyzw[i] = components[i].xyzw[0];
+	}
+	// if all the component lengths are 1 then result->length will still be -1, so set it to 1
+	if (result->length == -1) { result->length = 1; }
+	
+	// go through all the components of length 1 extend it to be same length as the rest of the vector
+	for (int32_t i = 0; i < result->dimensions; i++)
+	{
+		if (components[i].length == 1 && result->length > 1)
+		{
+			result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
+			for (int32_t j = 0; j < result->length; j++) { result->xyzw[i][j] = components[i].xyzw[0][0]; }
+			free(components[i].xyzw[0]);
+		}
+	}
+	return (RuntimeError){ RuntimeErrorNone };
+}
+
+static RuntimeError EvaluateArrayLiteral(HashMap identifiers, HashMap cache, list(Parameter) parameters, Operon operon, int32_t operonStart, int32_t operonEnd, VectorArray * result)
+{
+	result->dimensions = 0;
+	result->length = 0;
+	
+	// evaluate each element of the array and store them in elements temporarily
+	VectorArray * elements = malloc(sizeof(VectorArray) * ListLength(operon.expressions));
+	for (int32_t i = 0; i < ListLength(operon.expressions); i++)
+	{
+		RuntimeError error = EvaluateExpression(identifiers, cache, parameters, operon.expressions[i], elements + i);
+		if (error.code != RuntimeErrorNone)
+		{
+			for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
+			free(elements);
+			return error;
+		}
+		
+		// dimension of array is defined to be dimension of the first element
+		if (result->dimensions == 0) { result->dimensions = elements[i].dimensions; }
+		// if an element's dimension isn't the same as the previous elements, return an error
+		if (elements[i].dimensions != result->dimensions)
+		{
+			for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
+			free(elements);
+			return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd };
+		}
+		// if an element's length > 1 and it's not from ellipsis or for operator, then that means there's an array inside array so return error
+		if (elements[i].length > 1 && operon.expressions[i]->operator != OperatorFor && operon.expressions[i]->operator != OperatorEllipsis)
+		{
+			for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
+			free(elements);
+			return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd };
+		}
+		// increment total length by each element's length
+		result->length += elements[i].length;
+		continue;
+	}
+	
+	// return error if array too large
+	if (result->length > MAX_ARRAY_LENGTH)
+	{
+		for (int32_t i = 0; i < ListLength(operon.expressions); i++) { FreeVectorArray(elements[i]); }
+		free(elements);
+		return (RuntimeError){ RuntimeErrorArrayTooLarge, operonStart, operonEnd };
+	}
+	
+	// copy each contents of elements into the final array
+	for (int32_t i = 0; i < result->dimensions; i++)
+	{
+		// if there's only one element then just move the pointer to save time
+		if (ListLength(operon.expressions) == 1) { result->xyzw[i] = elements[0].xyzw[i]; }
+		else
+		{
+			result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
+			for (int32_t j = 0, p = 0; j < ListLength(operon.expressions); j++)
+			{
+				memcpy(result->xyzw[i] + p, elements[j].xyzw[i], elements[j].length * sizeof(scalar_t));
+				p += elements[j].length;
+				free(elements[j].xyzw[i]);
+			}
+		}
+	}
+	
+	free(elements);
+	return (RuntimeError){ RuntimeErrorNone };
 }
 
 static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, int32_t operonIndex, VectorArray * result)
@@ -67,166 +238,11 @@ static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Para
 	Operon operon = expression->operons[operonIndex];
 	int32_t operonStart = expression->operonStart[operonIndex];
 	int32_t operonEnd = expression->operonEnd[operonIndex];
-	
-	if (operonType == OperonTypeExpression) { return EvaluateExpression(identifiers, cache, parameters, operon.expression, result); } // recursively call EvaluateExpression
-	else if (operonType == OperonTypeIdentifier)
-	{
-		// first check if the identifier was passed as a parameter
-		if (parameters != NULL)
-		{
-			for (int32_t i = 0; i < ListLength(parameters); i++)
-			{
-				if (strcmp(operon.identifier, parameters[i].identifier) == 0)
-				{
-					// copy the contents of parameter if there's a match
-					result->dimensions = parameters[i].value.dimensions;
-					result->length = parameters[i].value.length;
-					for (int8_t d = 0; d < result->dimensions; d++)
-					{
-						result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
-						memcpy(result->xyzw[d], parameters[i].value.xyzw[d], result->length * sizeof(scalar_t));
-					}
-					return (RuntimeError){ RuntimeErrorNone };
-				}
-			}
-		}
-		
-		// next check if the identifier was defined in another statement
-		Statement * statement = HashMapGet(identifiers, operon.identifier);
-		if (statement != NULL)
-		{
-			// return error if identifier was defined as a function
-			if (statement->type == StatementTypeFunction) { return (RuntimeError){ RuntimeErrorIdentifierNotVariable, operonStart, operonEnd }; }
-			// check if there's a cached value that can be used
-			VectorArray * value = HashMapGet(cache, operon.identifier);
-			if (value != NULL)
-			{
-				// copy contents if there is
-				result->length = value->length;
-				result->dimensions = value->dimensions;
-				for (int8_t d = 0; d < result->dimensions; d++)
-				{
-					result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
-					memcpy(result->xyzw[d], value->xyzw[d], result->length * sizeof(scalar_t));
-				}
-				return (RuntimeError){ RuntimeErrorNone };
-			}
-			// otherwise evaluate the expression corresponding to the identifier
-			RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, result);
-			if (error.statement == NULL) { error.statement = statement; } // set the correct statement for error reporting
-			return error;
-		}
-	
-		// finally, check if it's a builtin variable
-		BuiltinVariable builtin = DetermineBuiltinVariable(operon.identifier);
-		if (builtin != BuiltinVariableNone) { return (RuntimeError){ EvaluateBuiltinVariable(builtin, result), operonStart, operonEnd }; }
-		
-		// otherwise return an error
-		return (RuntimeError){ RuntimeErrorUndefinedIdentifier, operonStart, operonEnd };
-	}
-	else if (operonType == OperonTypeConstant)
-	{
-		result->dimensions = 1;
-		result->length = 1;
-		result->xyzw[0] = malloc(sizeof(scalar_t));
-		result->xyzw[0][0] = operon.constant;
-	}
-	else if (operonType == OperonTypeVectorLiteral)
-	{
-		result->dimensions = ListLength(operon.expressions);
-		result->length = -1;
-		
-		// evaluate each vector component
-		VectorArray components[4];
-		for (int32_t i = 0; i < result->dimensions; i++)
-		{
-			RuntimeError error = EvaluateExpression(identifiers, cache, parameters, operon.expressions[i], components + i);
-			if (error.code != RuntimeErrorNone) { return error; }
-			// make sure there's no vector inside vector
-			if (components[i].dimensions > 1) { return (RuntimeError){ RuntimeErrorVectorInsideVector, operonStart, operonEnd }; }
-			// length is set to the smallest length of each component not including length 1 (since length 1 will assume length of the rest of the vector)
-			if (components[i].length > 1) { result->length = components[i].length < result->length ? components[i].length : result->length; }
-			result->xyzw[i] = components[i].xyzw[0];
-		}
-		// if all the component lengths are 1 then result->length will still be -1, so set it to 1
-		if (result->length == -1) { result->length = 1; }
-		
-		// go through all the components of length 1 extend it to be same length as the rest of the vector
-		for (int32_t i = 0; i < result->dimensions; i++)
-		{
-			if (components[i].length == 1 && result->length > 1)
-			{
-				result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
-				for (int32_t j = 0; j < result->length; j++) { result->xyzw[i][j] = components[i].xyzw[0][0]; }
-				free(components[i].xyzw[0]);
-			}
-		}
-	}
-	else if (operonType == OperonTypeArrayLiteral)
-	{
-		result->dimensions = 0;
-		result->length = 0;
-		
-		// evaluate each element of the array and store them in elements temporarily
-		VectorArray * elements = malloc(sizeof(VectorArray) * ListLength(operon.expressions));
-		for (int32_t i = 0; i < ListLength(operon.expressions); i++)
-		{
-			RuntimeError error = EvaluateExpression(identifiers, cache, parameters, operon.expressions[i], elements + i);
-			if (error.code != RuntimeErrorNone)
-			{
-				for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
-				free(elements);
-				return error;
-			}
-			
-			// dimension of array is defined to be dimension of the first element
-			if (result->dimensions == 0) { result->dimensions = elements[i].dimensions; }
-			// if an element's dimension isn't the same as the previous elements, return an error
-			if (elements[i].dimensions != result->dimensions)
-			{
-				for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
-				free(elements);
-				return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd };
-			}
-			// if an element's length > 1 and it's not from ellipsis or for operator, then that means there's an array inside array so return error
-			if (elements[i].length > 1 && operon.expressions[i]->operator != OperatorFor && operon.expressions[i]->operator != OperatorEllipsis)
-			{
-				for (int32_t j = 0; j < i; j++) { FreeVectorArray(elements[j]); }
-				free(elements);
-				return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd };
-			}
-			// increment total length by each element's length
-			result->length += elements[i].length;
-			continue;
-		}
-		
-		// return error if array too large
-		if (result->length > MAX_ARRAY_LENGTH)
-		{
-			for (int32_t i = 0; i < ListLength(operon.expressions); i++) { FreeVectorArray(elements[i]); }
-			free(elements);
-			return (RuntimeError){ RuntimeErrorArrayTooLarge, operonStart, operonEnd };
-		}
-		
-		// copy each contents of elements into the final array
-		for (int32_t i = 0; i < result->dimensions; i++)
-		{
-			// if there's only one element then just move the pointer to save time
-			if (ListLength(operon.expressions) == 1) { result->xyzw[i] = elements[0].xyzw[i]; }
-			else
-			{
-				result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
-				for (int32_t j = 0, p = 0; j < ListLength(operon.expressions); j++)
-				{
-					memcpy(result->xyzw[i] + p, elements[j].xyzw[i], elements[j].length * sizeof(scalar_t));
-					p += elements[j].length;
-					free(elements[j].xyzw[i]);
-				}
-			}
-		}
-		
-		free(elements);
-	}
+	if (operonType == OperonTypeExpression) { return EvaluateExpression(identifiers, cache, parameters, operon.expression, result); }
+	else if (operonType == OperonTypeIdentifier) { return EvaluateIdentifier(identifiers, cache, parameters, operon, operonStart, operonEnd, result); }
+	else if (operonType == OperonTypeConstant) { return EvaluateConstant(operon, result); }
+	else if (operonType == OperonTypeVectorLiteral) { return EvaluateVectorLiteral(identifiers, cache, parameters, operon, operonStart, operonEnd, result); }
+	else if (operonType == OperonTypeArrayLiteral) { return EvaluateArrayLiteral(identifiers, cache, parameters, operon, operonStart, operonEnd, result); }
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
