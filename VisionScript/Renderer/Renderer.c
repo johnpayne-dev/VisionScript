@@ -157,6 +157,7 @@ static void Update()
 {
 	GraphicsUpdate();
 	UpdatePipelines();
+	UpdateScript(renderer.script);
 }
 
 static void Render()

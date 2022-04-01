@@ -105,7 +105,7 @@ static RuntimeError EvaluateIdentifier(HashMap identifiers, HashMap cache, list(
 		// otherwise evaluate the expression corresponding to the identifier
 		RuntimeError error = EvaluateExpression(identifiers, cache, NULL, statement->expression, result);
 		if (error.statement == NULL) { error.statement = statement; } // set the correct statement for error reporting
-		if (error.code != RuntimeErrorNone)
+		if (error.code == RuntimeErrorNone)
 		{
 			// cache the result if it was evaluated successfully
 			VectorArray * cached = malloc(sizeof(VectorArray));
@@ -117,7 +117,7 @@ static RuntimeError EvaluateIdentifier(HashMap identifiers, HashMap cache, list(
 
 	// finally, check if it's a builtin variable
 	BuiltinVariable builtin = DetermineBuiltinVariable(operon.identifier);
-	if (builtin != BuiltinVariableNone) { return (RuntimeError){ EvaluateBuiltinVariable(builtin, result), operonStart, operonEnd }; }
+	if (builtin != BuiltinVariableNone) { return (RuntimeError){ EvaluateBuiltinVariable(cache, builtin, result), operonStart, operonEnd }; }
 	
 	// otherwise return an error
 	return (RuntimeError){ RuntimeErrorUndefinedIdentifier, operonStart, operonEnd };
@@ -656,4 +656,105 @@ RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Paramet
 	}
 	if (value.length > 0) { FreeVectorArray(value); }
 	return (RuntimeError){ RuntimeErrorNone };
+}
+
+static int CompareIdentifier(const void * a, const void * b)
+{
+	return strcmp(*(String *)a, *(String *)b);
+}
+
+list(String) FindExpressionParents(HashMap identifiers, Expression * expression, list(String) parameters)
+{
+	list(String) parents = ListCreate(sizeof(Statement *), 1);
+	
+	// create parameters list if doesn't exist otherwise create a copy
+	if (parameters == NULL) { parameters = ListCreate(sizeof(String), 1); }
+	else { parameters = ListClone(parameters); }
+	
+	// if it's a for operator, add the assignment to the parameters list
+	if (expression->operator == OperatorFor) { parameters = ListPush(parameters, &expression->operons[1].assignment.identifier); }
+	
+	// go through one or both operons
+	int32_t operons = expression->operator == OperatorFor || expression->operator == OperatorNone || expression->operator == OperatorNegative || expression->operator == OperatorPositive ? 1 : 2;
+	for (int32_t i = 0; i < operons; i++)
+	{
+		if (expression->operonTypes[i] == OperonTypeArrayLiteral || expression->operonTypes[i] == OperonTypeVectorLiteral || expression->operonTypes[i] == OperonTypeArguments)
+		{
+			// recursively go through each expression and add its parents to the list
+			for (int32_t j = 0; j < ListLength(expression->operons[i].expressions); j++)
+			{
+				list(String) argDependents = FindExpressionParents(identifiers, expression->operons[i].expressions[j], parameters);
+				for (int32_t k = 0; k < ListLength(argDependents); k++) { parents = ListPush(parents, &argDependents[k]); }
+				ListFree(argDependents);
+			}
+		}
+		else if (expression->operonTypes[i] == OperonTypeExpression)
+		{
+			// recursively go through this expression and find its parents
+			list(String) expDependents = FindExpressionParents(identifiers, expression->operons[i].expression, parameters);
+			for (int32_t k = 0; k < ListLength(expDependents); k++) { parents = ListPush(parents, &expDependents[k]); }
+			ListFree(expDependents);
+		}
+		else if (expression->operonTypes[i] == OperonTypeIdentifier)
+		{
+			// skip identifier if it's a parameter from a for assignment
+			if (parameters != NULL)
+			{
+				bool isParameter = false;
+				for (int32_t j = 0; j < ListLength(parameters); j++) { if (StringEquals(parameters[j], expression->operons[i].identifier) == 0) { isParameter = true; break; } }
+				if (isParameter) { continue; }
+			}
+			
+			Statement * statement = HashMapGet(identifiers, expression->operons[i].identifier);
+			if (statement != NULL && statement->type == StatementTypeFunction)
+			{
+				// if it's a function, look for parents in there
+				for (int32_t j = 0; j < ListLength(statement->declaration.function.arguments); j++) { parameters = ListPush(parameters, &statement->declaration.function.arguments[j]); }
+				list(String) funcParents = FindExpressionParents(identifiers, statement->expression, NULL);
+				for (int32_t j = 0; j < ListLength(funcParents); j++) { parents = ListPush(parents, &funcParents[j]); }
+				ListFree(funcParents);
+			}
+			else { parents = ListPush(parents, &expression->operons[i].identifier); }
+		}
+	}
+	
+	// free list that was cloned
+	ListFree(parameters);
+	
+	// remove duplicates from list
+	qsort(parents, ListLength(parents), ListElementSize(parents), CompareIdentifier);
+	for (int32_t i = 1; i < ListLength(parents); i++)
+	{
+		if (strcmp(parents[i], parents[i - 1]) == 0)
+		{
+			parents = ListRemove(parents, i);
+			i--;
+		}
+	}
+	
+	return parents;
+}
+
+static void InvalidateCached(HashMap cache, HashMap dependents, String identifier)
+{
+	VectorArray * cached = HashMapGet(cache, identifier);
+	if (cached != NULL)
+	{
+		FreeVectorArray(*cached);
+		free(cached);
+	}
+	HashMapSet(cache, identifier, NULL);
+	InvalidateCachedDependents(cache, dependents, identifier);
+}
+
+void InvalidateCachedDependents(HashMap cache, HashMap dependents, String identifier)
+{
+	list(String) dependentIdentifiers = HashMapGet(dependents, identifier);
+	if (dependentIdentifiers != NULL)
+	{
+		for (int32_t i = 0; i < ListLength(dependentIdentifiers); i++)
+		{
+			InvalidateCached(cache, dependents, dependentIdentifiers[i]);
+		}
+	}
 }

@@ -86,11 +86,17 @@ typedef enum BuiltinVariable
 	BuiltinVariableTAU,
 	BuiltinVariableE,
 	BuiltinVariableINF,
+	BuiltinVariablePOSITION,
+	BuiltinVariableSCALE,
+	BuiltinVariableROTATION,
+	BuiltinVariableTIME,
 	BuiltinVariableNone
 } BuiltinVariable;
 
 BuiltinVariable DetermineBuiltinVariable(const char * identifier);
 
-RuntimeErrorCode EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result);
+void InitializeBuiltins(HashMap cache);
+
+RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable, VectorArray * result);
 
 #endif

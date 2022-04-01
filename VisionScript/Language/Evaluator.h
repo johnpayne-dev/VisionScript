@@ -47,6 +47,7 @@ typedef struct VectorArray
 } VectorArray;
 
 void PrintVectorArray(VectorArray value);
+void CopyVectorArray(VectorArray value, VectorArray * result);
 void FreeVectorArray(VectorArray value);
 
 typedef struct Parameter
@@ -56,5 +57,9 @@ typedef struct Parameter
 } Parameter;
 
 RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result);
+
+list(String) FindExpressionParents(HashMap identifiers, Expression * expression, list(String) parameters);
+
+void InvalidateCachedDependents(HashMap cache, HashMap dependents, String identifier);
 
 #endif

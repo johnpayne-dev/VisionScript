@@ -19,6 +19,8 @@ typedef struct Script
 
 Script * LoadScript(const char * code, int32_t varLimit);
 
+void UpdateScript(Script * script);
+
 void FreeScript(Script * script);
 
 #endif

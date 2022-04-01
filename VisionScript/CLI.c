@@ -7,6 +7,7 @@
 #include "Utilities/String.h"
 #include "Language/Parser.h"
 #include "Language/Evaluator.h"
+#include "Language/Builtin.h"
 #include "CLI.h"
 
 void CLIRun(int32_t varLimit)
@@ -14,6 +15,7 @@ void CLIRun(int32_t varLimit)
 	printf("VisionScript v1.0 – Command Line Interpretter\n");
 	HashMap identifiers = HashMapCreate(varLimit);
 	HashMap cache = HashMapCreate(varLimit);
+	InitializeBuiltins(cache);
 	while (true)
 	{
 		// wait for input

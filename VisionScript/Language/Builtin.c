@@ -1055,9 +1055,8 @@ RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorAr
 static const char * builtinVariables[] =
 {
 	"pi", "tau", "e", "inf",
-	/*"cam_x", "cam_y", "cam_scale", "cam_rot",
-	"mouse_x", "mouse_y", "mouse_dx", "mouse_dy", "mouse_btn", "mouse_clk,"
-	"time",*/
+	"position", "scale", "rotation",
+	"time",
 };
 
 BuiltinVariable DetermineBuiltinVariable(const char * identifier)
@@ -1069,18 +1068,56 @@ BuiltinVariable DetermineBuiltinVariable(const char * identifier)
 	return BuiltinVariableNone;
 }
 
-RuntimeErrorCode EvaluateBuiltinVariable(BuiltinVariable variable, VectorArray * result)
+void InitializeBuiltins(HashMap cache)
 {
-	result->length = 1;
-	result->dimensions = 1;
-	result->xyzw[0] = malloc(sizeof(scalar_t));
-	switch (variable)
-	{
-		case BuiltinVariablePI: result->xyzw[0][0] = M_PI; break;
-		case BuiltinVariableTAU: result->xyzw[0][0] = 2 * M_PI; break;
-		case BuiltinVariableE: result->xyzw[0][0] = M_E; break;
-		case BuiltinVariableINF: result->xyzw[0][0] = INFINITY; break;
-		default: return RuntimeErrorNotImplemented;
-	}
+	VectorArray * pi = malloc(sizeof(VectorArray));
+	*pi = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
+	pi->xyzw[0][0] = M_PI;
+	
+	VectorArray * tau = malloc(sizeof(VectorArray));
+	*tau = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
+	tau->xyzw[0][0] = 2 * M_PI;
+	
+	VectorArray * e = malloc(sizeof(VectorArray));
+	*e = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
+	e->xyzw[0][0] = M_E;
+	
+	VectorArray * inf = malloc(sizeof(VectorArray));
+	*inf = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
+	inf->xyzw[0][0] = INFINITY;
+	
+	VectorArray * position = malloc(sizeof(VectorArray));
+	*position = (VectorArray){ .length = 1, .dimensions = 2, .xyzw = { malloc(sizeof(scalar_t)), malloc(sizeof(scalar_t)) } };
+	position->xyzw[0][0] = 0;
+	position->xyzw[1][0] = 0;
+	
+	VectorArray * scale = malloc(sizeof(VectorArray));
+	*scale = (VectorArray){ .length = 1, .dimensions = 2, .xyzw = { malloc(sizeof(scalar_t)), malloc(sizeof(scalar_t)) } };
+	scale->xyzw[0][0] = 1;
+	scale->xyzw[1][0] = 1;
+	
+	VectorArray * rotation = malloc(sizeof(VectorArray));
+	*rotation = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
+	rotation->xyzw[0][0] = 0.0;
+	
+	VectorArray * time = malloc(sizeof(VectorArray));
+	*time = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
+	time->xyzw[0][0] = 0.0;
+	
+	HashMapSet(cache, "pi", pi);
+	HashMapSet(cache, "tau", tau);
+	HashMapSet(cache, "e", e);
+	HashMapSet(cache, "inf", inf);
+	HashMapSet(cache, "position", position);
+	HashMapSet(cache, "scale", scale);
+	HashMapSet(cache, "rotation", rotation);
+	HashMapSet(cache, "time", time);
+}
+
+RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable, VectorArray * result)
+{
+	VectorArray * cached = HashMapGet(cache, builtinVariables[variable]);
+	if (cached == NULL) { return RuntimeErrorNotImplemented; }
+	CopyVectorArray(*cached, result);
 	return RuntimeErrorNone;
 }
