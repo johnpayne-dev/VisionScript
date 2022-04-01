@@ -28,6 +28,7 @@ typedef struct VertexBuffer
 {
 	VertexLayout layout;
 	int32_t vertexCount;
+	int32_t subVertexCount;
 	VkBuffer stagingBuffer;
 	VmaAllocation stagingAllocation;
 	VkBuffer vertexBuffer;

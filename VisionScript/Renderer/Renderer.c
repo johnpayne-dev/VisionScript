@@ -126,26 +126,17 @@ static void Startup()
 	{
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePolygons)
 		{
-			VertexBuffer buffer;
-			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &buffer);
-			if (error.code != RuntimeErrorNone) { continue; }
-			renderer.buffers = ListPush(renderer.buffers, &buffer);
+			renderer.buffers = ListPush(renderer.buffers, &(VertexBuffer){ 0 });
 			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygons });
 		}
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePoints)
 		{
-			VertexBuffer buffer;
-			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &buffer);
-			if (error.code != RuntimeErrorNone) { continue; }
-			renderer.buffers = ListPush(renderer.buffers, &buffer);
+			renderer.buffers = ListPush(renderer.buffers, &(VertexBuffer){ 0 });
 			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoints });
 		}
 		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypeParametric)
 		{
-			VertexBuffer buffer;
-			RuntimeError error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &buffer);
-			if (error.code != RuntimeErrorNone) { continue; }
-			renderer.buffers = ListPush(renderer.buffers, &buffer);
+			renderer.buffers = ListPush(renderer.buffers, &(VertexBuffer){ 0 });
 			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypeParametric });
 		}
 	}
@@ -158,6 +149,24 @@ static void Update()
 	GraphicsUpdate();
 	UpdatePipelines();
 	UpdateScript(renderer.script);
+	for (int32_t i = 0; i < ListLength(renderer.buffers); i++)
+	{
+		if (renderer.renderTypes[i] == StatementRenderTypePoints)
+		{
+			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.buffers[i]);
+			if (error.code != RuntimeErrorNone) { continue; }
+		}
+		if (renderer.renderTypes[i] == StatementRenderTypePolygons)
+		{
+			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.buffers[i]);
+			if (error.code != RuntimeErrorNone) { continue; }
+		}
+		if (renderer.renderTypes[i] == StatementRenderTypeParametric)
+		{
+			RuntimeError error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &renderer.buffers[i]);
+			if (error.code != RuntimeErrorNone) { continue; }
+		}
+	}
 }
 
 static void Render()
@@ -174,7 +183,7 @@ static void Render()
 		if (renderer.renderTypes[i] == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
 		if (renderer.renderTypes[i] == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
 		if (renderer.renderTypes[i] == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
-		GraphicsRenderVertexBuffer(renderer.buffers[i]);
+		if (renderer.buffers[i].vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.buffers[i]); }
 	}
 	GraphicsEnd();
 }

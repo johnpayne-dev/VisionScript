@@ -13,7 +13,11 @@ RuntimeError SamplePolygons(Script * script, Statement * statement, VertexBuffer
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
-	*buffer = VertexBufferCreate(renderer.layout, result.length);
+	if (result.length > buffer->vertexCount)
+	{
+		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
+		*buffer = VertexBufferCreate(renderer.layout, result.length);
+	}
 	vertex_t * vertices = VertexBufferMapVertices(*buffer);
 	for (int32_t i = 0; i < result.length; i++)
 	{
@@ -23,6 +27,7 @@ RuntimeError SamplePolygons(Script * script, Statement * statement, VertexBuffer
 			.color = { 0.0, 0.0, 0.0, 1.0 },
 		};
 	}
+	buffer->subVertexCount = result.length;
 	VertexBufferUnmapVertices(*buffer);
 	VertexBufferUpload(*buffer);
 	
@@ -37,7 +42,11 @@ RuntimeError SamplePoints(Script * script, Statement * statement, VertexBuffer *
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
-	*buffer = VertexBufferCreate(renderer.layout, result.length);
+	if (result.length > buffer->vertexCount)
+	{
+		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
+		*buffer = VertexBufferCreate(renderer.layout, result.length);
+	}
 	vertex_t * vertices = VertexBufferMapVertices(*buffer);
 	for (int32_t i = 0; i < result.length; i++)
 	{
@@ -48,6 +57,7 @@ RuntimeError SamplePoints(Script * script, Statement * statement, VertexBuffer *
 			.size = 8.0,
 		};
 	}
+	buffer->subVertexCount = result.length;
 	VertexBufferUnmapVertices(*buffer);
 	VertexBufferUpload(*buffer);
 	
@@ -125,7 +135,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	RuntimeError error = ReadSamples(script, statement, parameters, lower, &starts, &length);
 	
 	// create 128 base samples across the lower-upper range
-	int32_t baseSampleCount = 128;
+	int32_t baseSampleCount = 1024;
 	Sample * samples = starts;
 	for (int32_t i = 0; i < baseSampleCount; i++)
 	{
@@ -171,14 +181,16 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 			}
 			if (vertexCount == prevVertexCount){ break; }
 		}
-		printf("%i\n", vertexCount);
 		totalVertexCount += vertexCount;
 	}
 	
 	if (error.code == RuntimeErrorNone)
 	{
-		printf("%i\n", totalVertexCount);
-		*buffer = VertexBufferCreate(renderer.layout, totalVertexCount);
+		if (totalVertexCount > buffer->vertexCount)
+		{
+			if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
+			*buffer = VertexBufferCreate(renderer.layout, totalVertexCount);
+		}
 		vertex_t * vertices = VertexBufferMapVertices(*buffer);
 		int32_t c = 0;
 		for (int32_t i = 0; i < length; i++)
@@ -196,6 +208,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 				c++;
 			}
 		}
+		buffer->subVertexCount = c;
 		VertexBufferUnmapVertices(*buffer);
 		VertexBufferUpload(*buffer);
 	}

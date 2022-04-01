@@ -769,7 +769,7 @@ void GraphicsRenderVertexBuffer(VertexBuffer buffer)
 	
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(graphics.frames[graphics.frameIndex].commandBuffer, 0, 1, &buffer.vertexBuffer, &offset);
-	vkCmdDraw(graphics.frames[graphics.frameIndex].commandBuffer, buffer.vertexCount, 1, 0, 0);
+	vkCmdDraw(graphics.frames[graphics.frameIndex].commandBuffer, buffer.subVertexCount == 0 ? buffer.vertexCount : buffer.subVertexCount, 1, 0, 0);
 }
 
 void GraphicsEnd()
