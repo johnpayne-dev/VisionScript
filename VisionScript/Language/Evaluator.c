@@ -283,14 +283,18 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 	int8_t dimensions = a->dimensions > b->dimensions ? a->dimensions : b->dimensions;
 	// length is assumed to be lower of the two operons (again, with exception if an operon is of length 1)
 	int32_t length = a->length < b->length ? a->length : b->length;
+	// conditionals for whether a and b are scalars
+	bool aScalar = false, bScalar = false;
+	if (a->length == 1 && b->length > 1) { length = b->length; aScalar = true; }
+	if (b->length == 1 && a->length > 1) { length = a->length; bScalar = true; }
 	
 	// if one operon's dimension is 1 yet the other is greater than 1, then allocate more dimensions
 	if (a->dimensions == 1 && b->dimensions > 1)
 	{
 		for (int8_t d = 1; d < b->dimensions; d++)
 		{
-			a->xyzw[d] = malloc(length * sizeof(scalar_t));
-			memcpy(a->xyzw[d], a->xyzw[0], length * sizeof(scalar_t));
+			a->xyzw[d] = malloc(a->length * sizeof(scalar_t));
+			memcpy(a->xyzw[d], a->xyzw[0], a->length * sizeof(scalar_t));
 		}
 		a->dimensions = b->dimensions;
 	}
@@ -298,16 +302,11 @@ static void EvaluateOperation(Operator operator, VectorArray * a, VectorArray * 
 	{
 		for (int8_t d = 1; d < a->dimensions; d++)
 		{
-			b->xyzw[d] = malloc(length * sizeof(scalar_t));
-			memcpy(b->xyzw[d], b->xyzw[0], length * sizeof(scalar_t));
+			b->xyzw[d] = malloc(b->length * sizeof(scalar_t));
+			memcpy(b->xyzw[d], b->xyzw[0], b->length * sizeof(scalar_t));
 		}
 		b->dimensions = a->dimensions;
 	}
-	
-	// conditionals for whether a and b are scalars
-	bool aScalar = false, bScalar = false;
-	if (a->length == 1 && b->length > 1) { length = b->length; aScalar = true; }
-	if (b->length == 1 && a->length > 1) { length = a->length; bScalar = true; }
 	
 	// apply the operation
 	for (int8_t d = 0; d < dimensions; d++)
