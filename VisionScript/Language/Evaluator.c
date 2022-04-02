@@ -705,15 +705,21 @@ list(String) FindExpressionParents(HashMap identifiers, Expression * expression,
 			}
 			
 			Statement * statement = HashMapGet(identifiers, expression->operons[i].identifier);
-			if (statement != NULL && statement->type == StatementTypeFunction)
+			if (statement != NULL)
 			{
-				// if it's a function, look for parents in there
-				for (int32_t j = 0; j < ListLength(statement->declaration.function.arguments); j++) { parameters = ListPush(parameters, &statement->declaration.function.arguments[j]); }
-				list(String) funcParents = FindExpressionParents(identifiers, statement->expression, NULL);
-				for (int32_t j = 0; j < ListLength(funcParents); j++) { parents = ListPush(parents, &funcParents[j]); }
-				ListFree(funcParents);
+				if (statement->type == StatementTypeFunction)
+				{
+					for (int32_t j = 0; j < ListLength(statement->declaration.function.arguments); j++) { parameters = ListPush(parameters, &statement->declaration.function.arguments[j]); }
+				}
+				if (statement->type == StatementTypeVariable)
+				{
+					parents = ListPush(parents, &expression->operons[i].identifier);
+				}
+				list(String) subParents = FindExpressionParents(identifiers, statement->expression, NULL);
+				for (int32_t j = 0; j < ListLength(subParents); j++) { parents = ListPush(parents, &subParents[j]); }
+				ListFree(subParents);
 			}
-			else { parents = ListPush(parents, &expression->operons[i].identifier); }
+			else if (DetermineBuiltinVariable(expression->operons[i].identifier) != BuiltinVariableNone) { parents = ListPush(parents, &expression->operons[i].identifier); }
 		}
 	}
 	
@@ -732,28 +738,4 @@ list(String) FindExpressionParents(HashMap identifiers, Expression * expression,
 	}
 	
 	return parents;
-}
-
-static void InvalidateCached(HashMap cache, HashMap dependents, String identifier)
-{
-	VectorArray * cached = HashMapGet(cache, identifier);
-	if (cached != NULL)
-	{
-		FreeVectorArray(*cached);
-		free(cached);
-	}
-	HashMapSet(cache, identifier, NULL);
-	InvalidateCachedDependents(cache, dependents, identifier);
-}
-
-void InvalidateCachedDependents(HashMap cache, HashMap dependents, String identifier)
-{
-	list(String) dependentIdentifiers = HashMapGet(dependents, identifier);
-	if (dependentIdentifiers != NULL)
-	{
-		for (int32_t i = 0; i < ListLength(dependentIdentifiers); i++)
-		{
-			InvalidateCached(cache, dependents, dependentIdentifiers[i]);
-		}
-	}
 }

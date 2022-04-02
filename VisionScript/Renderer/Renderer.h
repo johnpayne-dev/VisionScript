@@ -13,6 +13,12 @@ typedef struct vertex
 	float size;
 } vertex_t;
 
+typedef struct RenderObject
+{
+	Statement * statement;
+	VertexBuffer buffer;
+} RenderObject;
+
 extern struct Renderer
 {
 	Script * script;
@@ -21,8 +27,7 @@ extern struct Renderer
 	int32_t width, height;
 	VertexLayout layout;
 	VertexBuffer quad;
-	list(VertexBuffer) buffers;
-	list(StatementRenderType) renderTypes;
+	list(RenderObject) objects;
 } renderer;
 
 void RenderScript(Script * script, bool testMode);

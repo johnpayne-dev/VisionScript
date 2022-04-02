@@ -60,6 +60,4 @@ RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Paramet
 
 list(String) FindExpressionParents(HashMap identifiers, Expression * expression, list(String) parameters);
 
-void InvalidateCachedDependents(HashMap cache, HashMap dependents, String identifier);
-
 #endif

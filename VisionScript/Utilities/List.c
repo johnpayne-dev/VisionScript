@@ -92,7 +92,7 @@ bool ListContains(list(void) list, void * value)
 {
 	for (uint32_t i = 0; i < ListLength(list); i++)
 	{
-		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list))) { return true; }
+		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0) { return true; }
 	}
 	return false;
 }

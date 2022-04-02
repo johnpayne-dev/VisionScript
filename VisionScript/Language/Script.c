@@ -16,10 +16,12 @@ Script * LoadScript(const char * code, int32_t varLimit)
 	
 	script->identifierList = ListCreate(sizeof(Statement *), varLimit);
 	script->renderList = ListCreate(sizeof(Statement *), 1024);
+	script->renderParents = ListCreate(sizeof(list(String)), 1);
 	script->errorList = ListCreate(sizeof(Statement *), 1024);
 	script->identifiers = HashMapCreate(varLimit);
 	script->cache = HashMapCreate(varLimit);
 	script->dependents = HashMapCreate(varLimit);
+	script->dirtyRenders = ListCreate(sizeof(Statement *), 1);
 	
 	// go through each statement, parse it and add it to the internal data structures
 	InitializeBuiltins(script->cache);
@@ -64,13 +66,56 @@ Script * LoadScript(const char * code, int32_t varLimit)
 		}
 	}
 	
+	// go through each render statement, set its parents and at it to dirty list
+	for (int32_t i = 0; i < ListLength(script->renderList); i++)
+	{
+		list(String) parameters = ListCreate(sizeof(String), 1);
+		if (script->renderList[i]->declaration.render.type == StatementRenderTypeParametric) { parameters = ListPush(parameters, &(String){ StringCreate("t") }); }
+		
+		list(String) parents = FindExpressionParents(script->identifiers, script->renderList[i]->expression, parameters);
+		script->renderParents = ListPush(script->renderParents, &parents);
+		
+		if (script->renderList[i]->declaration.render.type == StatementRenderTypeParametric) { StringFree(parameters[i]); }
+		ListFree(parameters);
+		
+		script->dirtyRenders = ListPush(script->dirtyRenders, &(Statement *){ script->renderList[i] });
+	}
+
 	return script;
 }
 
-void UpdateScript(Script * script)
+void InvalidateCachedDependents(Script * script, String identifier)
 {
-	((VectorArray *)HashMapGet(script->cache, "time"))->xyzw[0][0]++;
-	InvalidateCachedDependents(script->cache, script->dependents, "time");
+	list(String) dependentIdentifiers = HashMapGet(script->dependents, identifier);
+	if (dependentIdentifiers != NULL)
+	{
+		for (int32_t i = 0; i < ListLength(dependentIdentifiers); i++)
+		{
+			VectorArray * cached = HashMapGet(script->cache, dependentIdentifiers[i]);
+			if (cached != NULL)
+			{
+				FreeVectorArray(*cached);
+				free(cached);
+			}
+			HashMapSet(script->cache, dependentIdentifiers[i], NULL);
+		}
+	}
+}
+
+void InvalidateDependentRenders(Script * script, String identifier)
+{
+	for (int32_t i = 0; i < ListLength(script->renderParents); i++)
+	{
+		list(String) parents = script->renderParents[i];
+		for (int32_t j = 0; j < ListLength(parents); j++)
+		{
+			if (strcmp(parents[j], identifier) == 0 && !ListContains(script->dirtyRenders, &(Statement *){ script->renderList[i] }))
+			{
+				script->dirtyRenders = ListPush(script->dirtyRenders, &(Statement *){ script->renderList[i] });
+				break;
+			}
+		}
+	}
 }
 
 void FreeScript(Script * script)

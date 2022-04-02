@@ -156,7 +156,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 		int32_t vertexCount = baseSampleCount + 1;
 		while (true)
 		{
-			if (totalVertexCount > MAX_PARAMETRIC_VERTICES)
+			if (totalVertexCount + vertexCount > MAX_PARAMETRIC_VERTICES)
 			{
 				error = (RuntimeError){ RuntimeErrorNotImplemented };
 				break;
@@ -179,7 +179,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 				}
 				left = right;
 			}
-			if (vertexCount == prevVertexCount){ break; }
+			if (vertexCount <= prevVertexCount){ break; }
 		}
 		totalVertexCount += vertexCount;
 	}

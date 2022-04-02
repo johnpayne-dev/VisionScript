@@ -120,53 +120,107 @@ static void Startup()
 	VertexBufferUnmapVertices(renderer.quad);
 	VertexBufferUpload(renderer.quad);
 	
-	renderer.buffers = ListCreate(sizeof(VertexBuffer), 1);
-	renderer.renderTypes = ListCreate(sizeof(StatementRenderType), 1);
+	renderer.objects = ListCreate(sizeof(RenderObject), 1);
 	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
 	{
-		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePolygons)
-		{
-			renderer.buffers = ListPush(renderer.buffers, &(VertexBuffer){ 0 });
-			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePolygons });
-		}
-		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypePoints)
-		{
-			renderer.buffers = ListPush(renderer.buffers, &(VertexBuffer){ 0 });
-			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypePoints });
-		}
-		if (renderer.script->renderList[i]->declaration.render.type == StatementRenderTypeParametric)
-		{
-			renderer.buffers = ListPush(renderer.buffers, &(VertexBuffer){ 0 });
-			renderer.renderTypes = ListPush(renderer.renderTypes, &(StatementRenderType){ StatementRenderTypeParametric });
-		}
+		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .statement = renderer.script->renderList[i] });
 	}
 	
 	CreatePipelines();
+}
+
+static void UpdateBuiltins()
+{
+	((VectorArray *)HashMapGet(renderer.script->cache, "time"))->xyzw[0][0]++;
+	InvalidateCachedDependents(renderer.script, "time");
+	InvalidateDependentRenders(renderer.script, "time");
+	
+	Statement * statement = HashMapGet(renderer.script->identifiers, "position");
+	if (statement != NULL)
+	{
+		VectorArray result;
+		if (EvaluateExpression(renderer.script->identifiers, renderer.script->cache, NULL, statement->expression, &result).code == RuntimeErrorNone)
+		{
+			renderer.camera.position.x = result.xyzw[0][0];
+			renderer.camera.position.y = result.xyzw[1][0];
+		}
+	}
+	else
+	{
+		VectorArray * position = HashMapGet(renderer.script->cache, "position");
+		position->xyzw[0][0] = renderer.camera.position.x;
+		position->xyzw[1][0] = renderer.camera.position.y;
+		InvalidateCachedDependents(renderer.script, "position");
+		InvalidateDependentRenders(renderer.script, "position");
+	}
+	statement = HashMapGet(renderer.script->identifiers, "scale");
+	if (statement != NULL)
+	{
+		VectorArray result;
+		if (EvaluateExpression(renderer.script->identifiers, renderer.script->cache, NULL, statement->expression, &result).code == RuntimeErrorNone)
+		{
+			renderer.camera.scale.x = result.xyzw[0][0];
+			renderer.camera.scale.y = result.xyzw[1][0];
+		}
+	}
+	else
+	{
+		VectorArray * scale = HashMapGet(renderer.script->cache, "scale");
+		scale->xyzw[0][0] = renderer.camera.scale.x;
+		scale->xyzw[1][0] = renderer.camera.scale.y;
+		InvalidateCachedDependents(renderer.script, "scale");
+		InvalidateDependentRenders(renderer.script, "scale");
+	}
+	statement = HashMapGet(renderer.script->identifiers, "rotation");
+	if (statement != NULL)
+	{
+		VectorArray result;
+		if (EvaluateExpression(renderer.script->identifiers, renderer.script->cache, NULL, statement->expression, &result).code == RuntimeErrorNone)
+		{
+			renderer.camera.angle = result.xyzw[0][0];
+		}
+	}
+	else
+	{
+		VectorArray * rotation = HashMapGet(renderer.script->cache, "rotation");
+		rotation->xyzw[0][0] = renderer.camera.angle;
+		InvalidateCachedDependents(renderer.script, "rotation");
+		InvalidateDependentRenders(renderer.script, "rotation");
+	}
+}
+
+static void UpdateSamples()
+{
+	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
+	{
+		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
+		{
+			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints)
+			{
+				RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
+				if (error.code != RuntimeErrorNone) { continue; }
+			}
+			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons)
+			{
+				RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
+				if (error.code != RuntimeErrorNone) { continue; }
+			}
+			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric)
+			{
+				RuntimeError error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &renderer.objects[i].buffer);
+				if (error.code != RuntimeErrorNone) { continue; }
+			}
+			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
+		}
+	}
 }
 
 static void Update()
 {
 	GraphicsUpdate();
 	UpdatePipelines();
-	UpdateScript(renderer.script);
-	for (int32_t i = 0; i < ListLength(renderer.buffers); i++)
-	{
-		if (renderer.renderTypes[i] == StatementRenderTypePoints)
-		{
-			RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.buffers[i]);
-			if (error.code != RuntimeErrorNone) { continue; }
-		}
-		if (renderer.renderTypes[i] == StatementRenderTypePolygons)
-		{
-			RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.buffers[i]);
-			if (error.code != RuntimeErrorNone) { continue; }
-		}
-		if (renderer.renderTypes[i] == StatementRenderTypeParametric)
-		{
-			RuntimeError error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &renderer.buffers[i]);
-			if (error.code != RuntimeErrorNone) { continue; }
-		}
-	}
+	UpdateBuiltins();
+	UpdateSamples();
 }
 
 static void Render()
@@ -178,12 +232,12 @@ static void Render()
 		GraphicsBindPipeline(pipelines.grid);
 		GraphicsRenderVertexBuffer(renderer.quad);
 	}
-	for (int32_t i = 0; i < ListLength(renderer.buffers); i++)
+	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
 	{
-		if (renderer.renderTypes[i] == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
-		if (renderer.renderTypes[i] == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
-		if (renderer.renderTypes[i] == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
-		if (renderer.buffers[i].vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.buffers[i]); }
+		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
+		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
+		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
+		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
 	}
 	GraphicsEnd();
 }
