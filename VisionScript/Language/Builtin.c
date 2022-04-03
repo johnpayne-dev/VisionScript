@@ -1052,6 +1052,11 @@ RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorAr
 	}
 }
 
+RuntimeErrorCode EvaluateBuiltinFunctionSize(BuiltinFunction function, list(VectorArray) arguments, uint32_t * length, uint32_t * dimensions)
+{
+	return RuntimeErrorNone;
+}
+
 static const char * builtinVariables[] =
 {
 	"pi", "tau", "e", "inf",
@@ -1119,5 +1124,14 @@ RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable
 	VectorArray * cached = HashMapGet(cache, builtinVariables[variable]);
 	if (cached == NULL) { return RuntimeErrorNotImplemented; }
 	CopyVectorArray(*cached, result);
+	return RuntimeErrorNone;
+}
+
+RuntimeErrorCode EvaluateBuiltinVariableSize(HashMap cache, BuiltinVariable variable, uint32_t * length, uint32_t * dimensions)
+{
+	VectorArray * cached = HashMapGet(cache, builtinVariables[variable]);
+	if (cached == NULL) { return RuntimeErrorNotImplemented; }
+	*length = cached->length;
+	*dimensions = cached->dimensions;
 	return RuntimeErrorNone;
 }

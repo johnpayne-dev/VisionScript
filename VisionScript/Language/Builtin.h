@@ -80,6 +80,8 @@ bool IsFunctionSingleArgument(BuiltinFunction function);
 
 RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
 
+RuntimeErrorCode EvaluateBuiltinFunctionSize(BuiltinFunction function, list(VectorArray) arguments, uint32_t * length, uint32_t * dimensions);
+
 typedef enum BuiltinVariable
 {
 	BuiltinVariablePI,
@@ -98,5 +100,7 @@ BuiltinVariable DetermineBuiltinVariable(const char * identifier);
 void InitializeBuiltins(HashMap cache);
 
 RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable, VectorArray * result);
+
+RuntimeErrorCode EvaluateBuiltinVariableSize(HashMap cache, BuiltinVariable variable, uint32_t * length, uint32_t * dimensions);
 
 #endif

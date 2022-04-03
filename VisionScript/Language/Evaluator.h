@@ -42,7 +42,7 @@ const char * RuntimeErrorToString(RuntimeErrorCode code);
 typedef struct VectorArray
 {
 	scalar_t * xyzw[4];
-	uint8_t dimensions;
+	uint32_t dimensions;
 	uint32_t length;
 } VectorArray;
 
@@ -57,6 +57,8 @@ typedef struct Parameter
 } Parameter;
 
 RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result);
+
+RuntimeError EvaluateExpressionSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions);
 
 list(String) FindExpressionParents(HashMap identifiers, Expression * expression, list(String) parameters);
 
