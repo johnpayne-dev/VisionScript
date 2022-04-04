@@ -58,8 +58,6 @@ typedef struct Parameter
 
 RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result);
 
-RuntimeError EvaluateExpressionSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions);
-
 list(String) FindExpressionParents(HashMap identifiers, Expression * expression, list(String) parameters);
 
 #endif

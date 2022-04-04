@@ -139,55 +139,12 @@ static RuntimeError EvaluateIdentifier(HashMap identifiers, HashMap cache, list(
 	return (RuntimeError){ RuntimeErrorUndefinedIdentifier, operonStart, operonEnd };
 }
 
-static RuntimeError EvaluateIdentifierSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Operon operon, int32_t operonStart, int32_t operonEnd, uint32_t * length, uint32_t * dimensions)
-{
-	// first check if the identifier was passed as a parameter
-	if (parameters != NULL)
-	{
-		for (int32_t i = 0; i < ListLength(parameters); i++)
-		{
-			if (strcmp(operon.identifier, parameters[i].identifier) == 0)
-			{
-				*length = parameters[i].value.length;
-				*dimensions = parameters[i].value.dimensions;
-				return (RuntimeError){ RuntimeErrorNone };
-			}
-		}
-	}
-	
-	// next check if the identifier was defined in another statement
-	Statement * statement = HashMapGet(identifiers, operon.identifier);
-	if (statement != NULL)
-	{
-		// return error if identifier was defined as a function
-		if (statement->type == StatementTypeFunction) { return (RuntimeError){ RuntimeErrorIdentifierNotVariable, operonStart, operonEnd }; }
-		
-		RuntimeError error = EvaluateExpressionSize(identifiers, cache, NULL, statement->expression, length, dimensions);
-		if (error.statement == NULL) { error.statement = statement; } // set the correct statement for error reporting
-		return error;
-	}
-
-	// finally, check if it's a builtin variable
-	BuiltinVariable builtin = DetermineBuiltinVariable(operon.identifier);
-	if (builtin != BuiltinVariableNone) { return (RuntimeError){ EvaluateBuiltinVariableSize(cache, builtin, length, dimensions), operonStart, operonEnd }; }
-	
-	// otherwise return an error
-	return (RuntimeError){ RuntimeErrorUndefinedIdentifier, operonStart, operonEnd };
-}
-
 static RuntimeError EvaluateConstant(Operon operon, VectorArray * result)
 {
 	result->dimensions = 1;
 	result->length = 1;
 	result->xyzw[0] = malloc(sizeof(scalar_t));
 	result->xyzw[0][0] = operon.constant;
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
-static RuntimeError EvaluateConstantSize(Operon operon, uint32_t * length, uint32_t * dimensions)
-{
-	*length = 1;
-	*dimensions = 1;
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
@@ -221,24 +178,6 @@ static RuntimeError EvaluateVectorLiteral(HashMap identifiers, HashMap cache, li
 			free(components[i].xyzw[0]);
 		}
 	}
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
-static RuntimeError EvaluateVectorLiteralSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Operon operon, int32_t operonStart, int32_t operonEnd, uint32_t * length, uint32_t * dimensions)
-{
-	*dimensions = ListLength(operon.expressions);
-	*length = -1; // uint -1
-	for (int32_t i = 0; i < *dimensions; i++)
-	{
-		uint32_t len, dimen;
-		RuntimeError error = EvaluateExpressionSize(identifiers, cache, parameters, operon.expressions[i], &len, &dimen);
-		if (error.code != RuntimeErrorNone) { return error; }
-		if (dimen > 1) { return (RuntimeError){ RuntimeErrorVectorInsideVector, operonStart, operonEnd }; }
-		// length is set to the smallest length of each component not including length 1 (since length 1 will assume length of the rest of the vector)
-		if (len > 1) { *length = len < *length ? len : *length; }
-	}
-	// if all the component lengths are 1 then result->length will still be -1, so set it to 1
-	if (*length == -1) { *length = 1; }
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
@@ -308,45 +247,6 @@ static RuntimeError EvaluateArrayLiteral(HashMap identifiers, HashMap cache, lis
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
-static RuntimeError EvaluateArrayLiteralSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Operon operon, int32_t operonStart, int32_t operonEnd, uint32_t * length, uint32_t * dimensions)
-{
-	*dimensions = 0;
-	*length = 0;
-	for (int32_t i = 0; i < ListLength(operon.expressions); i++)
-	{
-		uint32_t len, dimen;
-		RuntimeError error = EvaluateExpressionSize(identifiers, cache, parameters, operon.expressions[i], &len, &dimen);
-		if (error.code != RuntimeErrorNone) { return error; }
-		
-		// dimension of array is defined to be dimension of the first element
-		if (*dimensions == 0) { *dimensions = dimen; }
-		// if an element's dimension isn't the same as the previous elements, return an error
-		if (dimen != *dimensions) { return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd }; }
-		// if an element's length > 1 and it's not from ellipsis or for operator, then that means there's an array inside array so return error
-		if (len > 1 && operon.expressions[i]->operator != OperatorFor && operon.expressions[i]->operator != OperatorEllipsis)
-		{
-			return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd };
-		}
-		// increment total length by each element's length
-		*length += len;
-	}
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
-static RuntimeError EvaluateOperonSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, int32_t operonIndex, uint32_t * length, uint32_t * dimensions)
-{
-	OperonType operonType = expression->operonTypes[operonIndex];
-	Operon operon = expression->operons[operonIndex];
-	int32_t operonStart = expression->operonStart[operonIndex];
-	int32_t operonEnd = expression->operonEnd[operonIndex];
-	if (operonType == OperonTypeExpression) { return EvaluateExpressionSize(identifiers, cache, parameters, operon.expression, length, dimensions); }
-	else if (operonType == OperonTypeIdentifier) { return EvaluateIdentifierSize(identifiers, cache, parameters, operon, operonStart, operonEnd, length, dimensions); }
-	else if (operonType == OperonTypeConstant) { return EvaluateConstantSize(operon, length, dimensions); }
-	else if (operonType == OperonTypeVectorLiteral) { return EvaluateVectorLiteralSize(identifiers, cache, parameters, operon, operonStart, operonEnd, length, dimensions); }
-	else if (operonType == OperonTypeArrayLiteral) { return EvaluateArrayLiteralSize(identifiers, cache, parameters, operon, operonStart, operonEnd, length, dimensions); }
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
 static RuntimeError EvaluateOperon(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, int32_t operonIndex, VectorArray * result)
 {
 	OperonType operonType = expression->operonTypes[operonIndex];
@@ -374,16 +274,6 @@ static RuntimeErrorCode EvaluateEllipsis(VectorArray * a, VectorArray * b, Vecto
 	result->dimensions = 1;
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = i + lower; }
-	return RuntimeErrorNone;
-}
-
-static RuntimeErrorCode EvalueateEllipsisSize(VectorArray * a, VectorArray * b, uint32_t * length, uint32_t * dimensions)
-{
-	int32_t lower = roundf(a->xyzw[0][0]);
-	int32_t upper = roundf(b->xyzw[0][0]);
-	if (upper - lower < 0) { return RuntimeErrorInvalidArrayRange; }
-	*length = upper - lower + 1;
-	*dimensions = 1;
 	return RuntimeErrorNone;
 }
 
@@ -535,71 +425,6 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 		ListFree(arguments);
 		return (RuntimeError){ error, identifierStart, argumentsEnd };
 	}
-
-	// if not builtin then return undefined identifier error
-	return (RuntimeError){ RuntimeErrorUndefinedIdentifier, identifierStart, identifierEnd };
-}
-
-static RuntimeError EvaluateFunctionCallSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions)
-{
-	String function = expression->operons[0].identifier;
-	list(Expression *) expressions = expression->operons[1].expressions;
-	int32_t identifierStart = expression->operonStart[0];
-	int32_t identifierEnd = expression->operonEnd[0];
-	int32_t argumentsStart = expression->operonStart[1];
-	int32_t argumentsEnd = expression->operonEnd[1];
-	
-	// check if identifier was definined in another statement
-	Statement * statement = HashMapGet(identifiers, function);
-	if (statement != NULL)
-	{
-		// return error if identifier is a variable
-		if (statement->type == StatementTypeVariable) { return (RuntimeError){ RuntimeErrorIdentifierNotFunction, identifierStart, identifierEnd }; }
-		// return error if number of arguments needed isn't equal to number of argments given
-		if (ListLength(expressions) != ListLength(statement->declaration.function.arguments)) { return (RuntimeError){ RuntimeErrorIncorrectParameterCount, argumentsStart, argumentsEnd }; }
-		
-		// evaluate each argument's size and store into parameter list
-		list(Parameter) arguments = ListCreate(sizeof(Parameter), ListLength(expressions));
-		for (int32_t i = 0; i < ListLength(expressions); i++)
-		{
-			Parameter parameter = { .identifier = statement->declaration.function.arguments[i] };
-			RuntimeError error = EvaluateExpressionSize(identifiers, cache, parameters, expressions[i], &parameter.value.length, &parameter.value.dimensions);
-			if (error.code != RuntimeErrorNone) { ListFree(arguments); return error; }
-			arguments = ListPush(arguments, &parameter);
-		}
-		// evaluate the function
-		RuntimeError error = EvaluateExpressionSize(identifiers, cache, arguments, statement->expression, length, dimensions);
-		if (error.statement == NULL) { error.statement = statement; } // set the correct statement for error reporting
-		
-		ListFree(arguments);
-		return error;
-	}
-	
-	// otherwise check if it's a builtin function
-	BuiltinFunction builtin = DetermineBuiltinFunction(function);
-	if (builtin != BuiltinFunctionNone)
-	{
-		// if it's a single argument builtin then supply result as both the parameter and result of the function
-		if (IsFunctionSingleArgument(builtin))
-		{
-			if (ListLength(expressions) > 1) { return (RuntimeError){ RuntimeErrorIncorrectParameterCount, argumentsStart, argumentsEnd }; }
-			RuntimeError error = EvaluateExpressionSize(identifiers, cache, parameters, expressions[0], length, dimensions);
-			if (error.code != RuntimeErrorNone) { return error; }
-			return (RuntimeError){ EvaluateBuiltinFunctionSize(builtin, NULL, length, dimensions), identifierStart, argumentsEnd };
-		}
-		
-		// otherwise evaluate each argument and store into parameter list
-		list(VectorArray) arguments = ListCreate(sizeof(VectorArray), ListLength(expressions));
-		for (int32_t i = 0; i < ListLength(expressions); i++)
-		{
-			arguments = ListPush(arguments, &(VectorArray){ 0 });
-			RuntimeError error = EvaluateExpressionSize(identifiers, cache, parameters, expressions[i], &arguments[i].length, &arguments[i].dimensions);
-			if (error.code != RuntimeErrorNone) { ListFree(arguments); return error; }
-		}
-		RuntimeErrorCode error = EvaluateBuiltinFunctionSize(builtin, arguments, length, dimensions);
-		ListFree(arguments);
-		return (RuntimeError){ error, identifierStart, argumentsEnd };
-	}
 	
 	// if not builtin then return undefined identifier error
 	return (RuntimeError){ RuntimeErrorUndefinedIdentifier, identifierStart, identifierEnd };
@@ -691,47 +516,6 @@ static RuntimeError EvaluateFor(HashMap identifiers, HashMap cache, list(Paramet
 	FreeVectorArray(assignmentValue);
 	ListFree(parameters);
 	
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
-static RuntimeError EvaluateForSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions)
-{
-	Operon operon = expression->operons[0];
-	int32_t operonStart = expression->operonStart[0];
-	int32_t operonEnd = expression->operonEnd[0];
-	ForAssignment assignment = expression->operons[1].assignment;
-	
-	// first evaluate the assignment size
-	*length = 0;
-	*dimensions = 0;
-	uint32_t assignmentLen, assignmentDimen;
-	RuntimeError error = EvaluateExpressionSize(identifiers, cache, parameters, assignment.expression, &assignmentLen, &assignmentDimen);
-	if (error.code != RuntimeErrorNone) { return error; }
-
-	// if there doesn't already exist a parameters list, create one or otherwise clone the existing one
-	if (parameters == NULL) { parameters = ListCreate(sizeof(Parameter), 1); }
-	else { parameters = ListClone(parameters); }
-	// add the assignment identifier to the front of the parameter list
-	parameters = ListInsert(parameters, &(Parameter){ .identifier = assignment.identifier }, 0);
-	parameters[0].value.length = 1;
-	parameters[0].value.dimensions = assignmentDimen;
-	
-	// go through each assignment element and evaluate the corresponding value
-	for (int32_t i = 0; i < assignmentLen; i++)
-	{
-		uint32_t len, dimen;
-		RuntimeError error = EvaluateOperonSize(identifiers, cache, parameters, expression, 0, &len, &dimen);
-		if (error.code != RuntimeErrorNone) { ListFree(parameters); return error; }
-		
-		// set the result dimensions to the dimension of the first element of the array
-		if (*dimensions == 0) { *dimensions = dimen; }
-		// return error if inconsistent dimensionality
-		if (dimen != *dimensions) { ListFree(parameters); return (RuntimeError){ RuntimeErrorNonUniformArray, operonStart, operonEnd }; }
-		// return error if array inside array
-		if (len > 1 && operon.expression->operator != OperatorFor) { ListFree(parameters); return (RuntimeError){ RuntimeErrorArrayInsideArray, operonStart, operonEnd }; }
-		*length += len; // increment final array length
-	}
-	ListFree(parameters);
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
@@ -834,53 +618,6 @@ static RuntimeError EvaluateIndex(HashMap identifiers, HashMap cache, list(Param
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
-static RuntimeError EvaluateIndexSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions)
-{
-	if (expression->operonTypes[1] == OperonTypeIdentifier)
-	{
-		// if the indexing operon is an identifier then check if it's vector swizzling
-		String identifier = expression->operons[1].identifier;
-		bool isSwizzling = true;
-		for (int32_t i = 0; i < StringLength(identifier); i++)
-		{
-			if (i >= 4 || (identifier[i] != 'x' && identifier[i] != 'y' && identifier[i] != 'z' && identifier[i] != 'w')) { isSwizzling = false; break; }
-		}
-		if (isSwizzling)
-		{
-			// evaluate the indexed operon
-			uint32_t len, dimen;
-			RuntimeError error = EvaluateOperonSize(identifiers, cache, parameters, expression, 0, &len, &dimen);
-			if (error.code != RuntimeErrorNone) { return error; }
-			
-			*dimensions = StringLength(identifier);
-			*length = len;
-			for (int8_t d = 0; d < *dimensions; d++)
-			{
-				int8_t component = 0;
-				if (identifier[d] == 'x') { component = 0; }
-				if (identifier[d] == 'y') { component = 1; }
-				if (identifier[d] == 'z') { component = 2; }
-				if (identifier[d] == 'w') { component = 3; }
-				// return error if trying to access component greater than number of dimensions
-				if (component >= *dimensions) { return (RuntimeError){ RuntimeErrorInvalidSwizzling, expression->operonStart[1], expression->operonEnd[1] }; }
-			}
-			return (RuntimeError){ RuntimeErrorNone };
-		}
-	}
-	
-	// evaluate the indexed and indexing operons
-	uint32_t valueLen, valueDimen;
-	uint32_t indexLen, indexDimen;
-	RuntimeError error = EvaluateOperonSize(identifiers, cache, parameters, expression, 0, &valueLen, &valueDimen);
-	error = EvaluateOperonSize(identifiers, cache, parameters, expression, 1, &indexLen, &indexDimen);
-	if (error.code != RuntimeErrorNone) { return error; }
-	// return error if indexing with a vector
-	if (indexDimen > 1) { return (RuntimeError){ RuntimeErrorIndexingWithVector, expression->operonStart[1], expression->operonEnd[1] }; }
-	*dimensions = valueDimen;
-	*length = indexLen;
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
 RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result)
 {
 	*result = (VectorArray){ 0 };
@@ -933,42 +670,6 @@ RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Paramet
 		}
 	}
 	if (value.length > 0) { FreeVectorArray(value); }
-	return (RuntimeError){ RuntimeErrorNone };
-}
-
-RuntimeError EvaluateExpressionSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions)
-{
-	*length = 0;
-	*dimensions = 0;
-	if (expression->operator == OperatorNone) { return EvaluateOperonSize(identifiers, cache, parameters, expression, 0, length, dimensions); }
-	if (expression->operator == OperatorFunctionCall) { return EvaluateFunctionCallSize(identifiers, cache, parameters, expression, length, dimensions); }
-	if (expression->operator == OperatorFor) { return EvaluateForSize(identifiers, cache, parameters, expression, length, dimensions); }
-	if (expression->operator == OperatorIndex) { return EvaluateIndexSize(identifiers, cache, parameters, expression, length, dimensions); }
-	if (expression->operator == OperatorPositive || expression->operator == OperatorNegative) { return EvaluateOperonSize(identifiers, cache, parameters, expression, 0, length, dimensions); }
-	
-	uint32_t len1, dimen1;
-	uint32_t len2, dimen2;
-	RuntimeError error = EvaluateOperonSize(identifiers, cache, parameters, expression, 0, &len1, &dimen1);
-	error = EvaluateOperonSize(identifiers, cache, parameters, expression, 1, &len2, &dimen2);
-	if (error.code != RuntimeErrorNone) { return error; }
-	
-	if (expression->operator == OperatorEllipsis)
-	{
-		// return error if trying to use ellipsis with array or vector
-		if (len1 > 1 || dimen1 > 1) { return (RuntimeError){ RuntimeErrorInvalidEllipsisOperon, expression->operonStart[0], expression->operonEnd[0] }; }
-		if (len2 > 1 || dimen2 > 1) { return (RuntimeError){ RuntimeErrorInvalidEllipsisOperon, expression->operonStart[1], expression->operonEnd[1] }; }
-		VectorArray left, right;
-		RuntimeError error = EvaluateOperon(identifiers, cache, parameters, expression, 0, &left);
-		error = EvaluateOperon(identifiers, cache, parameters, expression, 1, &right);
-		if (error.code != RuntimeErrorNone) { return error; }
-		return (RuntimeError){ EvalueateEllipsisSize(&left, &right, length, dimensions), expression->operonStart[0], expression->operonEnd[1] };
-	}
-	
-	if (dimen1 != dimen2 && dimen1 != 1 && dimen2 != 1) { return (RuntimeError){ RuntimeErrorDifferingLengthVectors, expression->operonStart[0], expression->operonEnd[1] }; }
-	if (len1 == 1) { len1 = len2; }
-	if (len2 == 1) { len2 = len1; }
-	*dimensions = dimen1 > dimen2 ? dimen1 : dimen2;
-	*length = len1 < len2 ? len1 : len2;
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
