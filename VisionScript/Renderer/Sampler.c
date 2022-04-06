@@ -77,7 +77,7 @@ typedef struct Sample
 
 static RuntimeError ReadSamples(Script * script, Statement * statement, list(Parameter) parameters, float t, Sample ** samples, int32_t * length)
 {
-	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
+	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
 	VectorArray result;
 	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, parameters, statement->expression, &result);
 	if (error.code != RuntimeErrorNone) { return error; }
@@ -104,16 +104,16 @@ static RuntimeError ReadSamples(Script * script, Statement * statement, list(Par
 
 static RuntimeError ReadSample(Script * script, Statement * statement, list(Parameter) parameters, float t, int32_t i, Sample ** sample)
 {
-	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
+	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
 	VectorArray result;
-	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, parameters, statement->expression, &result);
+	RuntimeError error = EvaluateExpressionIndices(script->identifiers, script->cache, parameters, statement->expression, &i, 1, &result);
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
 	*sample = malloc(sizeof(Sample));
 	**sample = (Sample)
 	{
-		.position = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] },
+		.position = (vec2_t){ result.xyzw[0][0], result.xyzw[1][0] },
 		.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
 		.t = t,
 		.next = NULL,
@@ -127,7 +127,7 @@ static RuntimeError ReadSample(Script * script, Statement * statement, list(Para
 
 RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, VertexBuffer * buffer)
 {
-	list(Parameter) parameters = ListPush(ListCreate(sizeof(Parameter), 1), &(Parameter){ .identifier = "t" });
+	list(Parameter) parameters = ListPush(ListCreate(sizeof(Parameter), 1), &(Parameter){ .identifier = "t", .cached = true });
 	
 	// get initial start sample
 	Sample * starts;

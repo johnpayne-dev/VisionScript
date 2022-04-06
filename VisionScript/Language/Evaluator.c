@@ -749,14 +749,12 @@ static bool IsIdentifierSwizzling(String identifier)
 
 static RuntimeError EvaluateIndexSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions)
 {
-	if (expression->operonTypes[1] == OperonTypeIdentifier)
+	if (expression->operonTypes[1] == OperonTypeIdentifier && IsIdentifierSwizzling(expression->operons[1].identifier))
 	{
-		if (IsIdentifierSwizzling(expression->operons[1].identifier))
-		{
-			RuntimeError error = EvaluateOperonSize(identifiers, cache, parameters, expression, 0, length, &(uint32_t){ 0 });
-			if (error.code != RuntimeErrorNone) { return error; }
-			*dimensions = StringLength(expression->operons[1].identifier);
-		}
+		RuntimeError error = EvaluateOperonSize(identifiers, cache, parameters, expression, 0, length, &(uint32_t){ 0 });
+		if (error.code != RuntimeErrorNone) { return error; }
+		*dimensions = StringLength(expression->operons[1].identifier);
+		return (RuntimeError){ RuntimeErrorNone };
 	}
 	
 	// evaluate length from indexing, dimension from indexed

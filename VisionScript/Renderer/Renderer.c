@@ -148,10 +148,14 @@ static void UpdateBuiltins()
 	else
 	{
 		VectorArray * position = HashMapGet(renderer.script->cache, "position");
-		position->xyzw[0][0] = renderer.camera.position.x;
-		position->xyzw[1][0] = renderer.camera.position.y;
-		InvalidateCachedDependents(renderer.script, "position");
-		InvalidateDependentRenders(renderer.script, "position");
+		if (position->xyzw[0][0] != renderer.camera.position.x || position->xyzw[1][0] != renderer.camera.position.y)
+		{
+			position->xyzw[0][0] = renderer.camera.position.x;
+			position->xyzw[1][0] = renderer.camera.position.y;
+			InvalidateCachedDependents(renderer.script, "position");
+			InvalidateDependentRenders(renderer.script, "position");
+			InvalidateParametricRenders(renderer.script);
+		}
 	}
 	statement = HashMapGet(renderer.script->identifiers, "scale");
 	if (statement != NULL)
@@ -166,10 +170,14 @@ static void UpdateBuiltins()
 	else
 	{
 		VectorArray * scale = HashMapGet(renderer.script->cache, "scale");
-		scale->xyzw[0][0] = renderer.camera.scale.x;
-		scale->xyzw[1][0] = renderer.camera.scale.y;
-		InvalidateCachedDependents(renderer.script, "scale");
-		InvalidateDependentRenders(renderer.script, "scale");
+		if (scale->xyzw[0][0] != renderer.camera.scale.x || scale->xyzw[1][0] != renderer.camera.scale.y)
+		{
+			scale->xyzw[0][0] = renderer.camera.scale.x;
+			scale->xyzw[1][0] = renderer.camera.scale.y;
+			InvalidateCachedDependents(renderer.script, "scale");
+			InvalidateDependentRenders(renderer.script, "scale");
+			InvalidateParametricRenders(renderer.script);
+		}
 	}
 	statement = HashMapGet(renderer.script->identifiers, "rotation");
 	if (statement != NULL)
@@ -183,9 +191,13 @@ static void UpdateBuiltins()
 	else
 	{
 		VectorArray * rotation = HashMapGet(renderer.script->cache, "rotation");
-		rotation->xyzw[0][0] = renderer.camera.angle;
-		InvalidateCachedDependents(renderer.script, "rotation");
-		InvalidateDependentRenders(renderer.script, "rotation");
+		if (rotation->xyzw[0][0] != renderer.camera.angle)
+		{
+			rotation->xyzw[0][0] = renderer.camera.angle;
+			InvalidateCachedDependents(renderer.script, "rotation");
+			InvalidateDependentRenders(renderer.script, "rotation");
+			InvalidateParametricRenders(renderer.script);
+		}
 	}
 }
 
@@ -236,7 +248,7 @@ static void Render()
 	{
 		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
 		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
-		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
+		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.points); }
 		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
 	}
 	GraphicsEnd();

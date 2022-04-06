@@ -118,6 +118,17 @@ void InvalidateDependentRenders(Script * script, String identifier)
 	}
 }
 
+void InvalidateParametricRenders(Script * script)
+{
+	for (int32_t i = 0; i < ListLength(script->renderList); i++)
+	{
+		if (script->renderList[i]->declaration.render.type == StatementRenderTypeParametric && !ListContains(script->dirtyRenders, &(Statement *){ script->renderList[i] }))
+		{
+			script->dirtyRenders = ListPush(script->dirtyRenders, &(Statement *){ script->renderList[i] });
+		}
+	}
+}
+
 void FreeScript(Script * script)
 {
 	for (int32_t i = 0; i < ListLength(script->errorList); i++) { FreeStatement(script->errorList[i]); }

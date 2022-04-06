@@ -25,6 +25,8 @@ void InvalidateCachedDependents(Script * script, String identifier);
 
 void InvalidateDependentRenders(Script * script, String identifier);
 
+void InvalidateParametricRenders(Script * script);
+
 void FreeScript(Script * script);
 
 #endif
