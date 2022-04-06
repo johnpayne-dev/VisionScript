@@ -47,15 +47,25 @@ typedef struct VectorArray
 } VectorArray;
 
 void PrintVectorArray(VectorArray value);
-void CopyVectorArray(VectorArray value, VectorArray * result);
+VectorArray CopyVectorArray(VectorArray value, int32_t * indices, int32_t indexCount);
 void FreeVectorArray(VectorArray value);
 
 typedef struct Parameter
 {
 	String identifier;
-	VectorArray value;
+	Expression * expression;
+	list(struct Parameter) parameters;
+	bool cached;
+	VectorArray cache;
 } Parameter;
 
+RuntimeError CreateParameter(HashMap identifiers, HashMap cache, String identifier, Expression * expression, list(Parameter) parameters, bool shouldCache, Parameter * parameter);
+RuntimeError EvaluateParameterSize(HashMap identifiers, HashMap cache, Parameter parameter, uint32_t * length, uint32_t * dimensions);
+RuntimeError EvaluateParameter(HashMap identifiers, HashMap cache, Parameter parameter, int32_t * indices, int32_t indexCount, VectorArray * result);
+void FreeParameter(Parameter parameter);
+
+RuntimeError EvaluateExpressionSize(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, uint32_t * length, uint32_t * dimensions);
+RuntimeError EvaluateExpressionIndices(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, int32_t * indices, int32_t indexCount, VectorArray * result);
 RuntimeError EvaluateExpression(HashMap identifiers, HashMap cache, list(Parameter) parameters, Expression * expression, VectorArray * result);
 
 list(String) FindExpressionParents(HashMap identifiers, Expression * expression, list(String) parameters);

@@ -20,57 +20,48 @@ static const char * builtinFunctions[] =
 	"cross", "dist", "distsq", "dot", "length", "lengthsq", "normalize",
 };
 
-static BuiltinFunction singleArgumentBuiltins[] =
+static BuiltinFunction multiArgumentBuiltins[] =
 {
-	BuiltinFunctionSIN,
-	BuiltinFunctionCOS,
-	BuiltinFunctionTAN,
-	BuiltinFunctionASIN,
-	BuiltinFunctionACOS,
-	BuiltinFunctionATAN,
-	BuiltinFunctionSEC,
-	BuiltinFunctionCSC,
-	BuiltinFunctionCOT,
-	BuiltinFunctionASEC,
-	BuiltinFunctionACSC,
-	BuiltinFunctionACOT,
-	BuiltinFunctionSINH,
-	BuiltinFunctionCOSH,
-	BuiltinFunctionTANH,
-	BuiltinFunctionASINH,
-	BuiltinFunctionACOSH,
-	BuiltinFunctionATANH,
-	BuiltinFunctionSECH,
-	BuiltinFunctionCSCH,
-	BuiltinFunctionCOTH,
-	BuiltinFunctionASECH,
-	BuiltinFunctionACSCH,
-	BuiltinFunctionACOTH,
-	BuiltinFunctionABS,
+	BuiltinFunctionATAN2,
+	BuiltinFunctionCORR,
+	BuiltinFunctionCOUNT,
+	BuiltinFunctionCOV,
+	BuiltinFunctionINTERLEAVE,
+	BuiltinFunctionJOIN,
+	BuiltinFunctionLOG,
+	BuiltinFunctionMAX,
+	BuiltinFunctionMIN,
+	BuiltinFunctionQUANTILE,
+	BuiltinFunctionRAND,
+	BuiltinFunctionSHUFFLE,
+	BuiltinFunctionSORT,
+	BuiltinFunctionCROSS,
+	BuiltinFunctionDIST,
+	BuiltinFunctionDISTSQ,
+	BuiltinFunctionDOT,
+};
+
+static BuiltinFunction unindexableBuiltins[] =
+{
 	BuiltinFunctionARGMAX,
 	BuiltinFunctionARGMIN,
-	BuiltinFunctionCBRT,
-	BuiltinFunctionCEIL,
-	BuiltinFunctionERF,
-	BuiltinFunctionEXP,
-	BuiltinFunctionFACTORIAL,
-	BuiltinFunctionFLOOR,
-	BuiltinFunctionGAMMA,
-	BuiltinFunctionLN,
-	BuiltinFunctionLOG10,
-	BuiltinFunctionLOG2,
+	BuiltinFunctionCORR,
+	BuiltinFunctionCOUNT,
+	BuiltinFunctionCOV,
+	BuiltinFunctionINTERLEAVE,
+	BuiltinFunctionJOIN,
+	BuiltinFunctionMAX,
 	BuiltinFunctionMEAN,
 	BuiltinFunctionMEDIAN,
+	BuiltinFunctionMIN,
 	BuiltinFunctionPROD,
-	BuiltinFunctionROUND,
-	BuiltinFunctionSIGN,
-	BuiltinFunctionSQRT,
+	BuiltinFunctionQUANTILE,
+	BuiltinFunctionRAND,
+	BuiltinFunctionSHUFFLE,
+	BuiltinFunctionSORT,
 	BuiltinFunctionSTDEV,
 	BuiltinFunctionSUM,
 	BuiltinFunctionVAR,
-	BuiltinFunctionLENGTH,
-	BuiltinFunctionLENGTHSQ,
-	BuiltinFunctionNORMALIZE,
 };
 
 static int compare(const void * a, const void * b)
@@ -123,21 +114,27 @@ static RuntimeErrorCode _atan(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _atan2(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _atan2_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// atan2 takes two non-vector arguments
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions > 1 || args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[0].length < args[1].length ? args[0].length : args[1].length;
+	if (args[0].length == 1 && args[1].length > 1) { *length = args[1].length; }
+	if (args[1].length == 1 && args[0].length > 1) { *length = args[0].length; }
+	*dimensions = 1;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _atan2(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _atan2_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
-	// length 1 argument will be extended to length of other argument, otherwise use the min of the two lengths
-	VectorArray y = args[0];
-	VectorArray x = args[1];
-	result->length = y.length < x.length ? y.length : x.length;
-	bool yi = false, xi = false;
-	if (y.length == 1 && x.length > 1) { result->length = x.length; yi = true; }
-	if (x.length == 1 && y.length > 1) { result->length = y.length; xi = true; }
+	// length 1 argument will be extended to length of other argument
+	VectorArray y = args[0], x = args[1];
+	bool yi = y.length == 1 && x.length > 1;
+	bool xi = x.length == 1 && y.length > 1;
 	
-	result->dimensions = 1;
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = atan2f(y.xyzw[0][yi ? 0 : i], x.xyzw[0][xi ? 0 : i]); }
 	
@@ -258,10 +255,18 @@ static RuntimeErrorCode _abs(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _argmax(VectorArray * result)
+static RuntimeErrorCode _argmax_size(uint32_t * length, uint32_t * dimensions)
 {
 	// argmax takes 1 non-vector argument
-	if (result->dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	if (*dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	*length = 1;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _argmax(VectorArray * result)
+{
+	RuntimeErrorCode error = _argmax_size(&result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
+	
 	scalar_t max = result->xyzw[0][0];
 	int32_t index = 0;
 	for (int32_t i = 1; i < result->length; i++)
@@ -271,14 +276,21 @@ static RuntimeErrorCode _argmax(VectorArray * result)
 	free(result->xyzw[0]);
 	result->xyzw[0] = malloc(sizeof(scalar_t));
 	result->xyzw[0][0] = (scalar_t)index;
-	result->length = 1;
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _argmin_size(uint32_t * length, uint32_t * dimensions)
+{
+	// argmax takes 1 non-vector argument
+	if (*dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _argmin(VectorArray * result)
 {
-	// argmin takes 1 non-vector argument
-	if (result->dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	RuntimeErrorCode error = _argmin_size(&result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
+	
 	scalar_t min = result->xyzw[0][0];
 	int32_t index = 0;
 	for (int32_t i = 1; i < result->length; i++)
@@ -288,7 +300,6 @@ static RuntimeErrorCode _argmin(VectorArray * result)
 	free(result->xyzw[0]);
 	result->xyzw[0] = malloc(sizeof(scalar_t));
 	result->xyzw[0][0] = index;
-	result->length = 1;
 	return RuntimeErrorNone;
 }
 
@@ -304,11 +315,19 @@ static RuntimeErrorCode _ceil(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _corr_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// corr takes two arguments of same dimensionality
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	*length = 1;
+	*dimensions = args[0].dimensions;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _corr_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
 	VectorArray a = args[0], b = args[1];
 	int32_t length = a.length < b.length ? a.length : b.length;
@@ -330,28 +349,36 @@ static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result)
 		result->xyzw[d] = malloc(sizeof(scalar_t));
 		result->xyzw[d][0] = sum / sqrtf(varA * varB);
 	}
-	result->length = 1;
-	result->dimensions = a.dimensions;
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _count_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	*dimensions = 1;
+	if (ListLength(args) == 2)
+	{
+		if (args[1].dimensions != args[0].dimensions) { return RuntimeErrorInvalidArgumentType; }
+		if (args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
+	}
+	return ListLength(args) != 1 && ListLength(args) != 2 ? RuntimeErrorIncorrectParameterCount : RuntimeErrorNone;
+}
 static RuntimeErrorCode _count(list(VectorArray) args, VectorArray * result)
 {
+	RuntimeErrorCode error = _count_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
+	
 	if (ListLength(args) == 1)
 	{
 		// returns length of the vector array passed
 		int32_t len = args[0].length;
 		result->xyzw[0] = malloc(sizeof(scalar_t));
 		result->xyzw[0][0] = len;
-		result->length = 1;
-		result->dimensions = 1;
 		return RuntimeErrorNone;
 	}
 	if (ListLength(args) == 2)
 	{
 		// counts how many elements equal the second argument
-		if (args[1].dimensions != args[0].dimensions) { return RuntimeErrorInvalidArgumentType; }
-		if (args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
 		int32_t count = 0;
 		for (int32_t i = 0; i < args[0].length; i++)
 		{
@@ -364,18 +391,24 @@ static RuntimeErrorCode _count(list(VectorArray) args, VectorArray * result)
 		}
 		result->xyzw[0] = malloc(sizeof(scalar_t));
 		result->xyzw[0][0] = count;
-		result->length = 1;
-		result->dimensions = 1;
 		return RuntimeErrorNone;
 	}
 	return RuntimeErrorIncorrectParameterCount;
 }
 
-static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _cov_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// cov takes two arguments of same dimensionality
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	*length = 1;
+	*dimensions = args[0].dimensions;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _cov_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
 	VectorArray a = args[0], b = args[1];
 	int32_t length = a.length < b.length ? a.length : b.length;
@@ -393,8 +426,6 @@ static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result)
 		result->xyzw[d] = malloc(sizeof(scalar_t));
 		result->xyzw[d][0] = sum / (length - 1);
 	}
-	result->length = 1;
-	result->dimensions = a.dimensions;
 	return RuntimeErrorNone;
 }
 
@@ -428,21 +459,24 @@ static RuntimeErrorCode _gamma(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _interleave_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes n arguments of same dimensionality
-	result->dimensions = 0;
-	result->length = 0;
+	*dimensions = 0;
+	*length = 0;
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
 		// first argument determines dimensionality of whole array
-		if (result->dimensions == 0) { result->dimensions = args[i].dimensions; }
-		if (args[i].dimensions != result->dimensions) { return RuntimeErrorInvalidArgumentType; }
-		result->length += args[i].length;
+		if (*dimensions == 0) { *dimensions = args[i].dimensions; }
+		if (args[i].dimensions != *dimensions) { return RuntimeErrorInvalidArgumentType; }
+		*length += args[i].length;
 	}
-	
-	// return error if array too large
-	if (result->length > MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _interleave_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
 	// interleave the contents of each argument into a single array
 	for (int32_t d = 0; d < result->dimensions; d++)
@@ -462,21 +496,24 @@ static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _join(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _join_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes n arguments of same dimensionality
-	result->dimensions = 0;
-	result->length = 0;
+	*dimensions = 0;
+	*length = 0;
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
 		// first argument determines dimensionality of whole array
-		if (result->dimensions == 0) { result->dimensions = args[i].dimensions; }
-		if (args[i].dimensions != result->dimensions) { return RuntimeErrorInvalidArgumentType; }
-		result->length += args[i].length;
+		if (*dimensions == 0) { *dimensions = args[i].dimensions; }
+		if (args[i].dimensions != *dimensions) { return RuntimeErrorInvalidArgumentType; }
+		*length += args[i].length;
 	}
-	
-	// return error if array too large
-	if (result->length > MAX_ARRAY_LENGTH) { return RuntimeErrorArrayTooLarge; }
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _join(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _join_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
 	// copy the contents of each argument into a single array
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -497,22 +534,28 @@ static RuntimeErrorCode _ln(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _log(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _log_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes two arguments of same vector, (with exception to dimension 1)
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions && args[0].dimensions != 1 && args[1].dimensions != 1) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[1].length < args[0].length ? args[1].length : args[0].length;
+	if (args[1].length == 1 && args[0].length > 1) { *length = args[0].length; }
+	if (args[0].length == 1 && args[1].length > 1) { *length = args[1].length; }
+	*dimensions = args[1].dimensions > args[0].dimensions ? args[1].dimensions : args[0].dimensions;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _log(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _log_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
 	// determine which arguments are scalars
-	VectorArray b = args[0];
-	VectorArray a = args[1];
-	result->dimensions = a.dimensions > b.dimensions ? a.dimensions : b.dimensions;
-	result->length = a.length < b.length ? a.length : b.length;
-	bool ai = false, bi = false, ad = false, bd = false;
-	if (a.length == 1 && b.length > 1) { result->length = b.length; ai = true; }
-	if (b.length == 1 && a.length > 1) { result->length = a.length; bi = true; }
-	if (a.dimensions == 1 && b.dimensions > 1) { ad = true; }
-	if (b.dimensions == 1 && a.dimensions > 1) { bd = true; }
+	VectorArray b = args[0], a = args[1];
+	bool ai = a.length == 1 && b.length > 1;
+	bool bi = b.length == 1 && a.length > 1;
+	bool ad = a.dimensions == 1 && b.dimensions > 1;
+	bool bd = b.dimensions == 1 && a.dimensions > 1;
 	
 	// calculate the log
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -539,22 +582,37 @@ static RuntimeErrorCode _log2(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _max_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	*dimensions = 1;
+	for (int32_t i = 0; i < ListLength(args); i++)
+	{
+		if (args[i].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	}
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _max(list(VectorArray) args, VectorArray * result)
 {
+	RuntimeErrorCode error = _max_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
+	
 	// takes n arguments all of dimension 1
 	scalar_t max = args[0].xyzw[0][0];
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
-		if (args[i].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 		for (int32_t j = 0; j < args[i].length; j++) { if (args[i].xyzw[0][j] > max) { max = args[i].xyzw[0][j]; } }
 	}
-	result->length = 1;
-	result->dimensions = 1;
 	result->xyzw[0] = malloc(sizeof(scalar_t));
 	result->xyzw[0][0] = max;
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _mean_size(uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _mean(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -569,6 +627,11 @@ static RuntimeErrorCode _mean(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _median_size(uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _median(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -584,22 +647,37 @@ static RuntimeErrorCode _median(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _min_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	*dimensions = 1;
+	for (int32_t i = 0; i < ListLength(args); i++)
+	{
+		if (args[i].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	}
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _min(list(VectorArray) args, VectorArray * result)
 {
+	RuntimeErrorCode error = _min_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
+	
 	// takes n arguments all of dimension 1
 	scalar_t min = args[0].xyzw[0][0];
 	for (int32_t i = 0; i < ListLength(args); i++)
 	{
-		if (args[i].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
 		for (int32_t j = 0; j < args[i].length; j++) { if (args[i].xyzw[0][j] < min) { min = args[i].xyzw[0][j]; } }
 	}
-	result->length = 1;
-	result->dimensions = 1;
 	result->xyzw[0] = malloc(sizeof(scalar_t));
 	result->xyzw[0][0] = min;
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _prod_size(uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _prod(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -614,15 +692,20 @@ static RuntimeErrorCode _prod(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _quantile_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes two arguments, second argument must not be a vector
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[1].length;
+	*dimensions = args[0].dimensions;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _quantile_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
-	
-	result->length = args[1].length;
-	result->dimensions = args[0].dimensions;
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
 		// sort list and get each element at each given quantile
@@ -639,35 +722,13 @@ static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _rand_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
+{
+	return RuntimeErrorNotImplemented;
+}
 static RuntimeErrorCode _rand(list(VectorArray) args, VectorArray * result)
 {
-	// if there's no arguments passed return a value between 0-1
-	if (ListLength(args) == 0)
-	{
-		result->length = 1;
-		result->dimensions = 1;
-		result->xyzw[0] = malloc(sizeof(scalar_t));
-		result->xyzw[0][0] = (scalar_t)rand() / RAND_MAX;
-		return RuntimeErrorNone;
-	}
-	if (ListLength(args) == 1 || ListLength(args) == 2)
-	{
-		// if there's two arguments use the second argument to set the seed
-		if (ListLength(args) == 2)
-		{
-			if (args[1].dimensions > 1 || args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
-			srand(args[1].xyzw[0][0]);
-		}
-		// the first argument is how many random numbers to generate
-		if (args[0].dimensions > 1 || args[0].length > 1) { return RuntimeErrorInvalidArgumentType; }
-		result->length = args[0].xyzw[0][0];
-		result->dimensions = 1;
-		result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
-		for (int32_t i = 0; i < result->length; i++) { result->xyzw[0][i] = (scalar_t)rand() / RAND_MAX; }
-		return RuntimeErrorNone;
-	}
-	
-	return RuntimeErrorIncorrectParameterCount;
+	return RuntimeErrorNotImplemented;
 }
 
 static RuntimeErrorCode _round(VectorArray * result)
@@ -676,35 +737,13 @@ static RuntimeErrorCode _round(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _shuffle_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
+{
+	return RuntimeErrorNotImplemented;
+}
 static RuntimeErrorCode _shuffle(list(VectorArray) args, VectorArray * result)
 {
-	if (ListLength(args) == 1 || ListLength(args) == 2)
-	{
-		// if two arguments are passed use the second to set the seed
-		if (ListLength(args) == 2)
-		{
-			if (args[1].dimensions > 1 || args[1].length > 1) { return RuntimeErrorInvalidArgumentType; }
-			srand(args[1].xyzw[0][0]);
-		}
-		
-		// shuffle the array by swapping each element with another random element
-		result->length = args[0].length;
-		result->dimensions = args[0].dimensions;
-		result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
-		for (int32_t i = 0; i < result->length; i++)
-		{
-			int32_t swapIndex = rand() % result->length;
-			for (int8_t d = 0; d < result->dimensions; d++)
-			{
-				result->xyzw[d][swapIndex] = args[0].xyzw[d][i];
-				result->xyzw[d][i] = args[0].xyzw[d][swapIndex];
-				args[0].xyzw[d][swapIndex] = result->xyzw[d][swapIndex];
-				args[0].xyzw[d][i] = result->xyzw[d][i];
-			}
-		}
-		return RuntimeErrorNone;
-	}
-	return RuntimeErrorIncorrectParameterCount;
+	return RuntimeErrorNotImplemented;
 }
 
 static RuntimeErrorCode _sign(VectorArray * result)
@@ -713,13 +752,29 @@ static RuntimeErrorCode _sign(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _sort_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
+{
+	if (ListLength(args) == 1)
+	{
+		*length = args[0].length;
+		*dimensions = 1;
+	}
+	if (ListLength(args) == 2)
+	{
+		if (args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
+		*length = args[0].length < args[1].length ? args[0].length : args[1].length;
+		*dimensions = args[0].dimensions;
+	}
+	return RuntimeErrorIncorrectParameterCount;
+}
 static RuntimeErrorCode _sort(list(VectorArray) args, VectorArray * result)
 {
+	RuntimeErrorCode error = _sort_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
+	
 	// if one argument is passed then sort in ascending order
 	if (ListLength(args) == 1)
 	{
-		result->length = args[0].length;
-		result->dimensions = 1;
 		for (int8_t d = 0; d < result->dimensions; d++)
 		{
 			result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
@@ -731,17 +786,12 @@ static RuntimeErrorCode _sort(list(VectorArray) args, VectorArray * result)
 	// if two arguments are passed then sort relative the second list
 	if (ListLength(args) == 2)
 	{
-		if (args[1].dimensions > 1) { return RuntimeErrorInvalidArgumentType; }
-		int32_t length = args[0].length < args[1].length ? args[0].length : args[1].length;
-		
 		// each index of the first list is coupled with the corresponding element of the second list
-		struct { int32_t i; scalar_t s; } * coupled = malloc(length * (sizeof(int32_t) + sizeof(scalar_t)));
-		for (int32_t i = 0; i < length; i++) { coupled[i].i = i; coupled[i].s = args[1].xyzw[0][i]; }
-		qsort(coupled, length, sizeof(int32_t) + sizeof(scalar_t), coupled_compare);
+		struct { int32_t i; scalar_t s; } * coupled = malloc(result->length * (sizeof(int32_t) + sizeof(scalar_t)));
+		for (int32_t i = 0; i < result->length; i++) { coupled[i].i = i; coupled[i].s = args[1].xyzw[0][i]; }
+		qsort(coupled, result->length, sizeof(int32_t) + sizeof(scalar_t), coupled_compare);
 		
 		// rearrange the first list to be in the order of how the second list was sorted
-		result->length = length;
-		result->dimensions = args[0].dimensions;
 		for (int8_t d = 0; d < result->dimensions; d++)
 		{
 			result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
@@ -758,6 +808,11 @@ static RuntimeErrorCode _sqrt(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _stdev_size(uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _stdev(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -778,6 +833,11 @@ static RuntimeErrorCode _stdev(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _sum_size(uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _sum(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -792,6 +852,11 @@ static RuntimeErrorCode _sum(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _var_size(uint32_t * length, uint32_t * dimensions)
+{
+	*length = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _var(VectorArray * result)
 {
 	for (int8_t d = 0; d < result->dimensions; d++)
@@ -812,25 +877,29 @@ static RuntimeErrorCode _var(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _cross_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// cross product works on two 3d vectors
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != 3 || args[1].dimensions != 3) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[0].length < args[1].length ? args[0].length : args[1].length;
+	if (args[0].length == 1 && args[1].length > 1) { *length = args[1].length; }
+	if (args[1].length == 1 && args[0].length > 1) { *length = args[0].length; }
+	*dimensions = 3;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _cross_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
-	// min length of the two unless length 1
-	result->dimensions = 3;
-	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
-	bool ai = false, bi = false;
-	if (args[0].length == 1 && args[1].length > 1) { result->length = args[1].length; ai = true; }
-	if (args[1].length == 1 && args[0].length > 1) { result->length = args[0].length; bi = true; }
-	
+	bool ai = args[0].length == 1 && args[1].length > 1;
+	bool bi = args[1].length == 1 && args[0].length > 1;
 	for (int8_t d = 0; d < result->dimensions; d++)
 	{
 		result->xyzw[d] = malloc(result->length * sizeof(scalar_t));
 		for (int32_t i = 0; i < result->length; i++)
 		{
-			// multiply corresponding to each component
 			if (d == 0) { result->xyzw[0][i] = args[0].xyzw[1][ai ? 0 : i] * args[1].xyzw[2][bi ? 0 : i] - args[0].xyzw[2][ai ? 0 : i] * args[1].xyzw[1][bi ? 0 : i]; }
 			if (d == 1) { result->xyzw[1][i] = args[0].xyzw[2][ai ? 0 : i] * args[1].xyzw[0][bi ? 0 : i] - args[0].xyzw[0][ai ? 0 : i] * args[1].xyzw[2][bi ? 0 : i]; }
 			if (d == 2) { result->xyzw[2][i] = args[0].xyzw[0][ai ? 0 : i] * args[1].xyzw[1][bi ? 0 : i] - args[0].xyzw[1][ai ? 0 : i] * args[1].xyzw[0][bi ? 0 : i]; }
@@ -839,20 +908,24 @@ static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _dist_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[0].length < args[1].length ? args[0].length : args[1].length;
+	if (args[0].length == 1 && args[1].length > 1) { *length = args[1].length; }
+	if (args[1].length == 1 && args[0].length > 1) { *length = args[0].length; }
+	*dimensions = 1;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _dist_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
-	// min length of the two unless length 1
-	result->dimensions = 1;
-	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
-	bool ai = false, bi = false;
-	if (args[0].length == 1 && args[1].length > 1) { result->length = args[1].length; ai = true; }
-	if (args[1].length == 1 && args[0].length > 1) { result->length = args[0].length; bi = true; }
-	
-	// find distance between each vector
+	bool ai = args[0].length == 1 && args[1].length > 1;
+	bool bi = args[1].length == 1 && args[0].length > 1;
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++)
 	{
@@ -868,19 +941,24 @@ static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _distsq_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[0].length < args[1].length ? args[0].length : args[1].length;
+	if (args[0].length == 1 && args[1].length > 1) { *length = args[1].length; }
+	if (args[1].length == 1 && args[0].length > 1) { *length = args[0].length; }
+	*dimensions = 1;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _distsq_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
-	// min length of the two unless length 1
-	result->dimensions = 1;
-	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
-	bool ai = false, bi = false;
-	if (args[0].length == 1 && args[1].length > 1) { result->length = args[1].length; ai = true; }
-	if (args[1].length == 1 && args[0].length > 1) { result->length = args[0].length; bi = true; }
-	
+	bool ai = args[0].length == 1 && args[1].length > 1;
+	bool bi = args[1].length == 1 && args[0].length > 1;
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++)
 	{
@@ -895,19 +973,24 @@ static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
-static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _dot_size(list(VectorArray) args, uint32_t * length, uint32_t * dimensions)
 {
 	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorIncorrectParameterCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorInvalidArgumentType; }
+	*length = args[0].length < args[1].length ? args[0].length : args[1].length;
+	if (args[0].length == 1 && args[1].length > 1) { *length = args[1].length; }
+	if (args[1].length == 1 && args[0].length > 1) { *length = args[0].length; }
+	*dimensions = 1;
+	return RuntimeErrorNone;
+}
+static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result)
+{
+	RuntimeErrorCode error = _dot_size(args, &result->length, &result->dimensions);
+	if (error != RuntimeErrorNone) { return error; }
 	
-	// min length of the two unless length 1
-	result->dimensions = 1;
-	result->length = args[0].length < args[1].length ? args[0].length : args[1].length;
-	bool ai = false, bi = false;
-	if (args[0].length == 1 && args[1].length > 1) { result->length = args[1].length; ai = true; }
-	if (args[1].length == 1 && args[0].length > 1) { result->length = args[0].length; bi = true; }
-	
+	bool ai = args[0].length == 1 && args[1].length > 1;
+	bool bi = args[1].length == 1 && args[0].length > 1;
 	result->xyzw[0] = malloc(result->length * sizeof(scalar_t));
 	for (int32_t i = 0; i < result->length; i++)
 	{
@@ -918,6 +1001,11 @@ static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _length_size(uint32_t * length, uint32_t * dimensions)
+{
+	*dimensions = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _length(VectorArray * result)
 {
 	// takes a single vector argument
@@ -933,6 +1021,11 @@ static RuntimeErrorCode _length(VectorArray * result)
 	return RuntimeErrorNone;
 }
 
+static RuntimeErrorCode _lengthsq_size(uint32_t * length, uint32_t * dimensions)
+{
+	*dimensions = 1;
+	return RuntimeErrorNone;
+}
 static RuntimeErrorCode _lengthsq(VectorArray * result)
 {
 	// takes a single vector argument
@@ -971,11 +1064,56 @@ BuiltinFunction DetermineBuiltinFunction(const char * identifier)
 
 bool IsFunctionSingleArgument(BuiltinFunction function)
 {
-	for (int32_t i = 0; i < sizeof(singleArgumentBuiltins) / sizeof(singleArgumentBuiltins[0]); i++)
+	for (int32_t i = 0; i < sizeof(multiArgumentBuiltins) / sizeof(multiArgumentBuiltins[0]); i++)
 	{
-		if (function == singleArgumentBuiltins[i]) { return true; }
+		if (function == multiArgumentBuiltins[i]) { return false; }
 	}
-	return false;
+	return true;
+}
+
+bool IsFunctionIndexable(BuiltinFunction function)
+{
+	for (int32_t i = 0; i < sizeof(unindexableBuiltins) / sizeof(unindexableBuiltins[0]); i++)
+	{
+		if (function == unindexableBuiltins[i]) { return false; }
+	}
+	return true;
+}
+
+RuntimeErrorCode EvaluateBuiltinFunctionSize(BuiltinFunction function, list(VectorArray) arguments, uint32_t * length, uint32_t * dimensions)
+{
+	switch (function)
+	{
+		case BuiltinFunctionATAN2: return _atan2_size(arguments, length, dimensions);
+		case BuiltinFunctionARGMAX: return _argmax_size(length, dimensions);
+		case BuiltinFunctionARGMIN: return _argmin_size(length, dimensions);
+		case BuiltinFunctionCORR: return _corr_size(arguments, length, dimensions);
+		case BuiltinFunctionCOUNT: return _count_size(arguments, length, dimensions);
+		case BuiltinFunctionCOV: return _cov_size(arguments, length, dimensions);
+		case BuiltinFunctionINTERLEAVE: return _interleave_size(arguments, length, dimensions);
+		case BuiltinFunctionJOIN: return _join_size(arguments, length, dimensions);
+		case BuiltinFunctionLOG: return _log_size(arguments, length, dimensions);
+		case BuiltinFunctionMAX: return _max_size(arguments, length, dimensions);
+		case BuiltinFunctionMEAN: return _mean_size(length, dimensions);
+		case BuiltinFunctionMEDIAN: return _median_size(length, dimensions);
+		case BuiltinFunctionMIN: return _min_size(arguments, length, dimensions);
+		case BuiltinFunctionPROD: return _prod_size(length, dimensions);
+		case BuiltinFunctionQUANTILE: return _quantile_size(arguments, length, dimensions);
+		case BuiltinFunctionRAND: return _rand_size(arguments, length, dimensions);
+		case BuiltinFunctionSHUFFLE: return _shuffle_size(arguments, length, dimensions);
+		case BuiltinFunctionSORT: return _sort_size(arguments, length, dimensions);
+		case BuiltinFunctionSTDEV: return _stdev_size(length, dimensions);
+		case BuiltinFunctionSUM: return _sum_size(length, dimensions);
+		case BuiltinFunctionVAR: return _var_size(length, dimensions);
+		case BuiltinFunctionCROSS: return _cross_size(arguments, length, dimensions);
+		case BuiltinFunctionDIST: return _dist_size(arguments, length, dimensions);
+		case BuiltinFunctionDISTSQ: return _distsq_size(arguments, length, dimensions);
+		case BuiltinFunctionDOT: return _dot_size(arguments, length, dimensions);
+		case BuiltinFunctionLENGTH: return _length_size(length, dimensions);
+		case BuiltinFunctionLENGTHSQ: return _lengthsq_size(length, dimensions);
+		default: break;
+	}
+	return RuntimeErrorNone;
 }
 
 RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result)
@@ -1114,10 +1252,19 @@ void InitializeBuiltins(HashMap cache)
 	HashMapSet(cache, "time", time);
 }
 
+RuntimeErrorCode EvaluateBuiltinVariableSize(HashMap cache, BuiltinVariable variable, uint32_t * length, uint32_t * dimensions)
+{
+	VectorArray * cached = HashMapGet(cache, builtinVariables[variable]);
+	if (cached == NULL) { return RuntimeErrorNotImplemented; }
+	*length = cached->length;
+	*dimensions = cached->dimensions;
+	return RuntimeErrorNone;
+}
+
 RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable, VectorArray * result)
 {
 	VectorArray * cached = HashMapGet(cache, builtinVariables[variable]);
 	if (cached == NULL) { return RuntimeErrorNotImplemented; }
-	CopyVectorArray(*cached, result);
+	*result = CopyVectorArray(*cached, NULL, 0);
 	return RuntimeErrorNone;
 }

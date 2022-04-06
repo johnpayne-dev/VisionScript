@@ -77,7 +77,9 @@ typedef enum BuiltinFunction
 BuiltinFunction DetermineBuiltinFunction(const char * identifier);
 
 bool IsFunctionSingleArgument(BuiltinFunction function);
+bool IsFunctionIndexable(BuiltinFunction function);
 
+RuntimeErrorCode EvaluateBuiltinFunctionSize(BuiltinFunction function, list(VectorArray) arguments, uint32_t * length, uint32_t * dimensions);
 RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
 
 typedef enum BuiltinVariable
@@ -97,6 +99,7 @@ BuiltinVariable DetermineBuiltinVariable(const char * identifier);
 
 void InitializeBuiltins(HashMap cache);
 
+RuntimeErrorCode EvaluateBuiltinVariableSize(HashMap cache, BuiltinVariable variable, uint32_t * length, uint32_t * dimensions);
 RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable, VectorArray * result);
 
 #endif
