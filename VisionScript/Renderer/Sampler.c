@@ -65,153 +65,133 @@ RuntimeError SamplePoints(Script * script, Statement * statement, VertexBuffer *
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
-typedef struct Sample
+typedef struct ParametricSample
 {
 	float t;
-	int32_t length;
-	vec2_t value;
 	vec2_t position;
+	vec2_t screenPosition;
 	vec4_t color;
-	struct Sample * next;
-} Sample;
+	int32_t next;
+} ParametricSample;
 
-static RuntimeError ReadSamples(Script * script, Statement * statement, list(Parameter) parameters, float t, Sample ** samples, int32_t * length)
+static RuntimeError EvaluateParametric(Script * script, Expression * expression, list(Parameter) parameters, float t, int32_t index, ParametricSample * samples)
 {
 	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
-	VectorArray result;
-	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, parameters, statement->expression, &result);
-	if (error.code != RuntimeErrorNone) { return error; }
-	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
-	*length = result.length;
 	
-	*samples = malloc(sizeof(Sample) * result.length);
+	VectorArray result;
+	RuntimeError error = EvaluateExpressionIndices(script->identifiers, script->cache, parameters, expression, index < 0 ? NULL : &index, 1, &result);
+	if (error.code != RuntimeErrorNone) { return error; }
+	if (result.dimensions != 2) { FreeVectorArray(result); return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
+	
 	for (int32_t i = 0; i < result.length; i++)
 	{
-		(*samples)[i] = (Sample)
+		samples[i] = (ParametricSample)
 		{
 			.position = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] },
 			.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
 			.t = t,
-			.next = NULL,
 		};
-		(*samples)[i].value = CameraTransformPoint(renderer.camera, (*samples)[i].position);
-		(*samples)[i].value = vec2_mul((*samples)[i].value, (vec2_t){ renderer.camera.aspectRatio, 1.0 });
+		samples[i].screenPosition = CameraTransformPoint(renderer.camera, samples[i].position);
+		samples[i].screenPosition = vec2_mul(samples[i].screenPosition, (vec2_t){ renderer.camera.aspectRatio, 1.0 });
 	}
 	
 	FreeVectorArray(result);
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
-static RuntimeError ReadSample(Script * script, Statement * statement, list(Parameter) parameters, float t, int32_t i, Sample ** sample)
-{
-	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
-	VectorArray result;
-	RuntimeError error = EvaluateExpressionIndices(script->identifiers, script->cache, parameters, statement->expression, &i, 1, &result);
-	if (error.code != RuntimeErrorNone) { return error; }
-	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
-	
-	*sample = malloc(sizeof(Sample));
-	**sample = (Sample)
-	{
-		.position = (vec2_t){ result.xyzw[0][0], result.xyzw[1][0] },
-		.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
-		.t = t,
-		.next = NULL,
-	};
-	(*sample)->value = CameraTransformPoint(renderer.camera, (*sample)->position);
-	(*sample)->value = vec2_mul((*sample)->value, (vec2_t){ renderer.camera.aspectRatio, 1.0 });
-	
-	FreeVectorArray(result);
-	return error;
-}
-
 RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, VertexBuffer * buffer)
 {
 	list(Parameter) parameters = ListPush(ListCreate(sizeof(Parameter), 1), &(Parameter){ .identifier = "t", .cached = true });
 	
-	// get initial start sample
-	Sample * starts;
-	int32_t length;
-	RuntimeError error = ReadSamples(script, statement, parameters, lower, &starts, &length);
+	uint32_t length, dimensions;
+	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1 };
+	RuntimeError error = EvaluateExpressionSize(script->identifiers, script->cache, parameters, statement->expression, &length, &dimensions);
+	if (error.code != RuntimeErrorNone) { ListFree(parameters); return error; }
 	
-	// create 128 base samples across the lower-upper range
+	list(ParametricSample) * samples = malloc(length * sizeof(list(ParametricSample)));
+	
+	// create sample list for each equation
 	int32_t baseSampleCount = 1024;
-	Sample * samples = starts;
-	for (int32_t i = 0; i < baseSampleCount; i++)
+	for (int32_t i = 0; i < length; i++) { samples[i] = ListCreate(sizeof(ParametricSample), baseSampleCount); }
+	
+	// evaluate each base sample across all equations
+	for (int32_t j = 0; j <= baseSampleCount; j++)
 	{
-		Sample * nexts;
-		int32_t nextLength;
-		RuntimeError sampleError = ReadSamples(script, statement, parameters, (upper - lower) * (float)(i + 1) / baseSampleCount + lower, &nexts, &nextLength);
-		if (nextLength != length) { error = (RuntimeError){ RuntimeErrorNotImplemented }; }
-		if (sampleError.code != RuntimeErrorNone){ error = sampleError; }
-		
-		for (int32_t j = 0; j < length; j++) { samples[j].next = nexts + j; }
-		samples = nexts;
+		ParametricSample * baseSamples = malloc(length * sizeof(ParametricSample));
+		RuntimeError error = EvaluateParametric(script, statement->expression, parameters, (upper - lower) * (float)j / baseSampleCount + lower, -1, baseSamples);
+		if (error.code != RuntimeErrorNone) { return error; }
+		for (int32_t i = 0; i < length; i++) { samples[i] = ListPush(samples[i], &baseSamples[i]); }
+		free(baseSamples);
 	}
 	
-	// subdivide based on visibility
-	int32_t totalVertexCount = 0;
+	// assign pointer linkage between base samples for each equation
 	for (int32_t i = 0; i < length; i++)
 	{
-		int32_t vertexCount = baseSampleCount + 1;
+		for (int32_t j = 0; j < baseSampleCount - 1; j++) { samples[i][j].next = j + 1; }
+	}
+	
+	// subdivide samples
+	int32_t totalVertexCount = length * (baseSampleCount + 1);
+	for (int32_t i = 0; i < length; i++)
+	{
+		int32_t vertexCount = 0;
 		while (true)
 		{
-			if (totalVertexCount + vertexCount > MAX_PARAMETRIC_VERTICES)
-			{
-				error = (RuntimeError){ RuntimeErrorNotImplemented };
-				break;
-			}
+			if (totalVertexCount + vertexCount > MAX_PARAMETRIC_VERTICES) { return (RuntimeError){ RuntimeErrorNotImplemented }; }
 			int32_t prevVertexCount = vertexCount;
-			Sample * left = starts + i;
-			while (left->next != NULL)
+			int32_t end = ListLength(samples[i]);
+			for (int32_t j = 0; j < end; j++)
 			{
-				Sample * right = left->next;
-				float ds = vec2_dist(left->value, right->value);
+				if (samples[i][j].next == 0) { continue; }
+				ParametricSample left = samples[i][j];
+				ParametricSample right = samples[i][left.next];
+				float ds = vec2_dist(left.screenPosition, right.screenPosition);
 				float radius = vec2_len((vec2_t){ renderer.camera.aspectRatio, 1.0 });
-				if (ds > 10.0 / renderer.height && (vec2_len(left->value) < radius || vec2_len(right->value) < radius))
+				if (ds > 10.0 / renderer.height && (vec2_len(left.screenPosition) < radius || vec2_len(right.screenPosition) < radius))
 				{
-					Sample * sample;
-					RuntimeError sampleError = ReadSample(script, statement, parameters, (left->t + right->t) / 2.0, i, &sample);
-					if (sampleError.code != RuntimeErrorNone) { error = sampleError; }
-					left->next = sample;
-					sample->next = right;
+					ParametricSample sample;
+					RuntimeError error = EvaluateParametric(script, statement->expression, parameters, (left.t + right.t) / 2.0, i, &sample);
+					if (error.code != RuntimeErrorNone) { return error; }
+					sample.next = left.next;
+					samples[i][j].next = ListLength(samples[i]);
+					samples[i] = ListPush(samples[i], &sample);
 					vertexCount++;
 				}
-				left = right;
 			}
-			if (vertexCount <= prevVertexCount){ break; }
+			if (vertexCount <= prevVertexCount) { break; }
 		}
 		totalVertexCount += vertexCount;
 	}
 	
-	if (error.code == RuntimeErrorNone)
+	// create the vertex buffer
+	if (totalVertexCount > buffer->vertexCount)
 	{
-		if (totalVertexCount > buffer->vertexCount)
-		{
-			if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
-			*buffer = VertexBufferCreate(renderer.layout, totalVertexCount);
-		}
-		vertex_t * vertices = VertexBufferMapVertices(*buffer);
-		int32_t c = 0;
-		for (int32_t i = 0; i < length; i++)
-		{
-			Sample * sample = starts + i;
-			while (sample != NULL)
-			{
-				vertices[c] = (vertex_t)
-				{
-					.position = sample->position,
-					.color = { 0.0, 0.0, 0.0, 1.0 },
-					.size = 8.0,
-				};
-				sample = sample->next;
-				c++;
-			}
-		}
-		buffer->subVertexCount = c;
-		VertexBufferUnmapVertices(*buffer);
-		VertexBufferUpload(*buffer);
+		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
+		*buffer = VertexBufferCreate(renderer.layout, totalVertexCount);
 	}
+	vertex_t * vertices = VertexBufferMapVertices(*buffer);
+	int32_t c = 0;
+	for (int32_t i = 0; i < length; i++)
+	{
+		ParametricSample sample = samples[i][0];
+		while (sample.next != 0)
+		{
+			vertices[c] = (vertex_t)
+			{
+				.position = sample.position,
+				.color = { 0.0, 0.0, 0.0, 1.0 },
+				.size = 8.0,
+			};
+			sample = samples[i][sample.next];
+			c++;
+		}
+	}
+	buffer->subVertexCount = c;
+	VertexBufferUnmapVertices(*buffer);
+	VertexBufferUpload(*buffer);
+	
 	ListFree(parameters);
-	return error;
+	for (int32_t i = 0; i < length; i++) { ListFree(samples[i]); }
+	free(samples);
+	return (RuntimeError){ RuntimeErrorNone };
 }
