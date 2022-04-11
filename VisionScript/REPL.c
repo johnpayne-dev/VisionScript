@@ -49,14 +49,7 @@ void RunREPL(void)
 		// assert error
 		if (statement->error.code != SyntaxErrorNone)
 		{
-			printf("SyntaxError: %s", SyntaxErrorToString(statement->error.code));
-			// retrieve the code snippet that the error occured at
-			int32_t start = statement->tokens[statement->error.tokenStart].lineIndexStart;
-			int32_t end = statement->tokens[statement->error.tokenEnd].lineIndexEnd;
-			String snippet = StringSub(statement->tokens[0].line, start, end);
-			printf(" \"%s\"\n", snippet);
-			StringFree(snippet);
-			
+			PrintSyntaxError(statement);
 			FreeStatement(statement);
 			FreeTokens(tokenLine);
 			continue;
@@ -72,13 +65,7 @@ void RunREPL(void)
 			timer = clock() - timer;
 			if (error.code != RuntimeErrorNone)
 			{
-				printf("RuntimeError: %s", RuntimeErrorToString(error.code));
-				// retrieve code snippet that the error occured at
-				list(Token) tokens = (error.statement == NULL ? statement : error.statement)->tokens;
-				String snippet = StringSub(tokens[0].line, tokens[error.tokenStart].lineIndexStart, tokens[error.tokenEnd].lineIndexEnd);
-				printf(" \"%s\"\n", snippet);
-				StringFree(snippet);
-				
+				PrintRuntimeError(error, statement);
 				FreeStatement(statement);
 				FreeTokens(tokenLine);
 				continue;

@@ -31,6 +31,16 @@ const char * RuntimeErrorToString(RuntimeErrorCode code)
 	}
 }
 
+void PrintRuntimeError(RuntimeError error, Statement * statement)
+{
+	printf("RuntimeError: %s", RuntimeErrorToString(error.code));
+	list(Token) tokens = (error.statement == NULL ? statement : error.statement)->tokens;
+	String snippet = StringSub(tokens[0].line, tokens[error.tokenStart].lineIndexStart, tokens[error.tokenEnd].lineIndexEnd);
+	printf(" \"%s\"\n", snippet);
+	printf("\tin line: %s\n", tokens[0].line);
+	StringFree(snippet);
+}
+
 void PrintVectorArray(VectorArray value)
 {
 	if (value.length > 1) { printf("["); }

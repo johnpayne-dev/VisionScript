@@ -31,6 +31,7 @@ Script * LoadScript(const char * code, int32_t varLimit)
 		if (statement->error.code != SyntaxErrorNone || statement->type == StatementTypeUnknown)
 		{
 			script->errorList = ListPush(script->errorList, &statement);
+			PrintSyntaxError(statement);
 			continue;
 		}
 		switch (statement->type)
@@ -66,7 +67,7 @@ Script * LoadScript(const char * code, int32_t varLimit)
 		}
 	}
 	
-	// go through each render statement, set its parents and at it to dirty list
+	// go through each render statement, set its parents and add it to dirty list
 	for (int32_t i = 0; i < ListLength(script->renderList); i++)
 	{
 		list(String) parameters = ListCreate(sizeof(String), 1);
@@ -75,7 +76,7 @@ Script * LoadScript(const char * code, int32_t varLimit)
 		list(String) parents = FindExpressionParents(script->identifiers, script->renderList[i]->expression, parameters);
 		script->renderParents = ListPush(script->renderParents, &parents);
 		
-		if (script->renderList[i]->declaration.render.type == StatementRenderTypeParametric) { StringFree(parameters[i]); }
+		if (script->renderList[i]->declaration.render.type == StatementRenderTypeParametric) { StringFree(parameters[0]); }
 		ListFree(parameters);
 		
 		script->dirtyRenders = ListPush(script->dirtyRenders, &(Statement *){ script->renderList[i] });

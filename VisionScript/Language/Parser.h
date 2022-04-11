@@ -117,6 +117,7 @@ typedef struct Statement
 } Statement;
 
 Statement * ParseTokenLine(list(Token) tokens);
+void PrintSyntaxError(Statement * statement);
 void FreeStatement(Statement * statement);
 
 #endif

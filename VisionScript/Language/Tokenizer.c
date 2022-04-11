@@ -165,7 +165,7 @@ list(list(Token)) TokenizeCode(String code)
 	for (int32_t i = 0; i < ListLength(statements); i++)
 	{
 		list(Token) tokenLine = TokenizeLine(statements[i]);
-		tokenLines = ListPush(tokenLines, &tokenLine);
+		if (ListLength(tokenLine) > 0) { tokenLines = ListPush(tokenLines, &tokenLine); }
 	}
 	ListFree(statements);
 	return tokenLines;

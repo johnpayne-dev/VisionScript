@@ -30,6 +30,16 @@ const char * SyntaxErrorToString(SyntaxErrorCode code)
 	}
 }
 
+void PrintSyntaxError(Statement * statement)
+{
+	printf("SyntaxError: %s", SyntaxErrorToString(statement->error.code));
+	int32_t start = statement->tokens[statement->error.tokenStart].lineIndexStart;
+	int32_t end = statement->tokens[statement->error.tokenEnd].lineIndexEnd;
+	String snippet = StringSub(statement->tokens[0].line, start, end);
+	printf(" \"%s\"\n", snippet);
+	StringFree(snippet);
+}
+
 static int32_t FindCorrespondingBracket(list(Token) tokens, int32_t start, int32_t end, int32_t bracketIndex)
 {
 	// determine which bracket to look for (and the corresponding direction)

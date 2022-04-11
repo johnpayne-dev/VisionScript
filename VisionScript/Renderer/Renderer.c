@@ -207,22 +207,21 @@ static void UpdateSamples()
 	{
 		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
 		{
+			RuntimeError error = { RuntimeErrorNone };
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints)
 			{
-				RuntimeError error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
-				if (error.code != RuntimeErrorNone) { continue; }
+				error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
 			}
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons)
 			{
-				RuntimeError error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
-				if (error.code != RuntimeErrorNone) { continue; }
+				error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
 			}
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric)
 			{
-				RuntimeError error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &renderer.objects[i].buffer);
-				if (error.code != RuntimeErrorNone) { continue; }
+				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &renderer.objects[i].buffer);
 			}
 			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
+			if (error.code != RuntimeErrorNone) { PrintRuntimeError(error, renderer.objects[i].statement); }
 		}
 	}
 }

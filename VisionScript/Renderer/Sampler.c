@@ -208,16 +208,16 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	for (int32_t i = 0; i < length; i++)
 	{
 		ParametricSample sample = samples[i][0];
-		while (sample.next != 0)
+		while (true)
 		{
-			vertices[c] = (vertex_t)
+			vertices[c++] = (vertex_t)
 			{
 				.position = sample.position,
 				.color = { 0.0, 0.0, 0.0, 1.0 },
 				.size = 6.0,
 			};
+			if (sample.next == 0) { break; }
 			sample = samples[i][sample.next];
-			c++;
 		}
 	}
 	buffer->subVertexCount = c;
@@ -228,5 +228,5 @@ free:
 	ListFree(parameters);
 	for (int32_t i = 0; i < length; i++) { ListFree(samples[i]); }
 	free(samples);
-	return (RuntimeError){ RuntimeErrorNone };
+	return error;
 }

@@ -38,6 +38,7 @@ typedef struct RuntimeError
 } RuntimeError;
 
 const char * RuntimeErrorToString(RuntimeErrorCode code);
+void PrintRuntimeError(RuntimeError error, Statement * statement);
 
 typedef struct VectorArray
 {
