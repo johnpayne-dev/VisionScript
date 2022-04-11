@@ -8,13 +8,15 @@
 #include "Language/Parser.h"
 #include "Language/Evaluator.h"
 #include "Language/Builtin.h"
-#include "CLI.h"
+#include "REPL.h"
 
-void CLIRun(int32_t varLimit)
+#define VARIABLE_LIMIT 65536
+
+void RunREPL(void)
 {
-	printf("VisionScript v1.0 – Command Line Interpretter\n");
-	HashMap identifiers = HashMapCreate(varLimit);
-	HashMap cache = HashMapCreate(varLimit);
+	printf("VisionScript v1.0 – REPL\n");
+	HashMap identifiers = HashMapCreate(VARIABLE_LIMIT);
+	HashMap cache = HashMapCreate(VARIABLE_LIMIT);
 	InitializeBuiltins(cache);
 	while (true)
 	{
@@ -38,7 +40,7 @@ void CLIRun(int32_t varLimit)
 		// skip if it's a render command
 		if (statement->type == StatementTypeRender)
 		{
-			printf("CLI doens't support render commands\n");
+			printf("REPL doens't support render commands\n");
 			FreeStatement(statement);
 			FreeTokens(tokenLine);
 			continue;

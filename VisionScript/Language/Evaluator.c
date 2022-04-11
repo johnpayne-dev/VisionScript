@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 #include "Evaluator.h"
 #include "Builtin.h"
 
@@ -39,7 +40,7 @@ void PrintVectorArray(VectorArray value)
 		for (int32_t j = 0; j < value.dimensions; j++)
 		{
 			// print as an integer if float is an integer
-			if (value.xyzw[j][i] - (int32_t)value.xyzw[j][i] == 0) { printf("%i", (int32_t)value.xyzw[j][i]); }
+			if (value.xyzw[j][i] < LLONG_MAX && value.xyzw[j][i] - floorf(value.xyzw[j][i]) == 0) { printf("%lld", (long long)value.xyzw[j][i]); }
 			else { printf("%f", value.xyzw[j][i]); }
 			if (j != value.dimensions - 1) { printf(","); }
 		}

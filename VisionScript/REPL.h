@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-void CLIRun(int32_t varLimit);
+void RunREPL(void);
 
 #endif
