@@ -29,8 +29,9 @@ extern struct Renderer
 	VertexLayout layout;
 	VertexBuffer quad;
 	list(RenderObject) objects;
-	pthread_t updateThread;
-	bool threadRunning;
+	bool samplerRunning;
+	pthread_t samplerThread;
+	pthread_mutex_t renderMutex;
 } renderer;
 
 void RenderScript(Script * script, bool testMode);

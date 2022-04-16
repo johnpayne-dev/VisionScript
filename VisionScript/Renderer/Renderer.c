@@ -176,6 +176,8 @@ static void UpdateBuiltins(float dt)
 
 static void UpdateSamples()
 {
+	// update samples
+	Camera camera = renderer.camera;
 	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
 	{
 		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
@@ -191,18 +193,28 @@ static void UpdateSamples()
 			}
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric)
 			{
-				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, renderer.camera, &renderer.objects[i].buffer);
+				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, camera, &renderer.objects[i].buffer);
 			}
-			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
 			if (error.code != RuntimeErrorNone) { PrintRuntimeError(error, renderer.objects[i].statement); }
 		}
 	}
+	// upload buffers
+	pthread_mutex_lock(&renderer.renderMutex);
+	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
+	{
+		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
+		{
+			VertexBufferUpload(renderer.objects[i].buffer);
+			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
+		}
+	}
+	pthread_mutex_unlock(&renderer.renderMutex);
 }
 
 static void * UpdateThread(void * arg)
 {
 	clock_t start = clock();
-	while (renderer.threadRunning)
+	while (renderer.samplerRunning)
 	{
 		UpdateBuiltins((clock() - start) / (float)CLOCKS_PER_SEC);
 		start = clock();
@@ -237,8 +249,9 @@ static void Startup()
 	
 	CreatePipelines();
 	
-	renderer.threadRunning = true;
-	pthread_create(&renderer.updateThread, NULL, UpdateThread, NULL);
+	renderer.samplerRunning = true;
+	pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
+	pthread_mutex_init(&renderer.renderMutex, NULL);
 }
 
 static void Update()
@@ -249,6 +262,7 @@ static void Update()
 
 static void Render()
 {
+	pthread_mutex_lock(&renderer.renderMutex);
 	GraphicsBegin();
 	GraphicsClearColor(1.0, 1.0, 1.0, 1.0);
 	if (renderer.testMode)
@@ -264,6 +278,7 @@ static void Render()
 		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
 	}
 	GraphicsEnd();
+	pthread_mutex_unlock(&renderer.renderMutex);
 }
 
 static void Resize(int32_t width, int32_t height)
@@ -293,8 +308,8 @@ static void ScrollWheel(float x, float y, float ds)
 
 static void Shutdown()
 {
-	renderer.threadRunning = false;
-	pthread_join(renderer.updateThread, NULL);
+	renderer.samplerRunning = false;
+	pthread_join(renderer.samplerThread, NULL);
 	GraphicsShutdown();
 }
 

@@ -222,7 +222,6 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	}
 	buffer->subVertexCount = c;
 	VertexBufferUnmapVertices(*buffer);
-	VertexBufferUpload(*buffer);
 	
 free:
 	ListFree(parameters);
