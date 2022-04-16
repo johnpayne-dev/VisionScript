@@ -82,7 +82,7 @@ static inline float FixFloat(float f)
 	return f;
 }
 
-static RuntimeError EvaluateParametric(Script * script, Expression * expression, list(Parameter) parameters, float t, int32_t index, ParametricSample * samples)
+static RuntimeError EvaluateParametric(Script * script, Expression * expression, list(Parameter) parameters, float t, Camera camera, int32_t index, ParametricSample * samples)
 {
 	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
 	
@@ -101,8 +101,8 @@ static RuntimeError EvaluateParametric(Script * script, Expression * expression,
 			.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
 			.t = t,
 		};
-		samples[i].screenPosition = CameraTransformPoint(renderer.camera, samples[i].position);
-		samples[i].screenPosition = vec2_mul(samples[i].screenPosition, (vec2_t){ renderer.camera.aspectRatio, 1.0 });
+		samples[i].screenPosition = CameraTransformPoint(camera, samples[i].position);
+		samples[i].screenPosition = vec2_mul(samples[i].screenPosition, (vec2_t){ camera.aspectRatio, 1.0 });
 	}
 	
 	FreeVectorArray(result);
@@ -127,7 +127,7 @@ bool SegmentCircleIntersection(vec2_t p1, vec2_t p2, float r)
 	}
 }
 
-RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, VertexBuffer * buffer)
+RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, Camera camera, VertexBuffer * buffer)
 {
 	list(Parameter) parameters = ListPush(ListCreate(sizeof(Parameter), 1), &(Parameter){ .identifier = "t", .cached = true });
 	
@@ -146,7 +146,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	{
 		float t = (upper - lower) * ((float)j / baseSampleCount) + lower;
 		ParametricSample * baseSamples = malloc(length * sizeof(ParametricSample));
-		error = EvaluateParametric(script, statement->expression, parameters, t, -1, baseSamples);
+		error = EvaluateParametric(script, statement->expression, parameters, t, camera, -1, baseSamples);
 		if (error.code != RuntimeErrorNone) { free(baseSamples); goto free; }
 		for (int32_t i = 0; i < length; i++) { samples[i] = ListPush(samples[i], &baseSamples[i]); }
 		free(baseSamples);
@@ -170,14 +170,14 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 			ParametricSample right = samples[i][left.next];
 			if (fabsf(left.t - right.t) < 0.0000001) { continue; }
 			float segmentLength = vec2_dist(left.screenPosition, right.screenPosition);
-			float radius = 1.0 * vec2_len((vec2_t){ renderer.camera.aspectRatio, 1.0 });
+			float radius = 1.0 * vec2_len((vec2_t){ camera.aspectRatio, 1.0 });
 			float innerDetail = 1.0 / 256.0;
 			for (int32_t k = 0; k < 16; k++)
 			{
 				if (segmentLength > (k == 0 ? 1.0 : 32.0 * expf(k)) * innerDetail && SegmentCircleIntersection(left.screenPosition, right.screenPosition, expf(k) * radius))
 				{
 					ParametricSample sample;
-					error = EvaluateParametric(script, statement->expression, parameters, (left.t + right.t) / 2.0, i, &sample);
+					error = EvaluateParametric(script, statement->expression, parameters, (left.t + right.t) / 2.0, camera, i, &sample);
 					if (error.code != RuntimeErrorNone) { goto free; }
 					if (k == 0)
 					{

@@ -102,36 +102,9 @@ static void UpdatePipelines()
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
 }
 
-static void Startup()
+static void UpdateBuiltins(float dt)
 {
-	GraphicsInitialize(renderer.width, renderer.height, 4);
-	
-	VertexAttribute attributes[] = { VertexAttributeVec2, VertexAttributeVec4, VertexAttributeFloat };
-	renderer.layout = VertexLayoutCreate(sizeof(attributes) / sizeof(attributes[0]), attributes);
-	
-	renderer.quad = VertexBufferCreate(renderer.layout, 6);
-	vertex_t * vertices = VertexBufferMapVertices(renderer.quad);
-	vertices[0].position = (vec2_t){ -1.0, -1.0 };
-	vertices[1].position = (vec2_t){ 1.0, -1.0 };
-	vertices[2].position = (vec2_t){ 1.0, 1.0 };
-	vertices[3].position = (vec2_t){ -1.0, -1.0 };
-	vertices[4].position = (vec2_t){ 1.0, 1.0 };
-	vertices[5].position = (vec2_t){ -1.0, 1.0 };
-	VertexBufferUnmapVertices(renderer.quad);
-	VertexBufferUpload(renderer.quad);
-	
-	renderer.objects = ListCreate(sizeof(RenderObject), 1);
-	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
-	{
-		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .statement = renderer.script->renderList[i] });
-	}
-	
-	CreatePipelines();
-}
-
-static void UpdateBuiltins()
-{
-	((VectorArray *)HashMapGet(renderer.script->cache, "time"))->xyzw[0][0]++;
+	((VectorArray *)HashMapGet(renderer.script->cache, "time"))->xyzw[0][0] += dt;
 	InvalidateCachedDependents(renderer.script, "time");
 	InvalidateDependentRenders(renderer.script, "time");
 	
@@ -218,7 +191,7 @@ static void UpdateSamples()
 			}
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric)
 			{
-				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, &renderer.objects[i].buffer);
+				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, renderer.camera, &renderer.objects[i].buffer);
 			}
 			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
 			if (error.code != RuntimeErrorNone) { PrintRuntimeError(error, renderer.objects[i].statement); }
@@ -226,12 +199,52 @@ static void UpdateSamples()
 	}
 }
 
+static void * UpdateThread(void * arg)
+{
+	clock_t start = clock();
+	while (renderer.threadRunning)
+	{
+		UpdateBuiltins((clock() - start) / (float)CLOCKS_PER_SEC);
+		start = clock();
+		UpdateSamples();
+	}
+	return NULL;
+}
+
+static void Startup()
+{
+	GraphicsInitialize(renderer.width, renderer.height, 4);
+	
+	VertexAttribute attributes[] = { VertexAttributeVec2, VertexAttributeVec4, VertexAttributeFloat };
+	renderer.layout = VertexLayoutCreate(sizeof(attributes) / sizeof(attributes[0]), attributes);
+	
+	renderer.quad = VertexBufferCreate(renderer.layout, 6);
+	vertex_t * vertices = VertexBufferMapVertices(renderer.quad);
+	vertices[0].position = (vec2_t){ -1.0, -1.0 };
+	vertices[1].position = (vec2_t){ 1.0, -1.0 };
+	vertices[2].position = (vec2_t){ 1.0, 1.0 };
+	vertices[3].position = (vec2_t){ -1.0, -1.0 };
+	vertices[4].position = (vec2_t){ 1.0, 1.0 };
+	vertices[5].position = (vec2_t){ -1.0, 1.0 };
+	VertexBufferUnmapVertices(renderer.quad);
+	VertexBufferUpload(renderer.quad);
+	
+	renderer.objects = ListCreate(sizeof(RenderObject), 1);
+	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
+	{
+		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .statement = renderer.script->renderList[i] });
+	}
+	
+	CreatePipelines();
+	
+	renderer.threadRunning = true;
+	pthread_create(&renderer.updateThread, NULL, UpdateThread, NULL);
+}
+
 static void Update()
 {
 	GraphicsUpdate();
 	UpdatePipelines();
-	UpdateBuiltins();
-	UpdateSamples();
 }
 
 static void Render()
@@ -247,7 +260,7 @@ static void Render()
 	{
 		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
 		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
-		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
+		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.points); }
 		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
 	}
 	GraphicsEnd();
@@ -280,6 +293,8 @@ static void ScrollWheel(float x, float y, float ds)
 
 static void Shutdown()
 {
+	renderer.threadRunning = false;
+	pthread_join(renderer.updateThread, NULL);
 	GraphicsShutdown();
 }
 

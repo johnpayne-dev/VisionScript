@@ -3,6 +3,7 @@
 
 #include "Language/Script.h"
 #include "Utilities/Math3D.h"
+#include "Utilities/Threads.h"
 #include "Backend/Graphics.h"
 #include "Camera.h"
 
@@ -28,6 +29,8 @@ extern struct Renderer
 	VertexLayout layout;
 	VertexBuffer quad;
 	list(RenderObject) objects;
+	pthread_t updateThread;
+	bool threadRunning;
 } renderer;
 
 void RenderScript(Script * script, bool testMode);
