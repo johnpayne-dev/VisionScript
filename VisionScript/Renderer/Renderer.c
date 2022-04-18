@@ -77,8 +77,8 @@ static void CreatePipelines()
 	config = (PipelineConfig)
 	{
 		.alphaBlend = true,
-		.polygonMode = PolygonModeLine,
-		.primitive = VertexPrimitiveLineStrip,
+		.polygonMode = PolygonModeFill,
+		.primitive = VertexPrimitiveTriangleList,
 		.shaderCount = 2,
 		.shaders = { vert, frag },
 		.vertexLayout = renderer.layout,
@@ -95,6 +95,7 @@ static void UpdatePipelines()
 	PipelineSetUniformMember(pipelines.points, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
 	
 	PipelineSetUniformMember(pipelines.parametric, "camera", 0, "matrix", &matrix);
+	PipelineSetUniformMember(pipelines.parametric, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
 	
 	matrix = CameraInverseMatrix(renderer.camera);
 	PipelineSetUniformMember(pipelines.grid, "camera", 0, "invMatrix", &matrix);
@@ -227,7 +228,7 @@ static void Startup()
 {
 	GraphicsInitialize(renderer.width, renderer.height, 4);
 	
-	VertexAttribute attributes[] = { VertexAttributeVec2, VertexAttributeVec4, VertexAttributeFloat };
+	VertexAttribute attributes[] = { VertexAttributeVec2, VertexAttributeVec4, VertexAttributeFloat, VertexAttributeVec2 };
 	renderer.layout = VertexLayoutCreate(sizeof(attributes) / sizeof(attributes[0]), attributes);
 	
 	renderer.quad = VertexBufferCreate(renderer.layout, 6);
@@ -274,7 +275,7 @@ static void Render()
 	{
 		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
 		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
-		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.points); }
+		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
 		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
 	}
 	GraphicsEnd();

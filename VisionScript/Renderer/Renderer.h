@@ -12,6 +12,7 @@ typedef struct vertex
 	vec2_t position;
 	vec4_t color;
 	float size;
+	vec2_t pair;
 } vertex_t;
 
 typedef struct RenderObject

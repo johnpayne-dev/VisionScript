@@ -71,6 +71,7 @@ typedef struct ParametricSample
 	vec2_t position;
 	vec2_t screenPosition;
 	vec4_t color;
+	float thickness;
 	int32_t next;
 } ParametricSample;
 
@@ -99,6 +100,7 @@ static RuntimeError EvaluateParametric(Script * script, Expression * expression,
 		{
 			.position = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] },
 			.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
+			.thickness = 4.0,
 			.t = t,
 		};
 		samples[i].screenPosition = CameraTransformPoint(camera, samples[i].position);
@@ -159,10 +161,10 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	}
 	
 	// subdivide samples
-	int32_t totalVertexCount = length * (baseSampleCount + 1);
+	int32_t totalSampleCount = length * (baseSampleCount + 1);
 	for (int32_t i = 0; i < length; i++)
 	{
-		int32_t vertexCount = 0;
+		int32_t sampleCount = 0;
 		for (int32_t j = 0; j < ListLength(samples[i]); j++)
 		{
 			if (samples[i][j].next == 0) { continue; }
@@ -174,7 +176,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 			float innerDetail = 1.0 / 256.0;
 			for (int32_t k = 0; k < 16; k++)
 			{
-				if (segmentLength > (k == 0 ? 1.0 : 32.0 * expf(k)) * innerDetail && SegmentCircleIntersection(left.screenPosition, right.screenPosition, expf(k) * radius))
+				if (segmentLength > (k == 0 ? innerDetail : expf(k - 3)) && SegmentCircleIntersection(left.screenPosition, right.screenPosition, expf(k) * radius))
 				{
 					ParametricSample sample;
 					error = EvaluateParametric(script, statement->expression, parameters, (left.t + right.t) / 2.0, camera, i, &sample);
@@ -188,35 +190,51 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 					sample.next = left.next;
 					samples[i][j].next = ListLength(samples[i]);
 					samples[i] = ListPush(samples[i], &sample);
-					vertexCount++;
+					sampleCount++;
 					j--;
 					break;
 				}
 			}
 		}
-		totalVertexCount += vertexCount;
+		totalSampleCount += sampleCount;
 	}
 	
 	// create the vertex buffer
-	if (totalVertexCount > buffer->vertexCount)
+	if (6 * totalSampleCount > buffer->vertexCount)
 	{
 		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
-		*buffer = VertexBufferCreate(renderer.layout, totalVertexCount);
+		*buffer = VertexBufferCreate(renderer.layout, 6 * totalSampleCount);
 	}
 	vertex_t * vertices = VertexBufferMapVertices(*buffer);
 	int32_t c = 0;
 	for (int32_t i = 0; i < length; i++)
 	{
 		ParametricSample sample = samples[i][0];
+		ParametricSample prevSample = sample;
 		while (true)
 		{
-			vertices[c++] = (vertex_t)
+			vertex_t v1 = (vertex_t)
 			{
 				.position = sample.position,
-				.color = { 0.0, 0.0, 0.0, 1.0 },
-				.size = 6.0,
+				.color = sample.color,
+				.size = sample.thickness,
+				.pair = prevSample.position,
 			};
+			vertex_t v2 = (vertex_t)
+			{
+				.position = prevSample.position,
+				.color = prevSample.color,
+				.size = prevSample.thickness,
+				.pair = sample.position,
+			};
+			vertices[c++] = v1;
+			vertices[c++] = v1;
+			vertices[c++] = v2;
+			vertices[c++] = v2;
+			vertices[c++] = v2;
+			vertices[c++] = v1;
 			if (sample.next == 0) { break; }
+			prevSample = sample;
 			sample = samples[i][sample.next];
 		}
 	}
