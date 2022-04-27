@@ -32,7 +32,6 @@ extern struct Renderer
 	list(RenderObject) objects;
 	bool samplerRunning;
 	pthread_t samplerThread;
-	pthread_mutex_t renderMutex;
 } renderer;
 
 void RenderScript(Script * script, bool testMode);

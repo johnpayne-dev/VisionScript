@@ -609,9 +609,11 @@ static RuntimeError EvaluateFunctionCall(HashMap identifiers, HashMap cache, lis
 		}
 		VectorArray value;
 		RuntimeErrorCode error = EvaluateBuiltinFunction(builtin, arguments, &value);
-		*result = CopyVectorArray(value, indices, indexCount);
-		FreeVectorArray(value);
-		// free the arguments
+		if (error == RuntimeErrorNone)
+		{
+			*result = CopyVectorArray(value, indices, indexCount);
+			FreeVectorArray(value);
+		}
 		for (int32_t i = 0; i < ListLength(arguments); i++) { FreeVectorArray(arguments[i]); }
 		ListFree(arguments);
 		return (RuntimeError){ error, identifierStart, argumentsEnd + 1 };

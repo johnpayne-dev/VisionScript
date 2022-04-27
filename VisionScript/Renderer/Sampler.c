@@ -70,63 +70,60 @@ typedef struct ParametricSample
 	float t;
 	vec2_t position;
 	vec2_t screenPosition;
+	vec2_t tangent;
+	vec2_t concavity;
 	vec4_t color;
 	float thickness;
 	int32_t next;
 } ParametricSample;
 
-static inline float FixFloat(float f)
+static RuntimeError EvaluateParametric(Script * script, Expression * expression, list(Parameter) parameters, float t, float dt, Camera camera, int32_t index, ParametricSample * samples)
 {
-	if (f == INFINITY) { return 1e7; }
-	if (f == -INFINITY) { return -1e7; }
-	if (isnan(f)) { return 0.0; }
-	return f;
-}
-
-static RuntimeError EvaluateParametric(Script * script, Expression * expression, list(Parameter) parameters, float t, Camera camera, int32_t index, ParametricSample * samples)
-{
-	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &t };
+	parameters[0].cache = (VectorArray){ .length = 1, .dimensions = 1 };
 	
-	VectorArray result;
+	VectorArray result, resultdt;
+	parameters[0].cache.xyzw[0] = &(float){ t };
 	RuntimeError error = EvaluateExpressionIndices(script->identifiers, script->cache, parameters, expression, index < 0 ? NULL : &index, 1, &result);
+	parameters[0].cache.xyzw[0] = &(float){ t + dt };
+	error = EvaluateExpressionIndices(script->identifiers, script->cache, parameters, expression, index < 0 ? NULL : &index, 1, &resultdt);
 	if (error.code != RuntimeErrorNone) { return error; }
-	if (result.dimensions != 2) { FreeVectorArray(result); return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
+	if (result.dimensions != 2 || resultdt.dimensions != 2)
+	{
+		FreeVectorArray(result);
+		FreeVectorArray(resultdt);
+		return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality };
+	}
 	
 	for (int32_t i = 0; i < result.length; i++)
 	{
-		result.xyzw[0][i] = FixFloat(result.xyzw[0][i]);
-		result.xyzw[1][i] = FixFloat(result.xyzw[1][i]);
+		vec2_t pos = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] };
+		vec2_t posdt = (vec2_t){ resultdt.xyzw[0][i], resultdt.xyzw[1][i] };
 		samples[i] = (ParametricSample)
 		{
-			.position = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] },
+			.position = pos,
+			.tangent = vec2_normalize(vec2_sub(posdt, pos)),
 			.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
 			.thickness = 4.0,
 			.t = t,
 		};
-		samples[i].screenPosition = CameraTransformPoint(camera, samples[i].position);
-		samples[i].screenPosition = vec2_mul(samples[i].screenPosition, (vec2_t){ camera.aspectRatio, 1.0 });
+		samples[i].screenPosition = vec2_mul(CameraTransformPoint(camera, samples[i].position), (vec2_t){ camera.aspectRatio, 1.0 });
 	}
 	
 	FreeVectorArray(result);
+	FreeVectorArray(resultdt);
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
 bool SegmentCircleIntersection(vec2_t p1, vec2_t p2, float r)
 {
-	vec2_t d = vec2_sub(p2, p1);
-	vec2_t f = vec2_neg(p1);
-	float a = vec2_dot(d, d);
-	float b = 2 * vec2_dot(f, d);
-	float c = vec2_dot(f, f) - r * r;
-	float discriminant = b * b - 4 * a * c;
-	if (discriminant < 0) { return false; }
-	else
-	{
-		discriminant = sqrtf(discriminant);
-		float t1 = (-b - discriminant) / (2 * a);
-		float t2 = (-b + discriminant) / (2 * a);
-		return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1) || (t1 <= 0 && t2 >= 1);
-	}
+	vec2_t ac = vec2_neg(p1);
+	vec2_t ab = vec2_sub(p2, p1);
+	vec2_t d = vec2_add(vec2_mulf(ab, vec2_dot(ac, ab) / vec2_dot(ab, ab)), p1);
+	vec2_t ad = vec2_sub(d, p1);
+	float k = fabsf(ab.x) > fabsf(ab.y) ? ad.x / ab.x : ad.y / ab.y;
+	if (k <= 0.0) { return vec2_len(p1) <= r; }
+	else if (k >= 1.0) { return vec2_len(p2) <= r; }
+	return vec2_len(d) <= r;
 }
 
 RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, Camera camera, VertexBuffer * buffer)
@@ -140,7 +137,8 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	
 	// create sample list for each equation
 	list(ParametricSample) * samples = malloc(length * sizeof(list(ParametricSample)));
-	int32_t baseSampleCount = 7;
+	int32_t baseSampleCount = 16384 / length;
+	if (baseSampleCount < 8) { baseSampleCount = 8; }
 	for (int32_t i = 0; i < length; i++) { samples[i] = ListCreate(sizeof(ParametricSample), baseSampleCount); }
 	
 	// evaluate each base sample across all equations
@@ -148,7 +146,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	{
 		float t = (upper - lower) * ((float)j / baseSampleCount) + lower;
 		ParametricSample * baseSamples = malloc(length * sizeof(ParametricSample));
-		error = EvaluateParametric(script, statement->expression, parameters, t, camera, -1, baseSamples);
+		error = EvaluateParametric(script, statement->expression, parameters, t, 0.5 / baseSampleCount, camera, -1, baseSamples);
 		if (error.code != RuntimeErrorNone) { free(baseSamples); goto free; }
 		for (int32_t i = 0; i < length; i++) { samples[i] = ListPush(samples[i], &baseSamples[i]); }
 		free(baseSamples);
@@ -170,30 +168,21 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 			if (samples[i][j].next == 0) { continue; }
 			ParametricSample left = samples[i][j];
 			ParametricSample right = samples[i][left.next];
-			if (fabsf(left.t - right.t) < 0.0000001) { continue; }
+			if (fabsf(left.t - right.t) < 1e-7) { continue; }
 			float segmentLength = vec2_dist(left.screenPosition, right.screenPosition);
-			float radius = 1.0 * vec2_len((vec2_t){ camera.aspectRatio, 1.0 });
-			float innerDetail = 1.0 / 256.0;
-			for (int32_t k = 0; k < 16; k++)
+			float radius = vec2_len((vec2_t){ camera.aspectRatio, 1.0 });
+			float innerDetail = 1.0 / 128.0;
+			if (segmentLength > innerDetail && SegmentCircleIntersection(left.screenPosition, right.screenPosition, radius))
 			{
-				if (segmentLength > (k == 0 ? innerDetail : expf(k - 3)) && SegmentCircleIntersection(left.screenPosition, right.screenPosition, expf(k) * radius))
-				{
-					ParametricSample sample;
-					error = EvaluateParametric(script, statement->expression, parameters, (left.t + right.t) / 2.0, camera, i, &sample);
-					if (error.code != RuntimeErrorNone) { goto free; }
-					if (k == 0)
-					{
-						vec2_t delta1 = vec2_sub(sample.screenPosition, left.screenPosition);
-						vec2_t delta2 = vec2_sub(right.screenPosition, sample.screenPosition);
-						if (vec2_dot(delta1, delta2) / (vec2_len(delta1) * vec2_len(delta2)) > 1.0 - expf(-200.0 * segmentLength)) { continue; }
-					}
-					sample.next = left.next;
-					samples[i][j].next = ListLength(samples[i]);
-					samples[i] = ListPush(samples[i], &sample);
-					sampleCount++;
-					j--;
-					break;
-				}
+				if (vec2_dot(left.tangent, right.tangent) > 1.0 - 1e-4 / segmentLength) { continue; }
+				ParametricSample sample;
+				error = EvaluateParametric(script, statement->expression, parameters, (left.t + right.t) / 2.0, fabsf(right.t - left.t) / 4.0, camera, i, &sample);
+				if (error.code != RuntimeErrorNone) { goto free; }
+				sample.next = left.next;
+				samples[i][j].next = ListLength(samples[i]);
+				samples[i] = ListPush(samples[i], &sample);
+				sampleCount++;
+				j--;
 			}
 		}
 		totalSampleCount += sampleCount;
@@ -213,6 +202,7 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 		ParametricSample prevSample = sample;
 		while (true)
 		{
+			if (vec2_dist(sample.screenPosition, prevSample.screenPosition) > 10) { prevSample = sample; }
 			vertex_t v1 = (vertex_t)
 			{
 				.position = sample.position,

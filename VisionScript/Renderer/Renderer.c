@@ -200,7 +200,6 @@ static void UpdateSamples()
 		}
 	}
 	// upload buffers
-	pthread_mutex_lock(&renderer.renderMutex);
 	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
 	{
 		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
@@ -209,7 +208,6 @@ static void UpdateSamples()
 			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
 		}
 	}
-	pthread_mutex_unlock(&renderer.renderMutex);
 }
 
 static void * UpdateThread(void * arg)
@@ -252,7 +250,6 @@ static void Startup()
 	
 	renderer.samplerRunning = true;
 	pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
-	pthread_mutex_init(&renderer.renderMutex, NULL);
 }
 
 static void Update()
@@ -263,7 +260,6 @@ static void Update()
 
 static void Render()
 {
-	pthread_mutex_lock(&renderer.renderMutex);
 	GraphicsBegin();
 	GraphicsClearColor(1.0, 1.0, 1.0, 1.0);
 	if (renderer.testMode)
@@ -279,7 +275,6 @@ static void Render()
 		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
 	}
 	GraphicsEnd();
-	pthread_mutex_unlock(&renderer.renderMutex);
 }
 
 static void Resize(int32_t width, int32_t height)
