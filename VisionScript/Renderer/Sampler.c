@@ -5,7 +5,7 @@
 #include "Camera.h"
 
 #define MAX_PARAMETRIC_VERTICES 1048576
-
+/*
 RuntimeError SamplePolygons(Script * script, Statement * statement, VertexBuffer * buffer)
 {
 	VectorArray result;
@@ -237,3 +237,4 @@ free:
 	free(samples);
 	return error;
 }
+*/

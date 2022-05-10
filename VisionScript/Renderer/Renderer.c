@@ -1,106 +1,118 @@
-#include <stdio.h>
-#include "Backend/Graphics.h"
-#include "Backend/Pipeline.h"
-#include "Application.h"
 #include "Renderer.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "Language/Evaluator.h"
 #include "Sampler.h"
 
 #define SCROLL_ZOOM_FACTOR 100.0
 
 struct Renderer renderer = { 0 };
 
-static struct Pipelines
+static struct Shaders
 {
-	Pipeline polygons;
-	Pipeline grid;
-	Pipeline points;
-	Pipeline parametric;
-} pipelines;
+	GLuint polygons;
+	GLuint grid;
+	GLuint points;
+	GLuint parametric;
+} shaders;
 
-static void CreatePipelines()
+static GLuint CreateShaderProgram(const char * vs, const char * fs)
 {
-#include "Shaders/Polygons.vert.h"
-#include "Shaders/Polygons.frag.h"
-	Shader vert = ShaderCompile(ShaderTypeVertex, vert_Polygons);
-	Shader frag = ShaderCompile(ShaderTypeFragment, frag_Polygons);
-	PipelineConfig config =
+	GLint success;
+	char info[512];
+	GLuint vert = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vert, 1, &vs, NULL);
+	glCompileShader(vert);
+	glGetShaderiv(vert, GL_COMPILE_STATUS, &success);
+	if (!success)
 	{
-		.alphaBlend = true,
-		.polygonMode = PolygonModeFill,
-		.primitive = VertexPrimitiveTriangleList,
-		.shaderCount = 2,
-		.shaders = { vert, frag },
-		.vertexLayout = renderer.layout,
-	};
-	pipelines.polygons = PipelineCreate(config);
+		glGetShaderInfoLog(vert, 512, NULL, info);
+		printf("%s\n", info);
+		abort();
+	}
 	
-#include "Shaders/Grid.vert.h"
-#include "Shaders/Grid.frag.h"
-	vert = ShaderCompile(ShaderTypeVertex, vert_Grid);
-	frag = ShaderCompile(ShaderTypeFragment, frag_Grid);
-	config = (PipelineConfig)
+	GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(frag, 1, &fs, NULL);
+	glCompileShader(frag);
+	glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
+	if (!success)
 	{
-		.alphaBlend = true,
-		.polygonMode = PolygonModeFill,
-		.primitive = VertexPrimitiveTriangleList,
-		.shaderCount = 2,
-		.shaders = { vert, frag },
-		.vertexLayout = renderer.layout,
-	};
-	pipelines.grid = PipelineCreate(config);
-	PipelineSetUniformMember(pipelines.grid, "properties", 0, "axisColor", &(vec4_t){ 0.0, 0.0, 0.0, 2.0 / 3.0 });
-	PipelineSetUniformMember(pipelines.grid, "properties", 0, "axisWidth", &(float){ 0.003 });
-	PipelineSetUniformMember(pipelines.grid, "properties", 0, "majorColor", &(vec4_t){ 0.0, 0.0, 0.0, 1.0 / 3.0 });
-	PipelineSetUniformMember(pipelines.grid, "properties", 0, "majorWidth", &(float){ 0.002 });
-	PipelineSetUniformMember(pipelines.grid, "properties", 0, "minorColor", &(vec4_t){ 0.0, 0.0, 0.0, 1.0 / 6.0 });
-	PipelineSetUniformMember(pipelines.grid, "properties", 0, "minorWidth", &(float){ 0.0015 });
+		glGetShaderInfoLog(frag, 512, NULL, info);
+		printf("%s\n", info);
+		abort();
+	}
 	
-#include "Shaders/Points.vert.h"
-#include "Shaders/Points.frag.h"
-	vert = ShaderCompile(ShaderTypeVertex, vert_Points);
-	frag = ShaderCompile(ShaderTypeFragment, frag_Points);
-	config = (PipelineConfig)
+	GLuint program = glCreateProgram();
+	glAttachShader(program, vert);
+	glAttachShader(program, frag);
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if(!success)
 	{
-		.alphaBlend = true,
-		.polygonMode = PolygonModePoint,
-		.primitive = VertexPrimitivePointList,
-		.shaderCount = 2,
-		.shaders = { vert, frag },
-		.vertexLayout = renderer.layout,
-	};
-	pipelines.points = PipelineCreate(config);
+		glGetProgramInfoLog(program, 512, NULL, info);
+		printf("%s\n", info);
+		abort();
+	}
+	glDeleteShader(vert);
+	glDeleteShader(frag);
 	
-#include "Shaders/Parametric.vert.h"
-#include "Shaders/Parametric.frag.h"
-	vert = ShaderCompile(ShaderTypeVertex, vert_Parametric);
-	frag = ShaderCompile(ShaderTypeFragment, frag_Parametric);
-	config = (PipelineConfig)
-	{
-		.alphaBlend = true,
-		.polygonMode = PolygonModeFill,
-		.primitive = VertexPrimitiveTriangleList,
-		.shaderCount = 2,
-		.shaders = { vert, frag },
-		.vertexLayout = renderer.layout,
-	};
-	pipelines.parametric = PipelineCreate(config);
+	return program;
 }
 
-static void UpdatePipelines()
+static void CreateShaders()
+{	
+#include "Shaders/Grid.vert.h"
+#include "Shaders/Grid.frag.h"
+	shaders.grid = CreateShaderProgram(vert_Grid, frag_Grid);
+#include "Shaders/Points.vert.h"
+#include "Shaders/Points.frag.h"
+	shaders.points = CreateShaderProgram(vert_Points, frag_Points);
+#include "Shaders/Parametric.vert.h"
+#include "Shaders/Parametric.frag.h"
+	shaders.parametric = CreateShaderProgram(vert_Parametric, frag_Parametric);
+#include "Shaders/Polygons.vert.h"
+#include "Shaders/Polygons.frag.h"
+	shaders.polygons = CreateShaderProgram(vert_Polygons, frag_Polygons);
+}
+
+static void UpdateUniforms()
 {
 	mat4_t matrix = CameraMatrix(renderer.camera);
-	PipelineSetUniformMember(pipelines.polygons, "camera", 0, "matrix", &matrix);
+	mat4_t invMatrix = CameraInverseMatrix(renderer.camera);
 	
-	PipelineSetUniformMember(pipelines.points, "camera", 0, "matrix", &matrix);
-	PipelineSetUniformMember(pipelines.points, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
+	glUseProgram(shaders.grid);
+	glUniformMatrix4fv(glGetUniformLocation(shaders.grid, "camera.invMatrix"), 1, false, (float *)&invMatrix);
+	glUniform2f(glGetUniformLocation(shaders.grid, "camera.scale"), renderer.camera.scale.x, renderer.camera.scale.y);
+	glUniform2f(glGetUniformLocation(shaders.grid, "camera.dimensions"), renderer.width, renderer.height);
+	glUniform4f(glGetUniformLocation(shaders.grid, "properties.axisColor"), 0.0, 0.0, 0.0, 2.0 / 3.0);
+	glUniform4f(glGetUniformLocation(shaders.grid, "properties.majorColor"), 0.0, 0.0, 0.0, 1.0 / 3.0);
+	glUniform4f(glGetUniformLocation(shaders.grid, "properties.minorColor"), 0.0, 0.0, 0.0, 1.0 / 6.0);
+	glUniform1f(glGetUniformLocation(shaders.grid, "properties.axisWidth"), 0.003);
+	glUniform1f(glGetUniformLocation(shaders.grid, "properties.majorWidth"), 0.002);
+	glUniform1f(glGetUniformLocation(shaders.grid, "properties.minorWidth"), 0.0015);
 	
-	PipelineSetUniformMember(pipelines.parametric, "camera", 0, "matrix", &matrix);
-	PipelineSetUniformMember(pipelines.parametric, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
+	glUseProgram(shaders.points);
+	glUniformMatrix4fv(glGetUniformLocation(shaders.points, "camera.matrix"), 1, false, (float *)&matrix);
+	glUniform2f(glGetUniformLocation(shaders.points, "camera.dimensions"), renderer.width, renderer.height);
 	
-	matrix = CameraInverseMatrix(renderer.camera);
-	PipelineSetUniformMember(pipelines.grid, "camera", 0, "invMatrix", &matrix);
-	PipelineSetUniformMember(pipelines.grid, "camera", 0, "scale", &renderer.camera.scale);
-	PipelineSetUniformMember(pipelines.grid, "camera", 0, "dimensions", &(vec2_t){ renderer.width, renderer.height });
+	glUseProgram(shaders.parametric);
+	glUniformMatrix4fv(glGetUniformLocation(shaders.parametric, "camera.matrix"), 1, false, (float *)&matrix);
+	glUniform2f(glGetUniformLocation(shaders.parametric, "camera.dimensions"), renderer.width, renderer.height);
+	
+	glUseProgram(shaders.polygons);
+	glUniformMatrix4fv(glGetUniformLocation(shaders.polygons, "camera.matrix"), 1, false, (float *)&matrix);
+}
+
+static void BindLayout()
+{
+	glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(2, 1, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glEnableVertexAttribArray(3);
 }
 
 static void UpdateBuiltins(float dt)
@@ -183,7 +195,7 @@ static void UpdateSamples()
 	{
 		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
 		{
-			RuntimeError error = { RuntimeErrorNone };
+			/*RuntimeError error = { RuntimeErrorNone };
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints)
 			{
 				error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
@@ -196,16 +208,15 @@ static void UpdateSamples()
 			{
 				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, camera, &renderer.objects[i].buffer);
 			}
-			if (error.code != RuntimeErrorNone) { PrintRuntimeError(error, renderer.objects[i].statement); }
-		}
-	}
-	// upload buffers
-	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
-	{
-		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
-		{
-			VertexBufferUpload(renderer.objects[i].buffer);
-			renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
+			if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
+			{
+				renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
+			}
+			if (error.code != RuntimeErrorNone)
+			{
+				PrintRuntimeError(error, renderer.objects[i].statement);
+				return;
+			}*/
 		}
 	}
 }
@@ -224,57 +235,62 @@ static void * UpdateThread(void * arg)
 
 static void Startup()
 {
-	GraphicsInitialize(renderer.width, renderer.height, 4);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	VertexAttribute attributes[] = { VertexAttributeVec2, VertexAttributeVec4, VertexAttributeFloat, VertexAttributeVec2 };
-	renderer.layout = VertexLayoutCreate(sizeof(attributes) / sizeof(attributes[0]), attributes);
+	glGenVertexArrays(1, &renderer.layout);
+	glBindVertexArray(renderer.layout);
 	
-	renderer.quad = VertexBufferCreate(renderer.layout, 6);
-	vertex_t * vertices = VertexBufferMapVertices(renderer.quad);
-	vertices[0].position = (vec2_t){ -1.0, -1.0 };
-	vertices[1].position = (vec2_t){ 1.0, -1.0 };
-	vertices[2].position = (vec2_t){ 1.0, 1.0 };
-	vertices[3].position = (vec2_t){ -1.0, -1.0 };
-	vertices[4].position = (vec2_t){ 1.0, 1.0 };
-	vertices[5].position = (vec2_t){ -1.0, 1.0 };
-	VertexBufferUnmapVertices(renderer.quad);
-	VertexBufferUpload(renderer.quad);
-	
+	glGenBuffers(1, &renderer.quad);
+	glBindBuffer(GL_ARRAY_BUFFER, renderer.quad);
+	vertex_t vertices[6] =
+	{
+		{ .position = { -1.0, -1.0 } },
+		{ .position = { 1.0, 1.0 } },
+		{ .position = { -1.0, 1.0 } },
+		{ .position = { -1.0, -1.0 } },
+		{ .position = { 1.0, 1.0 } },
+		{ .position = { 1.0, -1.0 } },
+	};
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
 	renderer.objects = ListCreate(sizeof(RenderObject), 1);
 	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
 	{
 		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .statement = renderer.script->renderList[i] });
 	}
 	
-	CreatePipelines();
+	CreateShaders();
 	
 	renderer.samplerRunning = true;
 	pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
 }
 
-static void Update()
+static void Frame()
 {
-	GraphicsUpdate();
-	UpdatePipelines();
-}
-
-static void Render()
-{
-	GraphicsBegin();
-	GraphicsClearColor(1.0, 1.0, 1.0, 1.0);
+	UpdateUniforms();
+	
+	glClearColor(1.0, 1.0, 1.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	
 	if (renderer.testMode)
 	{
-		GraphicsBindPipeline(pipelines.grid);
-		GraphicsRenderVertexBuffer(renderer.quad);
+		glUseProgram(shaders.grid);
+		glBindBuffer(GL_ARRAY_BUFFER, renderer.quad);
+		BindLayout();
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		//printf("%i\n", glGetError());
 	}
-	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
-	{
-		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
-		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
-		if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
-		if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
-	}
-	GraphicsEnd();
+	
+	/*
+	 for (int32_t i = 0; i < ListLength(renderer.objects); i++)
+	 {
+		 if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
+		 if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
+		 if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
+		 if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
+	 }
+	*/
 }
 
 static void Resize(int32_t width, int32_t height)
@@ -282,18 +298,20 @@ static void Resize(int32_t width, int32_t height)
 	renderer.width = width;
 	renderer.height = height;
 	renderer.camera.aspectRatio = (float)width / height;
-	GraphicsRecreateSwapchain(width, height);
+	glViewport(0, 0, width, height);
 }
 
 static void MouseDragged(float x, float y, float dx, float dy)
 {
-	vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera.angle), (vec4_t){ dx, dy, 0.0, 1.0 });
+	vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera.angle), (vec4_t){ dx, -dy, 0.0, 1.0 });
 	renderer.camera.position.x -= dir.x / (renderer.width * renderer.camera.scale.x) * renderer.camera.aspectRatio;
 	renderer.camera.position.y -= dir.y / (renderer.height * renderer.camera.scale.y);
 }
 
 static void ScrollWheel(float x, float y, float ds)
 {
+	x /= sapp_dpi_scale();
+	y /= sapp_dpi_scale();
 	renderer.camera.scale.x *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
 	renderer.camera.scale.y *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
 	vec4_t mousePos = { 2.0 * x / renderer.width - 1.0, -(2.0 * y / renderer.height - 1.0), 0.0, 1.0 };
@@ -302,14 +320,24 @@ static void ScrollWheel(float x, float y, float ds)
 	renderer.camera.position = vec2_add(renderer.camera.position, vec2_mulf(diff, ds / SCROLL_ZOOM_FACTOR));
 }
 
+static bool mouseDown = false;
+
+static void Event(const sapp_event * event)
+{
+	if (event->type == SAPP_EVENTTYPE_RESIZED) { Resize(event->window_width, event->window_height); }
+	if (event->type == SAPP_EVENTTYPE_MOUSE_DOWN) { mouseDown = true; }
+	if (event->type == SAPP_EVENTTYPE_MOUSE_UP) { mouseDown = false; }
+	if (event->type == SAPP_EVENTTYPE_MOUSE_MOVE && mouseDown) { MouseDragged(event->mouse_x, event->mouse_y, event->mouse_dx, event->mouse_dy); }
+	if (event->type == SAPP_EVENTTYPE_MOUSE_SCROLL) { ScrollWheel(event->mouse_x, event->mouse_y, event->scroll_y); }
+}
+
 static void Shutdown()
 {
 	renderer.samplerRunning = false;
 	pthread_join(renderer.samplerThread, NULL);
-	GraphicsShutdown();
 }
 
-void RenderScript(Script * script, bool testMode)
+sapp_desc RenderScript(Script * script, bool testMode)
 {
 	renderer.script = script;
 	renderer.testMode = testMode;
@@ -317,18 +345,15 @@ void RenderScript(Script * script, bool testMode)
 	renderer.height = 720;
 	renderer.camera = (Camera){ .scale = vec2_one, .aspectRatio = (float)renderer.width / renderer.height };
 	
-	AppConfig config =
+	return (sapp_desc)
 	{
 		.width = renderer.width,
 		.height = renderer.height,
-		.title = "VisionScript",
-		.startup = Startup,
-		.update = Update,
-		.render = Render,
-		.resize = Resize,
-		.mouseDragged = MouseDragged,
-		.scrollWheel = ScrollWheel,
-		.shutdown = Shutdown,
+		.window_title = "VisionScript",
+		.high_dpi = true,
+		.init_cb = Startup,
+		.frame_cb = Frame,
+		.event_cb = Event,
+		.cleanup_cb = Shutdown,
 	};
-	RunApplication(config);
 }

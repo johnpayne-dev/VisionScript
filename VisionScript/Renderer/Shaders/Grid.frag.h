@@ -1,17 +1,17 @@
 
 static const char * frag_Grid =
-"#version 450\n"
+"#version 330\n"
 
-"layout (location = 0) in vec2 uv;"
+"in vec2 uv;"
 
-"layout (binding = 0) uniform Camera"
+"uniform struct Camera"
 "{"
 "	mat4 invMatrix;"
 "	vec2 scale;"
 "	vec2 dimensions;"
 "} camera;"
 
-"layout (binding = 1) uniform Properties"
+"uniform struct Properties"
 "{"
 "	vec4 axisColor;"
 "	vec4 majorColor;"
@@ -21,7 +21,7 @@ static const char * frag_Grid =
 "	float minorWidth;"
 "} properties;"
 
-"layout (location = 0) out vec4 fragColor;"
+"out vec4 fragColor;"
 
 "void main()"
 "{"
@@ -38,4 +38,3 @@ static const char * frag_Grid =
 "	if (abs(pos.x - majorLine.x) < majorWidth.x || abs(pos.y - majorLine.y) < majorWidth.y) { fragColor = properties.majorColor; }"
 "	if (abs(pos.x) < axisWidth.x || abs(pos.y) < axisWidth.y) { fragColor = properties.axisColor; }"
 "}";
-

@@ -1,10 +1,11 @@
 #ifndef Renderer_h
 #define Renderer_h
 
+#include <sokol_app.h>
+#include <OpenGL/GL3.h>
 #include "Language/Script.h"
 #include "Utilities/Math3D.h"
 #include "Utilities/Threads.h"
-#include "Backend/Graphics.h"
 #include "Camera.h"
 
 typedef struct vertex
@@ -18,7 +19,7 @@ typedef struct vertex
 typedef struct RenderObject
 {
 	Statement * statement;
-	VertexBuffer buffer;
+	GLuint buffer;
 } RenderObject;
 
 extern struct Renderer
@@ -27,13 +28,13 @@ extern struct Renderer
 	Camera camera;
 	bool testMode;
 	int32_t width, height;
-	VertexLayout layout;
-	VertexBuffer quad;
+	GLuint layout;
+	GLuint quad;
 	list(RenderObject) objects;
 	bool samplerRunning;
 	pthread_t samplerThread;
 } renderer;
 
-void RenderScript(Script * script, bool testMode);
+sapp_desc RenderScript(Script * script, bool testMode);
 
 #endif

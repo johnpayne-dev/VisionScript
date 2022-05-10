@@ -5,7 +5,9 @@
 #include "Script.h"
 #include "Builtin.h"
 
-Script * LoadScript(const char * code, int32_t varLimit)
+#define VARIABLE_LIMIT 65536
+
+Script * LoadScript(const char * code)
 {
 	Script * script = malloc(sizeof(Script));
 	script->code = code;
@@ -14,13 +16,13 @@ Script * LoadScript(const char * code, int32_t varLimit)
 	script->tokenLines = TokenizeCode(codeStr);
 	StringFree(codeStr);
 	
-	script->identifierList = ListCreate(sizeof(Statement *), varLimit);
+	script->identifierList = ListCreate(sizeof(Statement *), VARIABLE_LIMIT);
 	script->renderList = ListCreate(sizeof(Statement *), 1024);
 	script->renderParents = ListCreate(sizeof(list(String)), 1);
 	script->errorList = ListCreate(sizeof(Statement *), 1024);
-	script->identifiers = HashMapCreate(varLimit);
-	script->cache = HashMapCreate(varLimit);
-	script->dependents = HashMapCreate(varLimit);
+	script->identifiers = HashMapCreate(VARIABLE_LIMIT);
+	script->cache = HashMapCreate(VARIABLE_LIMIT);
+	script->dependents = HashMapCreate(VARIABLE_LIMIT);
 	script->dirtyRenders = ListCreate(sizeof(Statement *), 1);
 	
 	// go through each statement, parse it and add it to the internal data structures

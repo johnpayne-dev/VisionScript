@@ -1,10 +1,10 @@
 
 static const char * frag_Polygons =
-"#version 450\n"
+"#version 330\n"
 
-"layout (location = 0) in vec4 vertexColor;"
+"in vec4 vertexColor;"
 
-"layout (location = 0) out vec4 fragColor;"
+"out vec4 fragColor;"
 
 "void main()"
 "{"

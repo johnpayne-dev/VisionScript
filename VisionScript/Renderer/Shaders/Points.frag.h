@@ -1,11 +1,11 @@
 
 static const char * frag_Points =
-"#version 450\n"
+"#version 330\n"
 
-"layout (location = 0) in vec4 vertexColor;"
-"layout (location = 1) in float vertexSize;"
+"in vec4 vertexColor;"
+"in float vertexSize;"
 
-"layout (location = 0) out vec4 fragColor;"
+"out vec4 fragColor;"
 
 "void main()"
 "{"

@@ -1,23 +1,23 @@
 
 static const char * frag_Parametric =
-"#version 450\n"
+"#version 330\n"
 
-"layout (location = 0) in vec4 vertexColor;"
-"layout (location = 1) in vec2 fragPosition;"
-"layout (location = 2) in struct Segment"
+"in vec4 vertexColor;"
+"in vec2 fragPosition;"
+"in struct Segment"
 "{"
 "	vec2 center;"
 "	vec2 size;"
 "	vec2 dir;"
 "} segment;"
 
-"layout (binding = 0) uniform Camera"
+"uniform struct Camera"
 "{"
 "	mat4 matrix;"
 "	vec2 dimensions;"
 "} camera;"
 
-"layout (location = 0) out vec4 fragColor;"
+"out vec4 fragColor;"
 
 "void main()"
 "{"

@@ -19,7 +19,7 @@ typedef struct Script
 	list(Statement *) dirtyRenders;
 } Script;
 
-Script * LoadScript(const char * code, int32_t varLimit);
+Script * LoadScript(const char * code);
 
 void InvalidateCachedDependents(Script * script, String identifier);
 
