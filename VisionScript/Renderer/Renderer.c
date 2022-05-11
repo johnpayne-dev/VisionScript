@@ -105,13 +105,13 @@ static void UpdateUniforms()
 
 static void BindLayout()
 {
-	glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vertex_t), (void *)0);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(vertex_t), (void *)8);
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 1, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glVertexAttribPointer(2, 1, GL_FLOAT, false, sizeof(vertex_t), (void *)24);
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(vertex_t), NULL);
+	glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(vertex_t), (void *)28);
 	glEnableVertexAttribArray(3);
 }
 
@@ -195,18 +195,18 @@ static void UpdateSamples()
 	{
 		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
 		{
-			/*RuntimeError error = { RuntimeErrorNone };
+			RuntimeError error = { RuntimeErrorNone };
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints)
 			{
-				error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
+				error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i]);
 			}
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons)
 			{
-				error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.objects[i].buffer);
+				error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.objects[i]);
 			}
 			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric)
 			{
-				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, camera, &renderer.objects[i].buffer);
+				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, camera, &renderer.objects[i]);
 			}
 			if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
 			{
@@ -216,7 +216,7 @@ static void UpdateSamples()
 			{
 				PrintRuntimeError(error, renderer.objects[i].statement);
 				return;
-			}*/
+			}
 		}
 	}
 }
@@ -235,6 +235,7 @@ static void * UpdateThread(void * arg)
 
 static void Startup()
 {
+	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
@@ -263,11 +264,14 @@ static void Startup()
 	CreateShaders();
 	
 	renderer.samplerRunning = true;
-	pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
+	//pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
 }
 
 static void Frame()
 {
+	UpdateBuiltins(0.01);
+	UpdateSamples();
+	
 	UpdateUniforms();
 	
 	glClearColor(1.0, 1.0, 1.0, 1.0);
@@ -279,18 +283,33 @@ static void Frame()
 		glBindBuffer(GL_ARRAY_BUFFER, renderer.quad);
 		BindLayout();
 		glDrawArrays(GL_TRIANGLES, 0, 6);
-		//printf("%i\n", glGetError());
 	}
 	
-	/*
-	 for (int32_t i = 0; i < ListLength(renderer.objects); i++)
-	 {
-		 if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons) { GraphicsBindPipeline(pipelines.polygons); }
-		 if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints) { GraphicsBindPipeline(pipelines.points); }
-		 if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric) { GraphicsBindPipeline(pipelines.parametric); }
-		 if (renderer.objects[i].buffer.vertexCount > 0) { GraphicsRenderVertexBuffer(renderer.objects[i].buffer); }
-	 }
-	*/
+	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
+	{
+		GLenum mode;
+		switch (renderer.objects[i].statement->declaration.render.type)
+		{
+			case StatementRenderTypePoints:
+				glUseProgram(shaders.points);
+				mode = GL_POINTS;
+				break;
+			case StatementRenderTypeParametric:
+				glUseProgram(shaders.parametric);
+				mode = GL_TRIANGLES;
+				break;
+			case StatementRenderTypePolygons:
+				mode = GL_TRIANGLES;
+				glUseProgram(shaders.polygons);
+				break;
+		}
+		if (renderer.objects[i].vertexCount > 0)
+		{
+			glBindBuffer(GL_ARRAY_BUFFER, renderer.objects[i].buffer);
+			BindLayout();
+			glDrawArrays(mode, 0, (GLsizei)renderer.objects[i].vertexCount);
+		}
+	}
 }
 
 static void Resize(int32_t width, int32_t height)

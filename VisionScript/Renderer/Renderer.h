@@ -20,6 +20,7 @@ typedef struct RenderObject
 {
 	Statement * statement;
 	GLuint buffer;
+	uint64_t vertexCount;
 } RenderObject;
 
 extern struct Renderer

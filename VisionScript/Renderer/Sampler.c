@@ -1,24 +1,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "Sampler.h"
-#include "Renderer.h"
 #include "Camera.h"
 
 #define MAX_PARAMETRIC_VERTICES 1048576
-/*
-RuntimeError SamplePolygons(Script * script, Statement * statement, VertexBuffer * buffer)
+
+RuntimeError SamplePolygons(Script * script, Statement * statement, RenderObject * object)
 {
 	VectorArray result;
 	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, NULL, statement->expression, &result);
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
-	if (result.length > buffer->vertexCount)
+	if (result.length > object->vertexCount)
 	{
-		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
-		*buffer = VertexBufferCreate(renderer.layout, result.length);
+		if (object->vertexCount > 0) { glDeleteBuffers(1, &object->buffer); }
+		glGenBuffers(1, &object->buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
+		glBufferData(GL_ARRAY_BUFFER, result.length * sizeof(vertex_t), NULL, GL_DYNAMIC_DRAW);
 	}
-	vertex_t * vertices = VertexBufferMapVertices(*buffer);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
+	vertex_t * vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	for (int32_t i = 0; i < result.length; i++)
 	{
 		vertices[i] = (vertex_t)
@@ -27,27 +30,30 @@ RuntimeError SamplePolygons(Script * script, Statement * statement, VertexBuffer
 			.color = { 0.0, 0.0, 0.0, 1.0 },
 		};
 	}
-	buffer->subVertexCount = result.length;
-	VertexBufferUnmapVertices(*buffer);
-	VertexBufferUpload(*buffer);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	object->vertexCount = result.length;
 	
 	FreeVectorArray(result);
 	return (RuntimeError){ RuntimeErrorNone };
 }
 
-RuntimeError SamplePoints(Script * script, Statement * statement, VertexBuffer * buffer)
+RuntimeError SamplePoints(Script * script, Statement * statement, RenderObject * object)
 {
 	VectorArray result;
 	RuntimeError error = EvaluateExpression(script->identifiers, script->cache, NULL, statement->expression, &result);
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
-	if (result.length > buffer->vertexCount)
+	if (result.length > object->vertexCount)
 	{
-		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
-		*buffer = VertexBufferCreate(renderer.layout, result.length);
+		if (object->vertexCount > 0) { glDeleteBuffers(1, &object->buffer); }
+		glGenBuffers(1, &object->buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
+		glBufferData(GL_ARRAY_BUFFER, result.length * sizeof(vertex_t), NULL, GL_DYNAMIC_DRAW);
 	}
-	vertex_t * vertices = VertexBufferMapVertices(*buffer);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
+	vertex_t * vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	for (int32_t i = 0; i < result.length; i++)
 	{
 		vertices[i] = (vertex_t)
@@ -57,9 +63,8 @@ RuntimeError SamplePoints(Script * script, Statement * statement, VertexBuffer *
 			.size = 8.0,
 		};
 	}
-	buffer->subVertexCount = result.length;
-	VertexBufferUnmapVertices(*buffer);
-	VertexBufferUpload(*buffer);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	object->vertexCount = result.length;
 	
 	FreeVectorArray(result);
 	return (RuntimeError){ RuntimeErrorNone };
@@ -126,7 +131,7 @@ bool SegmentCircleIntersection(vec2_t p1, vec2_t p2, float r)
 	return vec2_len(d) <= r;
 }
 
-RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, Camera camera, VertexBuffer * buffer)
+RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, Camera camera, RenderObject * object)
 {
 	list(Parameter) parameters = ListPush(ListCreate(sizeof(Parameter), 1), &(Parameter){ .identifier = "t", .cached = true });
 	
@@ -189,12 +194,16 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 	}
 	
 	// create the vertex buffer
-	if (6 * totalSampleCount > buffer->vertexCount)
+	if (6 * totalSampleCount > object->vertexCount)
 	{
-		if (buffer->vertexCount > 0) { VertexBufferFree(*buffer); }
-		*buffer = VertexBufferCreate(renderer.layout, 6 * totalSampleCount);
+		if (object->vertexCount > 0) { glDeleteBuffers(1, &object->buffer); }
+		glGenBuffers(1, &object->buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
+		glBufferData(GL_ARRAY_BUFFER, 6 * totalSampleCount * sizeof(vertex_t), NULL, GL_DYNAMIC_DRAW);
 	}
-	vertex_t * vertices = VertexBufferMapVertices(*buffer);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
+	vertex_t * vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	int32_t c = 0;
 	for (int32_t i = 0; i < length; i++)
 	{
@@ -228,8 +237,8 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 			sample = samples[i][sample.next];
 		}
 	}
-	buffer->subVertexCount = c;
-	VertexBufferUnmapVertices(*buffer);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	object->vertexCount = 6 * totalSampleCount;
 	
 free:
 	ListFree(parameters);
@@ -237,4 +246,3 @@ free:
 	free(samples);
 	return error;
 }
-*/
