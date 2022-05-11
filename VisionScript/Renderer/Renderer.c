@@ -259,19 +259,17 @@ static void Startup()
 	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
 	{
 		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .statement = renderer.script->renderList[i] });
+		glGenBuffers(1, &renderer.objects[i].buffer);
 	}
 	
 	CreateShaders();
 	
 	renderer.samplerRunning = true;
-	//pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
+	pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
 }
 
 static void Frame()
-{
-	UpdateBuiltins(0.01);
-	UpdateSamples();
-	
+{	
 	UpdateUniforms();
 	
 	glClearColor(1.0, 1.0, 1.0, 1.0);
@@ -306,6 +304,11 @@ static void Frame()
 		if (renderer.objects[i].vertexCount > 0)
 		{
 			glBindBuffer(GL_ARRAY_BUFFER, renderer.objects[i].buffer);
+			if (renderer.objects[i].needsUpload)
+			{
+				glBufferData(GL_ARRAY_BUFFER, renderer.objects[i].vertexCount * sizeof(vertex_t), renderer.objects[i].vertices, GL_DYNAMIC_DRAW);
+				renderer.objects[i].needsUpload = false;
+			}
 			BindLayout();
 			glDrawArrays(mode, 0, (GLsizei)renderer.objects[i].vertexCount);
 		}

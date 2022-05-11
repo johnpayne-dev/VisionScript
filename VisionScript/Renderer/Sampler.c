@@ -12,26 +12,24 @@ RuntimeError SamplePolygons(Script * script, Statement * statement, RenderObject
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
-	if (result.length > object->vertexCount)
+	if (!object->needsUpload)
 	{
-		if (object->vertexCount > 0) { glDeleteBuffers(1, &object->buffer); }
-		glGenBuffers(1, &object->buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
-		glBufferData(GL_ARRAY_BUFFER, result.length * sizeof(vertex_t), NULL, GL_DYNAMIC_DRAW);
-	}
-	
-	glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
-	vertex_t * vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-	for (int32_t i = 0; i < result.length; i++)
-	{
-		vertices[i] = (vertex_t)
+		if (result.length > object->vertexCount)
 		{
-			.position = { result.xyzw[0][i], result.xyzw[1][i] },
-			.color = { 0.0, 0.0, 0.0, 1.0 },
-		};
+			if (object->vertexCount == 0) { object->vertices = malloc(result.length * sizeof(vertex_t)); }
+			else { object->vertices = realloc(object->vertices, result.length * sizeof(vertex_t)); }
+		}
+		for (int32_t i = 0; i < result.length; i++)
+		{
+			object->vertices[i] = (vertex_t)
+			{
+				.position = { result.xyzw[0][i], result.xyzw[1][i] },
+				.color = { 0.0, 0.0, 0.0, 1.0 },
+			};
+		}
+		object->vertexCount = result.length;
+		object->needsUpload = true;
 	}
-	glUnmapBuffer(GL_ARRAY_BUFFER);
-	object->vertexCount = result.length;
 	
 	FreeVectorArray(result);
 	return (RuntimeError){ RuntimeErrorNone };
@@ -44,27 +42,25 @@ RuntimeError SamplePoints(Script * script, Statement * statement, RenderObject *
 	if (error.code != RuntimeErrorNone) { return error; }
 	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorInvalidRenderDimensionality }; }
 	
-	if (result.length > object->vertexCount)
+	if (!object->needsUpload)
 	{
-		if (object->vertexCount > 0) { glDeleteBuffers(1, &object->buffer); }
-		glGenBuffers(1, &object->buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
-		glBufferData(GL_ARRAY_BUFFER, result.length * sizeof(vertex_t), NULL, GL_DYNAMIC_DRAW);
-	}
-	
-	glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
-	vertex_t * vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-	for (int32_t i = 0; i < result.length; i++)
-	{
-		vertices[i] = (vertex_t)
+		if (result.length > object->vertexCount)
 		{
-			.position = { result.xyzw[0][i], result.xyzw[1][i] },
-			.color = { 0.0, 0.0, 0.0, 1.0 },
-			.size = 8.0,
-		};
+			if (object->vertexCount == 0) { object->vertices = malloc(result.length * sizeof(vertex_t)); }
+			else { object->vertices = realloc(object->vertices, result.length * sizeof(vertex_t)); }
+		}
+		for (int32_t i = 0; i < result.length; i++)
+		{
+			object->vertices[i] = (vertex_t)
+			{
+				.position = { result.xyzw[0][i], result.xyzw[1][i] },
+				.color = { 0.0, 0.0, 0.0, 1.0 },
+				.size = 8.0,
+			};
+		}
+		object->vertexCount = result.length;
+		object->needsUpload = true;
 	}
-	glUnmapBuffer(GL_ARRAY_BUFFER);
-	object->vertexCount = result.length;
 	
 	FreeVectorArray(result);
 	return (RuntimeError){ RuntimeErrorNone };
@@ -193,52 +189,50 @@ RuntimeError SampleParametric(Script * script, Statement * statement, float lowe
 		totalSampleCount += sampleCount;
 	}
 	
-	// create the vertex buffer
-	if (6 * totalSampleCount > object->vertexCount)
+	if (!object->needsUpload)
 	{
-		if (object->vertexCount > 0) { glDeleteBuffers(1, &object->buffer); }
-		glGenBuffers(1, &object->buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
-		glBufferData(GL_ARRAY_BUFFER, 6 * totalSampleCount * sizeof(vertex_t), NULL, GL_DYNAMIC_DRAW);
-	}
-	
-	glBindBuffer(GL_ARRAY_BUFFER, object->buffer);
-	vertex_t * vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-	int32_t c = 0;
-	for (int32_t i = 0; i < length; i++)
-	{
-		ParametricSample sample = samples[i][0];
-		ParametricSample prevSample = sample;
-		while (true)
+		if (6 * totalSampleCount > object->vertexCount)
 		{
-			if (vec2_dist(sample.screenPosition, prevSample.screenPosition) > 10) { prevSample = sample; }
-			vertex_t v1 = (vertex_t)
-			{
-				.position = sample.position,
-				.color = sample.color,
-				.size = sample.thickness,
-				.pair = prevSample.position,
-			};
-			vertex_t v2 = (vertex_t)
-			{
-				.position = prevSample.position,
-				.color = prevSample.color,
-				.size = prevSample.thickness,
-				.pair = sample.position,
-			};
-			vertices[c++] = v1;
-			vertices[c++] = v1;
-			vertices[c++] = v2;
-			vertices[c++] = v2;
-			vertices[c++] = v2;
-			vertices[c++] = v1;
-			if (sample.next == 0) { break; }
-			prevSample = sample;
-			sample = samples[i][sample.next];
+			if (object->vertexCount == 0) { object->vertices = malloc(6 * totalSampleCount* sizeof(vertex_t)); }
+			else { object->vertices = realloc(object->vertices, 6 * totalSampleCount * sizeof(vertex_t)); }
 		}
+		
+		int32_t c = 0;
+		for (int32_t i = 0; i < length; i++)
+		{
+			ParametricSample sample = samples[i][0];
+			ParametricSample prevSample = sample;
+			while (true)
+			{
+				if (vec2_dist(sample.screenPosition, prevSample.screenPosition) > 10) { prevSample = sample; }
+				vertex_t v1 = (vertex_t)
+				{
+					.position = sample.position,
+					.color = sample.color,
+					.size = sample.thickness,
+					.pair = prevSample.position,
+				};
+				vertex_t v2 = (vertex_t)
+				{
+					.position = prevSample.position,
+					.color = prevSample.color,
+					.size = prevSample.thickness,
+					.pair = sample.position,
+				};
+				object->vertices[c++] = v1;
+				object->vertices[c++] = v1;
+				object->vertices[c++] = v2;
+				object->vertices[c++] = v2;
+				object->vertices[c++] = v2;
+				object->vertices[c++] = v1;
+				if (sample.next == 0) { break; }
+				prevSample = sample;
+				sample = samples[i][sample.next];
+			}
+		}
+		object->vertexCount = 6 * totalSampleCount;
+		object->needsUpload = true;
 	}
-	glUnmapBuffer(GL_ARRAY_BUFFER);
-	object->vertexCount = 6 * totalSampleCount;
 	
 free:
 	ListFree(parameters);
