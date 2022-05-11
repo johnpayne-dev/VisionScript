@@ -377,5 +377,6 @@ sapp_desc RenderScript(Script * script, bool testMode)
 		.frame_cb = Frame,
 		.event_cb = Event,
 		.cleanup_cb = Shutdown,
+		.sample_count = 4,
 	};
 }
