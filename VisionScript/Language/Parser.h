@@ -2,122 +2,142 @@
 #define Parser_h
 
 #include "Utilities/List.h"
+#include "Utilities/String.h"
 #include "Tokenizer.h"
 
-typedef float scalar_t;
-
-typedef enum Operator
-{
-	OperatorNone,
-	OperatorFor, OperatorEllipsis,
-	OperatorAdd, OperatorSubtract,
-	OperatorMultiply, OperatorDivide, OperatorModulo,
-	OperatorPositive, OperatorNegative,
-	OperatorPower,
-	OperatorIndex,
-	OperatorFunctionCall,
-} Operator;
-
-typedef enum OperonType
-{
-	OperonTypeNone,
-	OperonTypeExpression,
-	OperonTypeIdentifier,
-	OperonTypeArguments,
-	OperonTypeConstant,
-	OperonTypeArrayLiteral,
-	OperonTypeVectorLiteral,
-	OperonTypeForAssignment
-} OperonType;
-
-typedef struct ForAssignment
-{
-	String identifier;
-	struct Expression * expression;
-} ForAssignment;
-
-typedef union Operon
-{
-	struct Expression * expression;
-	list(struct Expression *) expressions;
-	String identifier;
-	scalar_t constant;
-	ForAssignment assignment;
-} Operon;
-
-typedef struct Expression
-{
-	Operator operator;
-	OperonType operonTypes[2];
-	Operon operons[2];
-	int32_t operonStart[2];
-	int32_t operonEnd[2];
-} Expression;
-
-typedef enum SyntaxErrorCode
-{
-	SyntaxErrorNone,
-	SyntaxErrorUnknownToken,
-	SyntaxErrorUnknownStatementType,
-	SyntaxErrorInvalidVariableDeclaration,
-	SyntaxErrorInvalidFunctionDeclaration,
-	SyntaxErrorMissingExpression,
-	SyntaxErrorMissingBracket,
-	SyntaxErrorNonsenseExpression,
-	SyntaxErrorMissingOperon,
-	SyntaxErrorTooManyVectorElements,
-	SyntaxErrorInvalidCommaPlacement,
-	SyntaxErrorInvalidForPlacement,
-	SyntaxErrorInvalidForAssignment,
-	SyntaxErrorInvalidForAssignmentPlacement,
-	SyntaxErrorInvalidEllipsisPlacement,
-	SyntaxErrorInvalidEllipsisOperon,
-	SyntaxErrorIndexingWithVector,
-	SyntaxErrorInvalidFunctionCall,
+typedef enum SyntaxErrorCode {
+	SyntaxErrorCodeNone,
+	SyntaxErrorCodeUnknownToken,
+	SyntaxErrorCodeInvalidFunctionDeclaration,
+	SyntaxErrorCodeMissingExpression,
+	SyntaxErrorCodeMissingClosingBrace,
+	SyntaxErrorCodeMismatchedBrace,
+	SyntaxErrorCodeNonsenseExpression,
+	SyntaxErrorCodeUnreadableConstant,
+	SyntaxErrorCodeTooManyVectorElements,
+	SyntaxErrorCodeInvalidUnaryPlacement,
+	SyntaxErrorCodeInvalidTernaryPlacement,
 } SyntaxErrorCode;
 
-typedef struct SyntaxError
-{
+typedef struct SyntaxError {
 	SyntaxErrorCode code;
 	int32_t tokenStart;
 	int32_t tokenEnd;
 } SyntaxError;
 
-const char * SyntaxErrorToString(SyntaxErrorCode code);
+const char * SyntaxErrorCodeToString(SyntaxErrorCode code);
 
-typedef enum StatementType
-{
-	StatementTypeUnknown,
-	StatementTypeFunction,
+typedef struct ForAssignment {
+	String identifier;
+	struct Expression * expression;
+} ForAssignment;
+
+typedef enum Operator {
+	OperatorAdd,
+	OperatorSubtract,
+	OperatorMultiply,
+	OperatorDivide,
+	OperatorModulo,
+	OperatorPower,
+	OperatorEqual,
+	OperatorNotEqual,
+	OperatorGreater,
+	OperatorGreaterEqual,
+	OperatorLess,
+	OperatorLessEqual,
+	OperatorRange,
+	OperatorFor,
+	OperatorWhen,
+	OperatorDimension,
+	OperatorIndexStart,
+	OperatorIndexEnd,
+	OperatorCallStart,
+	OperatorCallEnd,
+	OperatorNegate,
+	OperatorFactorial,
+	OperatorNot,
+	OperatorIf,
+	OperatorElse,
+	OperatorCount,
+} Operator;
+
+typedef struct Unary {
+	Operator operator;
+	struct Expression * expression;
+} Unary;
+
+typedef struct Binary {
+	Operator operator;
+	struct Expression * left;
+	struct Expression * right;
+} Binary;
+
+typedef struct Ternary {
+	Operator leftOperator;
+	Operator rightOperator;
+	struct Expression * left;
+	struct Expression * middle;
+	struct Expression * right;
+} Ternary;
+
+typedef enum ExpressionType {
+	ExpressionTypeUnknown,
+	ExpressionTypeConstant,
+	ExpressionTypeIdentifier,
+	ExpressionTypeVectorLiteral,
+	ExpressionTypeArrayLiteral,
+	ExpressionTypeArguments,
+	ExpressionTypeForAssignment,
+	ExpressionTypeUnary,
+	ExpressionTypeBinary,
+	ExpressionTypeTernary,
+} ExpressionType;
+
+typedef struct Expression {
+	ExpressionType type;
+	union {
+		double constant;
+		String identifier;
+		list(struct Expression) vector;
+		list(struct Expression) array;
+		list(struct Expression) arguments;
+		ForAssignment assignment;
+		Unary unary;
+		Binary binary;
+		Ternary ternary;
+	};
+} Expression;
+
+SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression);
+void PrintExpression(Expression expression);
+void FreeExpression(Expression expression);
+
+typedef enum DeclarationAttribute {
+	DeclarationAttributeNone,
+	DeclarationAttributePoints,
+	DeclarationAttributeParametric,
+	DeclarationAttributePolygons,
+} DeclarationAttribute;
+
+typedef struct Declaration {
+	String identifier;
+	list(String) parameters;
+	DeclarationAttribute attribute;
+} Declaration;
+
+typedef enum StatementType {
+	StatementTypeNone,
 	StatementTypeVariable,
-	StatementTypeRender,
+	StatementTypeFunction,
 } StatementType;
 
-typedef enum StatementRenderType
-{
-	StatementRenderTypePoints,
-	StatementRenderTypeParametric,
-	StatementRenderTypePolygons,
-} StatementRenderType;
-
-typedef union StatementDeclaration
-{
-	struct { String identifier; } variable;
-	struct { String identifier; list(String) arguments; } function;
-	struct { StatementRenderType type; } render;
-} StatementDeclaration;
-
-typedef struct Statement
-{
-	list(Token) tokens;
-	SyntaxError error;
+typedef struct Statement {
 	StatementType type;
-	StatementDeclaration declaration;
-	Expression * expression;
+	Declaration declaration;
+	Expression expression;
 } Statement;
 
-Statement * ParseTokenLine(list(Token) tokens);
-void PrintSyntaxError(Statement * statement);
-void FreeStatement(Statement * statement);
+SyntaxError ParseStatement(list(Token) tokens, Statement * statement);
+void FreeStatement(Statement statement);
 
 #endif

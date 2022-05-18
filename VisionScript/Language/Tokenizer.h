@@ -4,29 +4,56 @@
 #include "Utilities/String.h"
 #include "Utilities/List.h"
 
-typedef enum TokenType
-{
+#define KEYWORD_POINTS     "points"
+#define KEYWORD_PARAMETRIC "parametric"
+#define KEYWORD_POLYGONS   "polygons"
+#define KEYWORD_FOR        "for"
+#define KEYWORD_WHEN       "when"
+#define KEYWORD_IF         "if"
+#define KEYWORD_ELSE       "else"
+#define KEYWORD_NOT        "not"
+
+#define SYMBOL_COMMA             ","
+#define SYMBOL_EQUAL             "="
+#define SYMBOL_LEFT_PARENTHESIS  "("
+#define SYMBOL_RIGHT_PARENTHESIS ")"
+#define SYMBOL_LEFT_BRACKET      "["
+#define SYMBOL_RIGHT_BRACKET     "]"
+#define SYMBOL_PLUS              "+"
+#define SYMBOL_MINUS             "-"
+#define SYMBOL_ASTERICK          "*"
+#define SYMBOL_SLASH             "/"
+#define SYMBOL_PERCENT           "%"
+#define SYMBOL_CARROT            "^"
+#define SYMBOL_LESS              "<"
+#define SYMBOL_GREATER           ">"
+#define SYMBOL_TILDE             "~"
+#define SYMBOL_DOT               "."
+#define SYMBOL_EXCLAMATION       "!"
+#define SYMBOL_EQUAL_EQUAL       "=="
+#define SYMBOL_BAR_EQUAL         "|="
+#define SYMBOL_GREATER_EQUAL     ">="
+#define SYMBOL_LESS_EQUAL        "<="
+
+typedef enum TokenType {
 	TokenTypeUnknown,
 	TokenTypeKeyword,
 	TokenTypeIdentifier,
 	TokenTypeNumber,
-	TokenTypeBracket,
-	TokenTypeOperator,
 	TokenTypeSymbol,
 } TokenType;
 
-typedef struct Token
-{
+typedef struct Token {
 	TokenType type;
 	String value;
-	String line;
-	int32_t lineIndexStart;
-	int32_t lineIndexEnd;
+	int32_t lineNumber;
+	int32_t start;
+	int32_t end;
 } Token;
 
-list(Token) TokenizeLine(String line);
-list(list(Token)) TokenizeCode(String code);
-
+list(Token) TokenizeLine(String line, int32_t lineNumber);
 void FreeTokens(list(Token) token);
+
+list(String) SplitCodeIntoLines(char * code);
 
 #endif

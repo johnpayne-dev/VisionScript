@@ -1,18 +1,137 @@
-#include <string.h>
 #include "Tokenizer.h"
 
-static list(String) SplitCodeIntoStatements(String code)
-{
-	code = StringCreate(code); // create a copy of the original code
+static bool IsLetter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+
+static bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+
+static bool IsWhitespace(char c) { return c == ' ' || c == '\t'; }
+
+static bool IsValidInIdentifier(char c) { return IsLetter(c) || IsDigit(c) || c == '_' || c == ':'; }
+
+static bool MatchesWord(String line, int32_t start, int32_t * end, const char * word) {
+	int32_t j = 0;
+	while (line[start + j] != '\0') {
+		if (word[j] == '\0' && !IsValidInIdentifier(line[start + j])) {
+			*end = start + j;
+			return true;
+		}
+		if (word[j] != line[start + j]) { return false; }
+		j++;
+	}
+	return false;
+}
+
+static const char * keywords[] = {
+	KEYWORD_POINTS,
+	KEYWORD_PARAMETRIC,
+	KEYWORD_POLYGONS,
+	KEYWORD_FOR,
+	KEYWORD_WHEN,
+	KEYWORD_IF,
+	KEYWORD_ELSE,
+	KEYWORD_NOT,
+};
+
+static bool IsKeyword(String line, int32_t start, int32_t * end) {
+	for (int32_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+		if (MatchesWord(line, start, end, keywords[i])) { return true; }
+	}
+	return false;
+}
+
+static bool IsIdentifier(String line, int32_t start, int32_t * end) {
+	*end = start;
+	if (!IsLetter(line[start]) && line[start] != '_') { return false; } // if first character isn't letter or underscore
+	while (IsValidInIdentifier(line[*end])) { (*end)++; } // finds end of identifier
+	return true;
+}
+
+static const char * singleSymbols[] = {
+	SYMBOL_COMMA,
+	SYMBOL_EQUAL,
+	SYMBOL_LEFT_PARENTHESIS,
+	SYMBOL_RIGHT_PARENTHESIS,
+	SYMBOL_LEFT_BRACKET,
+	SYMBOL_RIGHT_BRACKET,
+	SYMBOL_PLUS,
+	SYMBOL_MINUS,
+	SYMBOL_ASTERICK,
+	SYMBOL_SLASH,
+	SYMBOL_PERCENT,
+	SYMBOL_CARROT,
+	SYMBOL_LESS,
+	SYMBOL_GREATER,
+	SYMBOL_TILDE,
+	SYMBOL_DOT,
+	SYMBOL_EXCLAMATION,
+};
+
+static const char * doubleSymbols[] = {
+	SYMBOL_EQUAL_EQUAL,
+	SYMBOL_BAR_EQUAL,
+	SYMBOL_GREATER_EQUAL,
+	SYMBOL_LESS_EQUAL,
+};
+
+static bool IsSymbol(String line, int32_t start, int32_t * end) {
+	for (int32_t i = 0; i < sizeof(doubleSymbols) / sizeof(doubleSymbols[0]); i++) {
+		if (line[start] == doubleSymbols[i][0] && line[start + 1] == doubleSymbols[i][1]) {
+			*end = start + 2;
+			return true;
+		}
+	}
+	if (line[start] == '.') {
+		if (IsDigit(line[start + 1]) || (start > 0 && IsDigit(line[start - 1]))) { return false; }
+	}
+	for (int32_t i = 0; i < sizeof(singleSymbols) / sizeof(singleSymbols[0]); i++) {
+		if (line[start] == singleSymbols[i][0]) {
+			*end = start + 1;
+			return true;
+		}
+	}
+	return false;
+}
+
+
+static bool IsNumber(String line, int32_t start, int32_t * end) {
+	*end = start;
+	while (IsDigit(line[*end]) || line[*end] == '.') { (*end)++; }
+	return *end > start;
+}
+
+list(Token) TokenizeLine(String line, int32_t lineNumber) {
+	list(Token) tokens = ListCreate(sizeof(Token), 32);
+	int32_t i = 0;
+	while (i < StringLength(line)) {
+		int32_t end = i;
+		TokenType tokenType = TokenTypeUnknown;
+		if (IsKeyword(line, i, &end)) { tokenType = TokenTypeKeyword; }
+		else if (IsIdentifier(line, i, &end)) { tokenType = TokenTypeIdentifier; }
+		else if (IsSymbol(line, i, &end)) { tokenType = TokenTypeSymbol; }
+		else if (IsNumber(line, i, &end)) { tokenType = TokenTypeNumber; }
+		else if (IsWhitespace(line[i])) {
+			i++;
+			continue;
+		}
+		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end - 1), .lineNumber = lineNumber, .start = i, .end = end - 1 });
+		i = end == i ? i + 1 : end;
+	}
+	return tokens;
+}
+
+void FreeTokens(list(Token) tokens) {
+	for (int32_t i = 0; i < ListLength(tokens); i++) { StringFree(tokens[i].value); }
+	ListFree(tokens);
+}
+
+list(String) SplitCodeIntoLines(char * code) {
+	code = StringCreate(code);
 	list(String) statements = ListCreate(sizeof(String), 16);
 	int32_t lastStatementStart = 0;
-	for (int32_t i = 0; i < StringLength(code); i++)
-	{
+	for (int32_t i = 0; i < StringLength(code); i++) {
 		if (code[i] == ';') { code[i] = '\n'; } // semicolons are treated as newlines
-		if (code[i] == '\n')
-		{
-			if (i > 0 && code[i - 1] == '\\') // backslashes ignore newlines
-			{
+		if (code[i] == '\n') {
+			if (i > 0 && code[i - 1] == '\\') { // backslashes ignore newlines
 				StringRemove(&code, i, i);
 				i--;
 				continue;
@@ -27,156 +146,4 @@ static list(String) SplitCodeIntoStatements(String code)
 	
 	StringFree(code);
 	return statements;
-}
-
-static bool IsLetter(char c)
-{
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-static bool IsDigit(char c)
-{
-	return c >= '0' && c <= '9';
-}
-
-static bool IsWhitespace(char c)
-{
-	return c == ' ' || c == '\t';
-}
-
-static bool IsIdentifier(String statement, int32_t i, int32_t * end)
-{
-	*end = i;
-	if (!IsLetter(statement[i]) && statement[i] != '_') { return false; } // if first character isn't letter or underscore
-	while (IsLetter(statement[*end]) || IsDigit(statement[*end]) || statement[*end] == '_') { (*end)++; } // finds end of identifier
-	(*end)--;
-	return true;
-}
-
-static const char brackets[] = { '(', ')', '[', ']' }; // Future possible brackets: '{', '}'
-
-static bool IsBracket(String statement, int32_t i, int32_t * end)
-{
-	*end = i;
-	for (int32_t j = 0; j < sizeof(brackets) / sizeof(brackets[0]); j++)
-	{
-		if (statement[i] == brackets[j]) { return true; }
-	}
-	return false;
-}
-
-static const char * operators[] = { "+", "-", "*", "/", "%", "^", "for", "...", "." }; // Future possible operators: "==", "~=", "<=", ">=", "<", ">"
-
-static bool IsOperator(String statement, int32_t i, int32_t * end)
-{
-	*end = i;
-	for (int32_t j = 0; j < sizeof(operators) / sizeof(operators[0]); j++)
-	{
-		int32_t k = 0;
-		bool match = true;
-		for (k = 0; operators[j][k] != '\0'; k++) // compares each character of the operator with the statement
-		{
-			if (operators[j][k] != statement[i + k]) { match = false; break; }
-		}
-		if (match)
-		{
-			*end = i + k - 1;
-			return true;
-		}
-	}
-	return false;
-}
-
-static const char symbols[] = { ',', '=' };
-
-static bool IsSymbol(String statement, int32_t i, int32_t * end)
-{
-	*end = i;
-	for (int32_t j = 0; j < sizeof(symbols) / sizeof(symbols[0]); j++)
-	{
-		if (statement[i] == symbols[j]) { return true; }
-	}
-	return false;
-}
-
-static const char * keywords[] = { "points", "parametric", "polygons" };
-
-static bool IsKeyword(String statement, int32_t i, int32_t * end)
-{
-	*end = i;
-	for (int32_t j = 0; j < sizeof(keywords) / sizeof(keywords[0]); j++)
-	{
-		int32_t k = 0;
-		bool match = true;
-		for (k = 0; keywords[j][k] != '\0'; k++) // compares each character of the keyword with the statement
-		{
-			if (keywords[j][k] != statement[i + k]) { match = false; break; }
-		}
-		if (match)
-		{
-			*end = i + k - 1;
-			return true;
-		}
-	}
-	return false;
-}
-
-static bool IsNumber(String statement, int32_t i, int32_t * end)
-{
-	*end = i;
-	if (!IsDigit(statement[i]) && statement[i] != '.') { return false; }  // check if first character isn't number or '.'
-	if (statement[i] == '.' && statement[i + 1] == '.') { return false; } // and make sure the second char isn't also a '.'
-	while (IsDigit(statement[*end]) || statement[*end] == '.')
-	{
-		(*end)++;
-		if (statement[*end] == '.' && statement[*end + 1] == '.') { break; } // if there's two '.' in a row then assume it's the ... operator
-	}
-	(*end)--;
-	if (*end == i && statement[i] == '.') { return false; } // if the only character is '.' then it's not a number
-	return true;
-}
-
-list(Token) TokenizeLine(String line)
-{
-	list(Token) tokens = ListCreate(sizeof(Token), 32);
-	int32_t i = 0;
-	while (i < StringLength(line))
-	{
-		int32_t end = i;
-		TokenType tokenType = TokenTypeUnknown;
-		if (IsKeyword(line, i, &end)) { tokenType = TokenTypeKeyword; }
-		else if (IsNumber(line, i, &end)) { tokenType = TokenTypeNumber; }
-		else if (IsOperator(line, i, &end)) { tokenType = TokenTypeOperator; }
-		else if (IsIdentifier(line, i, &end)) { tokenType = TokenTypeIdentifier; }
-		else if (IsBracket(line, i, &end)) { tokenType = TokenTypeBracket; }
-		else if (IsSymbol(line, i, &end)) { tokenType = TokenTypeSymbol; }
-		else if (IsWhitespace(line[i])) { i++; continue; }
-		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .line = StringCreate(line), .lineIndexStart = i, .lineIndexEnd = end });
-		i = end + 1;
-	}
-	return tokens;
-}
-
-list(list(Token)) TokenizeCode(String code)
-{
-	list(list(Token)) tokenLines = ListCreate(sizeof(list(Token)), 16);
-	
-	list(String) statements = SplitCodeIntoStatements(code);
-	for (int32_t i = 0; i < ListLength(statements); i++)
-	{
-		list(Token) tokenLine = TokenizeLine(statements[i]);
-		if (ListLength(tokenLine) > 0) { tokenLines = ListPush(tokenLines, &tokenLine); }
-	}
-	ListFree(statements);
-	return tokenLines;
-}
-
-void FreeTokens(list(Token) tokens)
-{
-	for (int32_t i = 0; i < ListLength(tokens); i++)
-	{
-		StringFree(tokens[i].value);
-		StringFree(tokens[i].line);
-	}
-	ListFree(tokens);
 }
