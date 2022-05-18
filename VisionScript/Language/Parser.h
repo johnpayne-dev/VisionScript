@@ -21,8 +21,8 @@ typedef enum SyntaxErrorCode {
 
 typedef struct SyntaxError {
 	SyntaxErrorCode code;
-	int32_t tokenStart;
-	int32_t tokenEnd;
+	int32_t start;
+	int32_t end;
 } SyntaxError;
 
 const char * SyntaxErrorCodeToString(SyntaxErrorCode code);
@@ -105,6 +105,8 @@ typedef struct Expression {
 		Binary binary;
 		Ternary ternary;
 	};
+	int32_t start;
+	int32_t end;
 } Expression;
 
 SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression);
@@ -124,19 +126,19 @@ typedef struct Declaration {
 	DeclarationAttribute attribute;
 } Declaration;
 
-typedef enum StatementType {
-	StatementTypeNone,
-	StatementTypeVariable,
-	StatementTypeFunction,
-} StatementType;
+typedef enum EquationType {
+	EquationTypeNone,
+	EquationTypeVariable,
+	EquationTypeFunction,
+} EquationType;
 
-typedef struct Statement {
-	StatementType type;
+typedef struct Equation {
+	EquationType type;
 	Declaration declaration;
 	Expression expression;
-} Statement;
+} Equation;
 
-SyntaxError ParseStatement(list(Token) tokens, Statement * statement);
-void FreeStatement(Statement statement);
+SyntaxError ParseEquation(list(Token) tokens, Equation * equation);
+void FreeEquation(Equation equation);
 
 #endif

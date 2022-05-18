@@ -22,7 +22,7 @@ const char * SyntaxErrorCodeToString(SyntaxErrorCode code) {
 
 void PrintSyntaxError(SyntaxError error, list(Token) tokens, list(String) lines) {
 	printf("SyntaxError: %s", SyntaxErrorCodeToString(error.code));
-	String snippet = StringSub(lines[tokens[0].lineNumber], tokens[error.tokenStart].start, tokens[error.tokenEnd].end);
+	String snippet = StringSub(lines[tokens[0].lineNumber], tokens[error.start].start, tokens[error.end].end);
 	printf(" \"%s\"\n", snippet);
 	printf("\tin line: \"%s\"\n", lines[tokens[0].lineNumber]);
 	StringFree(snippet);
@@ -393,6 +393,8 @@ static SyntaxError ParseTernary(list(Token) tokens, int32_t start, int32_t end, 
 
 SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	if (end < start) { return (SyntaxError){ SyntaxErrorCodeMissingExpression, end, start }; }
+	expression->start = start;
+	expression->end = end;
 	
 	SyntaxError error = CheckMissingBraces(tokens, start, end);
 	if (error.code != SyntaxErrorCodeNone) { return error; }
@@ -529,27 +531,27 @@ static bool IsDeclarationttribute(Token token) {
 	return false;
 }
 
-static StatementType DetermineStatementType(list(Token) tokens) {
-	if (ListLength(tokens) == 0) { return StatementTypeNone; }
+static EquationType DetermineEquationType(list(Token) tokens) {
+	if (ListLength(tokens) == 0) { return EquationTypeNone; }
 	
 	// check if first token is a declaration attribute
 	int32_t start = 0;
 	if (IsDeclarationttribute(tokens[start])) { start++; }
-	if (start >= ListLength(tokens) - 1) { return StatementTypeNone; }
+	if (start >= ListLength(tokens) - 1) { return EquationTypeNone; }
 	
 	// check if it's a variable or function declaration
 	if (tokens[start].type == TokenTypeIdentifier) {
 		// if second token is a '(' then it must be a function
 		if (start + 1 < ListLength(tokens) && StringEquals(tokens[start + 1].value, SYMBOL_LEFT_PARENTHESIS)) {
 			int32_t index = FindClosingParenthesis(tokens, start + 1, ListLength(tokens) - 1);
-			if (index > -1 && index != ListLength(tokens) - 1 && tokens[index + 1].value[0] == '=') { return StatementTypeFunction; }
+			if (index > -1 && index != ListLength(tokens) - 1 && tokens[index + 1].value[0] == '=') { return EquationTypeFunction; }
 		}
 		// if second token is a '=' then it must be a variable
-		if (StringEquals(tokens[start + 1].value, SYMBOL_EQUAL)) { return StatementTypeVariable; }
-		return StatementTypeNone;
+		if (StringEquals(tokens[start + 1].value, SYMBOL_EQUAL)) { return EquationTypeVariable; }
+		return EquationTypeNone;
 	}
 	
-	return StatementTypeNone;
+	return EquationTypeNone;
 }
 
 static int32_t ParseDeclarationAttribute(list(Token) tokens, Declaration * declaration) {
@@ -588,8 +590,8 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, Declaration * de
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-SyntaxError ParseStatement(list(Token) tokens, Statement * statement) {
-	*statement = (Statement){ 0 };
+SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
+	*equation = (Equation){ 0 };
 	
 	// check for any unknown tokens
 	for (int32_t i = 0; i < ListLength(tokens); i++) {
@@ -597,37 +599,37 @@ SyntaxError ParseStatement(list(Token) tokens, Statement * statement) {
 	}
 	
 	// parse statement declaration
-	statement->type = DetermineStatementType(tokens);
+	equation->type = DetermineEquationType(tokens);
 	int32_t declarationEnd = -1;
 	SyntaxError error = (SyntaxError){ SyntaxErrorCodeNone };
-	switch (statement->type) {
-		case StatementTypeVariable:
-			error = ParseVariableDeclaration(tokens, &statement->declaration, &declarationEnd);
+	switch (equation->type) {
+		case EquationTypeVariable:
+			error = ParseVariableDeclaration(tokens, &equation->declaration, &declarationEnd);
 			break;
-		case StatementTypeFunction:
-			error = ParseFunctionDeclaration(tokens, &statement->declaration, &declarationEnd);
+		case EquationTypeFunction:
+			error = ParseFunctionDeclaration(tokens, &equation->declaration, &declarationEnd);
 			break;
 		default: break;
 	}
 	if (error.code != SyntaxErrorCodeNone) {
-		FreeStatement(*statement);
+		FreeEquation(*equation);
 		return error;
 	}
 	
 	// parse the expression
 	int32_t start = declarationEnd + 1;
 	int32_t end = ListLength(tokens) - 1;
-	error = ParseExpression(tokens, start, end, &statement->expression);
-	if (error.code != SyntaxErrorCodeNone) { FreeStatement(*statement); }
+	error = ParseExpression(tokens, start, end, &equation->expression);
+	if (error.code != SyntaxErrorCodeNone) { FreeEquation(*equation); }
 	return error;
 }
 
-void FreeStatement(Statement statement) {
+void FreeEquation(Equation statement) {
 	FreeExpression(statement.expression);
-	if (statement.type == StatementTypeVariable) {
+	if (statement.type == EquationTypeVariable) {
 		StringFree(statement.declaration.identifier);
 	}
-	if (statement.type == StatementTypeFunction) {
+	if (statement.type == EquationTypeFunction) {
 		StringFree(statement.declaration.identifier);
 		for (int32_t i = 0; i < ListLength(statement.declaration.parameters); i++) { StringFree(statement.declaration.parameters[i]); }
 		ListFree(statement.declaration.parameters);
