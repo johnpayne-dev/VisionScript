@@ -12,7 +12,7 @@ static bool MatchesWord(String line, int32_t start, int32_t * end, const char * 
 	int32_t j = 0;
 	while (line[start + j] != '\0') {
 		if (word[j] == '\0' && !IsValidInIdentifier(line[start + j])) {
-			*end = start + j;
+			*end = start + j - 1;
 			return true;
 		}
 		if (word[j] != line[start + j]) { return false; }
@@ -43,6 +43,7 @@ static bool IsIdentifier(String line, int32_t start, int32_t * end) {
 	*end = start;
 	if (!IsLetter(line[start]) && line[start] != '_') { return false; } // if first character isn't letter or underscore
 	while (IsValidInIdentifier(line[*end])) { (*end)++; } // finds end of identifier
+	(*end)--;
 	return true;
 }
 
@@ -76,7 +77,7 @@ static const char * doubleSymbols[] = {
 static bool IsSymbol(String line, int32_t start, int32_t * end) {
 	for (int32_t i = 0; i < sizeof(doubleSymbols) / sizeof(doubleSymbols[0]); i++) {
 		if (line[start] == doubleSymbols[i][0] && line[start + 1] == doubleSymbols[i][1]) {
-			*end = start + 2;
+			*end = start + 1;
 			return true;
 		}
 	}
@@ -85,7 +86,7 @@ static bool IsSymbol(String line, int32_t start, int32_t * end) {
 	}
 	for (int32_t i = 0; i < sizeof(singleSymbols) / sizeof(singleSymbols[0]); i++) {
 		if (line[start] == singleSymbols[i][0]) {
-			*end = start + 1;
+			*end = start;
 			return true;
 		}
 	}
@@ -94,9 +95,12 @@ static bool IsSymbol(String line, int32_t start, int32_t * end) {
 
 
 static bool IsNumber(String line, int32_t start, int32_t * end) {
-	*end = start;
-	while (IsDigit(line[*end]) || line[*end] == '.') { (*end)++; }
-	return *end > start;
+	int32_t i = start;
+	while (IsDigit(line[i]) || line[i] == '.') { i++; }
+	if (i > start) {
+		*end = i - 1;
+		return true;
+	} else { return false; }
 }
 
 list(Token) TokenizeLine(String line, int32_t lineNumber) {
@@ -113,8 +117,8 @@ list(Token) TokenizeLine(String line, int32_t lineNumber) {
 			i++;
 			continue;
 		}
-		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end - 1), .lineNumber = lineNumber, .start = i, .end = end - 1 });
-		i = end == i ? i + 1 : end;
+		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .lineNumber = lineNumber, .start = i, .end = end });
+		i = end + 1;
 	}
 	return tokens;
 }

@@ -11,12 +11,12 @@ typedef enum SyntaxErrorCode {
 	SyntaxErrorCodeInvalidFunctionDeclaration,
 	SyntaxErrorCodeMissingExpression,
 	SyntaxErrorCodeMissingClosingBrace,
-	SyntaxErrorCodeMismatchedBrace,
+	SyntaxErrorCodeMissingOpeningBrace,
 	SyntaxErrorCodeNonsenseExpression,
 	SyntaxErrorCodeUnreadableConstant,
-	SyntaxErrorCodeTooManyVectorElements,
 	SyntaxErrorCodeInvalidUnaryPlacement,
 	SyntaxErrorCodeInvalidTernaryPlacement,
+	SyntaxErrorCodeTooManyVectorElements,
 } SyntaxErrorCode;
 
 typedef struct SyntaxError {
@@ -26,6 +26,7 @@ typedef struct SyntaxError {
 } SyntaxError;
 
 const char * SyntaxErrorCodeToString(SyntaxErrorCode code);
+void PrintSyntaxError(SyntaxError error, list(Token) tokens, list(String) lines);
 
 typedef struct ForAssignment {
 	String identifier;
@@ -98,9 +99,7 @@ typedef struct Expression {
 	union {
 		double constant;
 		String identifier;
-		list(struct Expression) vector;
-		list(struct Expression) array;
-		list(struct Expression) arguments;
+		list(struct Expression) list;
 		ForAssignment assignment;
 		Unary unary;
 		Binary binary;

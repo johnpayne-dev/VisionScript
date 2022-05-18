@@ -3,6 +3,31 @@
 #include <stdio.h>
 #include "Parser.h"
 
+const char * SyntaxErrorCodeToString(SyntaxErrorCode code) {
+	switch (code) {
+		case SyntaxErrorCodeNone: return "no error";
+		case SyntaxErrorCodeUnknownToken: return "unrecognized token";
+		case SyntaxErrorCodeInvalidFunctionDeclaration: return "invalid function declaration";
+		case SyntaxErrorCodeMissingExpression: return "missing expression";
+		case SyntaxErrorCodeMissingClosingBrace: return "missing closing brace";
+		case SyntaxErrorCodeMissingOpeningBrace: return "missing opening brace";
+		case SyntaxErrorCodeNonsenseExpression: return "unable to understand expression";
+		case SyntaxErrorCodeUnreadableConstant: return "invalid numeric constant";
+		case SyntaxErrorCodeInvalidUnaryPlacement: return "unable to understand unary expression (try inserting parenthesis)";
+		case SyntaxErrorCodeInvalidTernaryPlacement: return "unable to understand ternary expression (try inserting parenthesis)";
+		case SyntaxErrorCodeTooManyVectorElements: return "too many elements in vector literal";
+		default: return "unknown error";
+	}
+}
+
+void PrintSyntaxError(SyntaxError error, list(Token) tokens, list(String) lines) {
+	printf("SyntaxError: %s", SyntaxErrorCodeToString(error.code));
+	String snippet = StringSub(lines[tokens[0].lineNumber], tokens[error.tokenStart].start, tokens[error.tokenEnd].end);
+	printf(" \"%s\"\n", snippet);
+	printf("\tin line: \"%s\"\n", lines[tokens[0].lineNumber]);
+	StringFree(snippet);
+}
+
 static const char * operators[] = {
 	[OperatorAdd]          = SYMBOL_PLUS,
 	[OperatorSubtract]     = SYMBOL_MINUS,
@@ -214,7 +239,7 @@ static SyntaxError CheckMissingBraces(list(Token) tokens, int32_t start, int32_t
 			continue;
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_RIGHT_PARENTHESIS)) {
-			return (SyntaxError){ SyntaxErrorCodeMismatchedBrace, start, i };
+			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, start, i };
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_BRACKET)) {
 			int32_t next = FindClosingBracket(tokens, i, end);
@@ -223,7 +248,7 @@ static SyntaxError CheckMissingBraces(list(Token) tokens, int32_t start, int32_t
 			continue;
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_RIGHT_BRACKET)) {
-			return (SyntaxError){ SyntaxErrorCodeMismatchedBrace, start, i };
+			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, start, i };
 		}
 	}
 	return (SyntaxError){ SyntaxErrorCodeNone };
@@ -282,39 +307,22 @@ static SyntaxError ParseIdentifier(list(Token) tokens, int32_t start, int32_t en
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-static SyntaxError ParseCommas(list(Token) tokens, int32_t start, int32_t end, list(Expression) * expressions) {
+static SyntaxError ParseList(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+	expression->list = ListCreate(sizeof(Expression), 1);
 	int32_t index = FindComma(tokens, start, end);
 	int32_t prevIndex = start;
 	while (index > -1) {
-		*expressions = ListPush(*expressions, &(Expression){ 0 });
-		SyntaxError error = ParseExpression(tokens, prevIndex + 1, index - 1, &(*expressions)[ListLength(*expressions) - 1]);
+		expression->list = ListPush(expression->list, &(Expression){ 0 });
+		SyntaxError error = ParseExpression(tokens, prevIndex + 1, index - 1, &expression->list[ListLength(expression->list) - 1]);
 		if (error.code != SyntaxErrorCodeNone) { return error; }
 		prevIndex = index;
 		index = FindComma(tokens, index + 1, end);
 	}
-	*expressions = ListPush(*expressions, &(Expression){ 0 });
-	SyntaxError error = ParseExpression(tokens, prevIndex + 1, end - 1, &(*expressions)[ListLength(*expressions) - 1]);
+	expression->list = ListPush(expression->list, &(Expression){ 0 });
+	SyntaxError error = ParseExpression(tokens, prevIndex + 1, end - 1, &expression->list[ListLength(expression->list) - 1]);
 	if (error.code != SyntaxErrorCodeNone) { return error; }
 	
 	return (SyntaxError){ SyntaxErrorCodeNone };
-}
-
-static SyntaxError ParseVectorLiteral(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	expression->vector = ListCreate(sizeof(Expression), 1);
-	SyntaxError error = ParseCommas(tokens, start, end, &expression->vector);
-	if (error.code != SyntaxErrorCodeNone) { return error; }
-	if (ListLength(expression->vector) > 4) { return (SyntaxError){ SyntaxErrorCodeTooManyVectorElements, start, end }; }
-	return (SyntaxError){ SyntaxErrorCodeNone };
-}
-
-static SyntaxError ParseArrayLiteral(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	expression->array = ListCreate(sizeof(Expression), 1);
-	return ParseCommas(tokens, start, end, &expression->array);
-}
-
-static SyntaxError ParseArguments(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	expression->arguments = ListCreate(sizeof(Expression), 1);
-	return ParseCommas(tokens, start, end, &expression->arguments);
 }
 
 static SyntaxError ParseForAssignment(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
@@ -398,9 +406,9 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 		case ExpressionTypeUnknown: return (SyntaxError){ SyntaxErrorCodeNonsenseExpression, start, end };
 		case ExpressionTypeConstant: return ParseConstant(tokens, start, end, expression);
 		case ExpressionTypeIdentifier: return ParseIdentifier(tokens, start, end, expression);
-		case ExpressionTypeVectorLiteral: return ParseVectorLiteral(tokens, start, end, expression);
-		case ExpressionTypeArrayLiteral: return ParseArrayLiteral(tokens, start, end, expression);
-		case ExpressionTypeArguments: return ParseArguments(tokens, start, end, expression);
+		case ExpressionTypeVectorLiteral: return ParseList(tokens, start, end, expression);
+		case ExpressionTypeArrayLiteral: return ParseList(tokens, start, end, expression);
+		case ExpressionTypeArguments: return ParseList(tokens, start, end, expression);
 		case ExpressionTypeForAssignment: return ParseForAssignment(tokens, start, end, expression);
 		case ExpressionTypeUnary: return ParseUnary(tokens, start, end, expression);
 		case ExpressionTypeBinary: return ParseBinary(tokens, start, end, expression);
@@ -416,24 +424,24 @@ void PrintExpression(Expression expression) {
 	if (expression.type == ExpressionTypeIdentifier) { printf("%s", expression.identifier); }
 	if (expression.type == ExpressionTypeVectorLiteral) {
 		printf("(");
-		for (int32_t i = 0; i < ListLength(expression.vector); i++) {
-			PrintExpression(expression.vector[i]);
-			if (i < ListLength(expression.vector) - 1) { printf(", "); }
+		for (int32_t i = 0; i < ListLength(expression.list); i++) {
+			PrintExpression(expression.list[i]);
+			if (i < ListLength(expression.list) - 1) { printf(", "); }
 		}
 		printf(")");
 	}
 	if (expression.type == ExpressionTypeArrayLiteral) {
 		printf("[");
-		for (int32_t i = 0; i < ListLength(expression.array); i++) {
-			PrintExpression(expression.array[i]);
-			if (i < ListLength(expression.array) - 1) { printf(", "); }
+		for (int32_t i = 0; i < ListLength(expression.list); i++) {
+			PrintExpression(expression.list[i]);
+			if (i < ListLength(expression.list) - 1) { printf(", "); }
 		}
 		printf("]");
 	}
 	if (expression.type == ExpressionTypeArguments) {
-		for (int32_t i = 0; i < ListLength(expression.arguments); i++) {
-			PrintExpression(expression.arguments[i]);
-			if (i < ListLength(expression.array) - 1) { printf(", "); }
+		for (int32_t i = 0; i < ListLength(expression.list); i++) {
+			PrintExpression(expression.list[i]);
+			if (i < ListLength(expression.list) - 1) { printf(", "); }
 		}
 	}
 	if (expression.type == ExpressionTypeForAssignment) {
@@ -482,8 +490,8 @@ void PrintExpression(Expression expression) {
 void FreeExpression(Expression expression) {
 	if (expression.type == ExpressionTypeIdentifier) { StringFree(expression.identifier); }
 	if (expression.type == ExpressionTypeVectorLiteral || expression.type == ExpressionTypeArguments || expression.type == ExpressionTypeArrayLiteral) {
-		for (int32_t i = 0; i < ListLength(expression.array); i++) { FreeExpression(expression.array[i]); }
-		ListFree(expression.array);
+		for (int32_t i = 0; i < ListLength(expression.list); i++) { FreeExpression(expression.list[i]); }
+		ListFree(expression.list);
 	}
 	if (expression.type == ExpressionTypeForAssignment) {
 		StringFree(expression.assignment.identifier);
