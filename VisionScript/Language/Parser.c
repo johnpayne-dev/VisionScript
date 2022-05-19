@@ -598,6 +598,7 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, Declaration * de
 
 SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
 	*equation = (Equation){ 0 };
+	equation->dependents = ListCreate(sizeof(Equation *), 1);
 	
 	// check for any unknown tokens
 	for (int32_t i = 0; i < ListLength(tokens); i++) {
@@ -630,14 +631,15 @@ SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
 	return error;
 }
 
-void FreeEquation(Equation statement) {
-	FreeExpression(statement.expression);
-	if (statement.type == EquationTypeVariable) {
-		StringFree(statement.declaration.identifier);
+void FreeEquation(Equation equation) {
+	ListFree(equation.dependents);
+	FreeExpression(equation.expression);
+	if (equation.type == EquationTypeVariable) {
+		StringFree(equation.declaration.identifier);
 	}
-	if (statement.type == EquationTypeFunction) {
-		StringFree(statement.declaration.identifier);
-		for (int32_t i = 0; i < ListLength(statement.declaration.parameters); i++) { StringFree(statement.declaration.parameters[i]); }
-		ListFree(statement.declaration.parameters);
+	if (equation.type == EquationTypeFunction) {
+		StringFree(equation.declaration.identifier);
+		for (int32_t i = 0; i < ListLength(equation.declaration.parameters); i++) { StringFree(equation.declaration.parameters[i]); }
+		ListFree(equation.declaration.parameters);
 	}
 }

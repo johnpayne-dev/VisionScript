@@ -33,7 +33,7 @@ void RunREPL(void)
 		Equation equation;
 		SyntaxError error = ParseEquation(tokenLine, &equation);
 		if (error.code != SyntaxErrorCodeNone) {
-			PrintSyntaxError(error, tokenLine, inputs);
+			PrintSyntaxError(error, inputs);
 			FreeTokens(tokenLine);
 			continue;
 		}
@@ -47,7 +47,7 @@ void RunREPL(void)
 			RuntimeError error = EvaluateExpression(&environment, NULL, equation.expression, &result);
 			timer = clock() - timer;
 			if (error.code != RuntimeErrorCodeNone) {
-				printf("error %i\n", error.code);//PrintRuntimeError(error, statement);
+				PrintRuntimeError(error, inputs);
 				FreeEquation(equation);
 				FreeTokens(tokenLine);
 				continue;

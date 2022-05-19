@@ -73,8 +73,12 @@ typedef struct Environment {
 Environment CreateEmptyEnvironment(void);
 void SetEnvironmentEquation(Environment * environment, Equation equation);
 void SetEnvironmentCache(Environment * environment, Binding binding);
+Equation * GetEnvironmentEquation(Environment * environment, const char * identifier);
+VectorArray * GetEnvironmentCache(Environment * environment, const char * identifier);
+void InitializeEnvironmentDependents(Environment * environment);
 void FreeEnvironment(Environment environment);
 
 RuntimeError EvaluateExpression(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result);
+void FindExpressionParents(Environment environment, Expression expression, list(String) parameters, list(String) * identifiers);
 
 #endif

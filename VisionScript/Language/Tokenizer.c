@@ -10,15 +10,14 @@ static bool IsValidInIdentifier(char c) { return IsLetter(c) || IsDigit(c) || c 
 
 static bool MatchesWord(String line, int32_t start, int32_t * end, const char * word) {
 	int32_t j = 0;
-	while (line[start + j] != '\0') {
+	while (true) {
 		if (word[j] == '\0' && !IsValidInIdentifier(line[start + j])) {
 			*end = start + j - 1;
 			return true;
 		}
-		if (word[j] != line[start + j]) { return false; }
+		if (word[j] != line[start + j] || line[start + j] == '\0') { return false; }
 		j++;
 	}
-	return false;
 }
 
 static const char * keywords[] = {

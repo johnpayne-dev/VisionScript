@@ -3,30 +3,22 @@
 
 #include "Tokenizer.h"
 #include "Parser.h"
-#include "Utilities/HashMap.h"
+#include "Evaluator.h"
 
-typedef struct Script
-{
-	const char * code;
-	list(list(Token)) tokenLines;
-	list(Statement *) identifierList;
-	list(Statement *) renderList;
-	list(list(String)) renderParents;
-	list(Statement *) errorList;
-	HashMap identifiers;
-	HashMap cache;
-	HashMap dependents;
-	list(Statement *) dirtyRenders;
+typedef struct Script {
+	list(String) lines;
+	Environment environment;
+	list(Equation *) needsRender;
 } Script;
 
-Script * LoadScript(const char * code);
+Script LoadScript(const char * code);
 
-void InvalidateCachedDependents(Script * script, String identifier);
+void AddToScriptRenderList(Script * script, Equation equation);
 
-void InvalidateDependentRenders(Script * script, String identifier);
+void RemoveFromRenderList(Script * script, Equation equation);
 
-void InvalidateParametricRenders(Script * script);
+void InvalidateDependents(String * script, String identifer);
 
-void FreeScript(Script * script);
+void FreeScript(Script script);
 
 #endif

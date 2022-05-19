@@ -119,6 +119,13 @@ void SetEnvironmentEquation(Environment * environment, Equation equation) {
 	if (!replaced) { environment->equations = ListPush(environment->equations, &equation); }
 }
 
+Equation * GetEnvironmentEquation(Environment * environment, const char * identifier) {
+	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
+		if (StringEquals(environment->equations[i].declaration.identifier, identifier)) { return &environment->equations[i]; }
+	}
+	return NULL;
+}
+
 void SetEnvironmentCache(Environment * environment, Binding binding) {
 	bool replaced = false;
 	for (int32_t i = 0; i < ListLength(environment->cache); i++) {
@@ -130,6 +137,27 @@ void SetEnvironmentCache(Environment * environment, Binding binding) {
 		}
 	}
 	if (!replaced) { environment->cache = ListPush(environment->cache, &binding); }
+}
+
+VectorArray * GetEnvironmentCache(Environment * environment, const char * identifier) {
+	for (int32_t i = 0; i < ListLength(environment->cache); i++) {
+		if (StringEquals(environment->cache[i].identifier, identifier)) { return &environment->cache[i].value; }
+	}
+	return NULL;
+}
+
+void InitializeEnvironmentDependents(Environment * environment) {
+	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
+		list(String) parents = ListCreate(sizeof(String), 1);
+		FindExpressionParents(*environment, environment->equations[i].expression, environment->equations[i].declaration.parameters, &parents);
+		for (int32_t j = 0; j < ListLength(parents); j++) {
+			Equation * equation = GetEnvironmentEquation(environment, parents[j]);
+			if (equation != NULL && !ListContains(equation->dependents, &(Equation *){ environment->equations + i })) {
+				equation->dependents = ListPush(equation->dependents, &(Equation *){ environment->equations + i });
+			}
+		}
+		ListFree(parents);
+	}
 }
 
 void FreeEnvironment(Environment environment) {
@@ -157,20 +185,18 @@ static RuntimeError EvaluateIdentifier(Environment * environment, list(Binding) 
 		}
 	}
 	
-	for (int32_t i = 0; i < ListLength(environment->cache); i++) {
-		if (StringEquals(environment->cache[i].identifier, expression.identifier)) {
-			*result = CopyVectorArray(environment->cache[i].value);
-			return (RuntimeError){ RuntimeErrorCodeNone };
-		}
+	VectorArray * cached = GetEnvironmentCache(environment, expression.identifier);
+	if (cached != NULL) {
+		*result = CopyVectorArray(*cached);
+		return (RuntimeError){ RuntimeErrorCodeNone };
 	}
 	
-	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
-		if (StringEquals(environment->equations[i].declaration.identifier, expression.identifier)) {
-			if (environment->equations[i].type == EquationTypeFunction) { return (RuntimeError){ RuntimeErrorCodeIdentifierNotVariable, expression.start, expression.end, expression.line }; }
-			RuntimeError error = EvaluateExpression(environment, NULL, environment->equations[i].expression, result);
-			if (error.code == RuntimeErrorCodeNone) { SetEnvironmentCache(environment, CreateBinding(expression.identifier, *result)); }
-			return error;
-		}
+	Equation * equation = GetEnvironmentEquation(environment, expression.identifier);
+	if (equation != NULL) {
+		if (equation->type == EquationTypeFunction) { return (RuntimeError){ RuntimeErrorCodeIdentifierNotVariable, expression.start, expression.end, expression.line }; }
+		RuntimeError error = EvaluateExpression(environment, NULL, equation->expression, result);
+		if (error.code == RuntimeErrorCodeNone) { SetEnvironmentCache(environment, CreateBinding(expression.identifier, *result)); }
+		return error;
 	}
 	
 	return (RuntimeError){ RuntimeErrorCodeUndefinedIdentifier, expression.start, expression.end, expression.line };
@@ -493,21 +519,18 @@ static RuntimeError EvaluateCall(Environment * environment, list(Binding) parame
 		return (RuntimeError){ RuntimeErrorCodeUncallableExpression, expression.binary.left->start, expression.binary.left->end, expression.line };
 	}
 	
-	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
-		if (StringEquals(environment->equations[i].declaration.identifier, expression.binary.left->identifier)) {
-			if (environment->equations[i].type == EquationTypeVariable) {
-				return (RuntimeError){ RuntimeErrorCodeIdentifierNotFunction, expression.binary.left->start, expression.binary.left->end, expression.line };
-			}
-			
-			list(Binding) arguments = ListCreate(sizeof(Binding), 1);
-			RuntimeError error = EvaluateArguments(environment, parameters, expression, environment->equations[i].declaration.parameters, &arguments);
-			if (error.code == RuntimeErrorCodeNone) {
-				error = EvaluateExpression(environment, arguments, environment->equations[i].expression, result);
-			}
-			for (int32_t j = 0; j < ListLength(arguments); j++) { FreeBinding(arguments[j]); }
-			ListFree(arguments);
-			return error;
+	Equation * equation = GetEnvironmentEquation(environment, expression.binary.left->identifier);
+	if (equation != NULL) {
+		if (equation->type == EquationTypeVariable) {
+			return (RuntimeError){ RuntimeErrorCodeIdentifierNotFunction, expression.binary.left->start, expression.binary.left->end, expression.line };
 		}
+		
+		list(Binding) arguments = ListCreate(sizeof(Binding), 1);
+		RuntimeError error = EvaluateArguments(environment, parameters, expression, equation->declaration.parameters, &arguments);
+		if (error.code == RuntimeErrorCodeNone) { error = EvaluateExpression(environment, arguments, equation->expression, result); }
+		for (int32_t j = 0; j < ListLength(arguments); j++) { FreeBinding(arguments[j]); }
+		ListFree(arguments);
+		return error;
 	}
 	
 	return (RuntimeError){ RuntimeErrorCodeUndefinedIdentifier, expression.binary.left->start, expression.binary.left->end, expression.line };
@@ -616,5 +639,48 @@ RuntimeError EvaluateExpression(Environment * environment, list(Binding) paramet
 		case ExpressionTypeUnary: return EvaluateUnary(environment, parameters, expression, result);
 		case ExpressionTypeBinary: return EvaluateBinary(environment, parameters, expression, result);
 		case ExpressionTypeTernary: return EvaluateTernary(environment, parameters, expression, result);
+	}
+}
+
+void FindExpressionParents(Environment environment, Expression expression, list(String) parameters, list(String) * identifiers) {
+	if (expression.type == ExpressionTypeIdentifier) {
+		if (parameters != NULL) {
+			for (int32_t i = 0; i < ListLength(parameters); i++) {
+				if (StringEquals(parameters[i], expression.identifier)) { return; }
+			}
+		}
+		*identifiers = ListPush(*identifiers, &expression.identifier);
+		Equation * equation = GetEnvironmentEquation(&environment, expression.identifier);
+		if (equation != NULL) { FindExpressionParents(environment, equation->expression, equation->declaration.parameters, identifiers); }
+	}
+	if (expression.type == ExpressionTypeVectorLiteral || expression.type == ExpressionTypeArrayLiteral || expression.type == ExpressionTypeArguments) {
+		for (int32_t i = 0; i < ListLength(expression.list); i++) { FindExpressionParents(environment, expression.list[i], parameters, identifiers); }
+	}
+	if (expression.type == ExpressionTypeUnary) {
+		FindExpressionParents(environment, *expression.unary.expression, parameters, identifiers);
+	}
+	if (expression.type == ExpressionTypeBinary) {
+		if (expression.binary.operator == OperatorFor && expression.binary.right->type == ExpressionTypeForAssignment) {
+			parameters = parameters == NULL ? ListCreate(sizeof(String), 1) : ListClone(parameters);
+			parameters = ListInsert(parameters, &expression.binary.right->assignment.identifier, 0);
+			FindExpressionParents(environment, *expression.binary.left, parameters, identifiers);
+			ListFree(parameters);
+		} else {
+			FindExpressionParents(environment, *expression.binary.left, parameters, identifiers);
+			FindExpressionParents(environment, *expression.binary.right, parameters, identifiers);
+		}
+	}
+	if (expression.type == ExpressionTypeTernary) {
+		if (expression.ternary.leftOperator == OperatorFor && expression.ternary.middle->type == ExpressionTypeForAssignment) {
+			parameters = ListClone(parameters);
+			parameters = ListInsert(parameters, &expression.ternary.middle->assignment.identifier, 0);
+			FindExpressionParents(environment, *expression.ternary.left, parameters, identifiers);
+			FindExpressionParents(environment, *expression.ternary.right, parameters, identifiers);
+			ListFree(parameters);
+		} else {
+			FindExpressionParents(environment, *expression.ternary.left, parameters, identifiers);
+			FindExpressionParents(environment, *expression.ternary.middle, parameters, identifiers);
+			FindExpressionParents(environment, *expression.ternary.right, parameters, identifiers);
+		}
 	}
 }
