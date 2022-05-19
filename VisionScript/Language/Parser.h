@@ -16,17 +16,17 @@ typedef enum SyntaxErrorCode {
 	SyntaxErrorCodeUnreadableConstant,
 	SyntaxErrorCodeInvalidUnaryPlacement,
 	SyntaxErrorCodeInvalidTernaryPlacement,
-	SyntaxErrorCodeTooManyVectorElements,
 } SyntaxErrorCode;
 
 typedef struct SyntaxError {
 	SyntaxErrorCode code;
 	int32_t start;
 	int32_t end;
+	int32_t line;
 } SyntaxError;
 
 const char * SyntaxErrorCodeToString(SyntaxErrorCode code);
-void PrintSyntaxError(SyntaxError error, list(Token) tokens, list(String) lines);
+void PrintSyntaxError(SyntaxError error, list(String) lines);
 
 typedef struct ForAssignment {
 	String identifier;
@@ -107,6 +107,7 @@ typedef struct Expression {
 	};
 	int32_t start;
 	int32_t end;
+	int32_t line;
 } Expression;
 
 SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression);

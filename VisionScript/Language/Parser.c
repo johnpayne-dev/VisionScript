@@ -15,16 +15,15 @@ const char * SyntaxErrorCodeToString(SyntaxErrorCode code) {
 		case SyntaxErrorCodeUnreadableConstant: return "invalid numeric constant";
 		case SyntaxErrorCodeInvalidUnaryPlacement: return "unable to understand unary expression (try inserting parenthesis)";
 		case SyntaxErrorCodeInvalidTernaryPlacement: return "unable to understand ternary expression (try inserting parenthesis)";
-		case SyntaxErrorCodeTooManyVectorElements: return "too many elements in vector literal";
 		default: return "unknown error";
 	}
 }
 
-void PrintSyntaxError(SyntaxError error, list(Token) tokens, list(String) lines) {
+void PrintSyntaxError(SyntaxError error, list(String) lines) {
 	printf("SyntaxError: %s", SyntaxErrorCodeToString(error.code));
-	String snippet = StringSub(lines[tokens[0].lineNumber], tokens[error.start].start, tokens[error.end].end);
+	String snippet = StringSub(lines[error.line], error.start, error.end);
 	printf(" \"%s\"\n", snippet);
-	printf("\tin line: \"%s\"\n", lines[tokens[0].lineNumber]);
+	printf("\tin line: \"%s\"\n", lines[error.line]);
 	StringFree(snippet);
 }
 
@@ -238,21 +237,21 @@ static SyntaxError CheckMissingBraces(list(Token) tokens, int32_t start, int32_t
 	for (int32_t i = start; i <= end; i++) {
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_PARENTHESIS)) {
 			int32_t next = FindClosingParenthesis(tokens, i, end);
-			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, i, end }; }
+			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, tokens[i].start, tokens[end].end, tokens[i].lineNumber }; }
 			i = next;
 			continue;
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_RIGHT_PARENTHESIS)) {
-			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, start, i };
+			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, tokens[start].start, tokens[i].end, tokens[start].lineNumber };
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_BRACKET)) {
 			int32_t next = FindClosingBracket(tokens, i, end);
-			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, i, end }; }
+			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, tokens[i].start, tokens[end].end, tokens[i].lineNumber }; }
 			i = next;
 			continue;
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_RIGHT_BRACKET)) {
-			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, start, i };
+			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, tokens[start].start, tokens[i].end, tokens[start].lineNumber };
 		}
 	}
 	return (SyntaxError){ SyntaxErrorCodeNone };
@@ -302,7 +301,7 @@ static ExpressionType DetermineExpressionType(list(Token) tokens, int32_t start,
 static SyntaxError ParseConstant(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	char * endPtr = NULL;
 	expression->constant = strtod(tokens[start].value, &endPtr);
-	if (*endPtr != '\0') { return (SyntaxError){ SyntaxErrorCodeUnreadableConstant, start, end }; }
+	if (*endPtr != '\0') { return (SyntaxError){ SyntaxErrorCodeUnreadableConstant, expression->start, expression->end, expression->line }; }
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
@@ -320,7 +319,7 @@ static SyntaxError ParseList(list(Token) tokens, int32_t start, int32_t end, Exp
 		SyntaxError error = ParseExpression(tokens, prevIndex + 1, index - 1, &expression->list[ListLength(expression->list) - 1]);
 		if (error.code != SyntaxErrorCodeNone) { return error; }
 		prevIndex = index;
-		index = FindComma(tokens, index + 1, end);
+		index = FindComma(tokens, index, end);
 	}
 	expression->list = ListPush(expression->list, &(Expression){ 0 });
 	SyntaxError error = ParseExpression(tokens, prevIndex + 1, end - 1, &expression->list[ListLength(expression->list) - 1]);
@@ -342,10 +341,10 @@ static SyntaxError ParseUnary(list(Token) tokens, int32_t start, int32_t end, Ex
 	
 	SyntaxError error = (SyntaxError){ SyntaxErrorCodeNone };
 	if (IsPostfix(expression->unary.operator)) {
-		if (indices[ListLength(indices) - 1] != end) { return (SyntaxError){ SyntaxErrorCodeInvalidUnaryPlacement, start, end }; }
+		if (indices[ListLength(indices) - 1] != end) { return (SyntaxError){ SyntaxErrorCodeInvalidUnaryPlacement, expression->start, expression->end, expression->line }; }
 		error = ParseExpression(tokens, start, end - 1, expression->unary.expression);
 	} else {
-		if (indices[0] != start) { return (SyntaxError){ SyntaxErrorCodeInvalidUnaryPlacement, start, end }; }
+		if (indices[0] != start) { return (SyntaxError){ SyntaxErrorCodeInvalidUnaryPlacement, expression->start, expression->end, expression->line }; }
 		error = ParseExpression(tokens, start + 1, end, expression->unary.expression);
 	}
 	ListFree(indices);
@@ -376,7 +375,7 @@ static SyntaxError ParseTernary(list(Token) tokens, int32_t start, int32_t end, 
 	list(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
 	if (ListLength(indices) != 2) {
 		ListFree(indices);
-		return (SyntaxError){ SyntaxErrorCodeInvalidTernaryPlacement, start, end };
+		return (SyntaxError){ SyntaxErrorCodeInvalidTernaryPlacement, expression->start, expression->end, expression->line };
 	}
 	int32_t leftOpIndex = indices[0];
 	int32_t rightOpIndex = indices[1];
@@ -396,9 +395,10 @@ static SyntaxError ParseTernary(list(Token) tokens, int32_t start, int32_t end, 
 }
 
 SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	if (end < start) { return (SyntaxError){ SyntaxErrorCodeMissingExpression, end, start }; }
-	expression->start = start;
-	expression->end = end;
+	if (end < start) { return (SyntaxError){ SyntaxErrorCodeMissingExpression, tokens[end].start, tokens[start].end, tokens[end].lineNumber }; }
+	expression->start = tokens[start].start;
+	expression->end = tokens[end].end;
+	expression->line = tokens[start].lineNumber;
 	
 	SyntaxError error = CheckMissingBraces(tokens, start, end);
 	if (error.code != SyntaxErrorCodeNone) { return error; }
@@ -409,7 +409,7 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 	
 	expression->type = DetermineExpressionType(tokens, start, end);
 	switch (expression->type) {
-		case ExpressionTypeUnknown: return (SyntaxError){ SyntaxErrorCodeNonsenseExpression, start, end };
+		case ExpressionTypeUnknown: return (SyntaxError){ SyntaxErrorCodeNonsenseExpression, expression->start, expression->end, expression->line };
 		case ExpressionTypeConstant: return ParseConstant(tokens, start, end, expression);
 		case ExpressionTypeIdentifier: return ParseIdentifier(tokens, start, end, expression);
 		case ExpressionTypeVectorLiteral: return ParseList(tokens, start, end, expression);
@@ -584,11 +584,11 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, Declaration * de
 	// go through each identifier and add it to the argument list
 	declaration->parameters = ListCreate(sizeof(String), 4);
 	for (int32_t i = start + 2; i < argumentsEnd; i++) {
-		if (tokens[i].type != TokenTypeIdentifier) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, i, i }; }
+		if (tokens[i].type != TokenTypeIdentifier) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, tokens[i].start, tokens[i].end, tokens[i].lineNumber }; }
 		declaration->parameters = ListPush(declaration->parameters, &(String){ StringCreate(tokens[i].value) });
 		i++;
 		if (i == argumentsEnd) { break; }
-		if (!StringEquals(tokens[i].value, SYMBOL_COMMA)) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, i, i }; }
+		if (!StringEquals(tokens[i].value, SYMBOL_COMMA)) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, tokens[i].start, tokens[i].end, tokens[i].lineNumber }; }
 	}
 	
 	declaration->identifier = StringCreate(tokens[start].value);
@@ -601,7 +601,7 @@ SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
 	
 	// check for any unknown tokens
 	for (int32_t i = 0; i < ListLength(tokens); i++) {
-		if (tokens[i].type == TokenTypeUnknown) { return (SyntaxError){ SyntaxErrorCodeUnknownToken, i, i }; }
+		if (tokens[i].type == TokenTypeUnknown) { return (SyntaxError){ SyntaxErrorCodeUnknownToken, tokens[i].start, tokens[i].end, tokens[i].lineNumber }; }
 	}
 	
 	// parse statement declaration

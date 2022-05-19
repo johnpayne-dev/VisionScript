@@ -19,6 +19,9 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeNonUniformRange,
 	RuntimeErrorCodeInvalidRangePlacement,
 	RuntimeErrorCodeInvalidForPlacement,
+	RuntimeErrorCodeInvalidIfPlacement,
+	RuntimeErrorCodeInvalidElsePlacement,
+	RuntimeErrorCodeInvalidWhenPlacement,
 	RuntimeErrorCodeMissingForAssignment,
 	RuntimeErrorCodeInvalidDimensionOperon,
 	RuntimeErrorCodeInvalidSwizzling,
@@ -33,13 +36,13 @@ typedef enum RuntimeErrorCode {
 
 typedef struct RuntimeError {
 	RuntimeErrorCode code;
-	int32_t tokenStart;
-	int32_t tokenEnd;
-	Equation * equation;
+	int32_t start;
+	int32_t end;
+	int32_t line;
 } RuntimeError;
 
 const char * RuntimeErrorToString(RuntimeErrorCode code);
-void PrintRuntimeError(RuntimeError error);
+void PrintRuntimeError(RuntimeError error, list(String) lines);
 
 typedef float scalar_t;
 
