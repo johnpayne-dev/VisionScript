@@ -33,11 +33,12 @@ void RunREPL(void)
 		Equation equation;
 		SyntaxError error = ParseEquation(tokenLine, &equation);
 		if (error.code != SyntaxErrorCodeNone) {
-			PrintSyntaxError(error, tokenLine, &input);
-			FreeEquation(equation);
+			PrintSyntaxError(error, tokenLine, inputs);
 			FreeTokens(tokenLine);
 			continue;
 		}
+		//PrintExpression(equation.expression);
+		//printf("\n");
 		
 		if (equation.type == EquationTypeNone || equation.type == EquationTypeVariable) {
 			// evaluate the expression

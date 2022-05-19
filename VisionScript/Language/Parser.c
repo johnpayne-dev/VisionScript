@@ -96,7 +96,7 @@ static const int32_t precedences[] = {
 	[OperatorNot]          = 7,
 	[OperatorPower]        = 8,
 	[OperatorFactorial]    = 9,
-	[OperatorDimension]    = 10,
+	[OperatorDimension]    = 11,
 	[OperatorIndexStart]   = 11,
 	[OperatorIndexEnd]     = 11,
 	[OperatorCallStart]    = 12,
@@ -181,6 +181,10 @@ static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end) {
 		if (StringEquals(tokens[i].value, SYMBOL_COMMA)) { return i; }
 	}
 	return -1;
+}
+
+static bool ShouldReduceParenthesis(list(Token) tokens, int32_t start, int32_t end) {
+	return FindComma(tokens, start, end) == -1 && start > 0 && tokens[start - 1].type != TokenTypeIdentifier;
 }
 
 static Operator FindOperator(list(Token) tokens, int32_t start, int32_t end, int32_t * operatorStart, int32_t * operatorEnd) {
@@ -399,7 +403,7 @@ SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expr
 	SyntaxError error = CheckMissingBraces(tokens, start, end);
 	if (error.code != SyntaxErrorCodeNone) { return error; }
 	
-	if (StringEquals(tokens[start].value, SYMBOL_LEFT_PARENTHESIS) && FindClosingParenthesis(tokens, start, end) == end && FindComma(tokens, start, end) == -1) {
+	if (StringEquals(tokens[start].value, SYMBOL_LEFT_PARENTHESIS) && FindClosingParenthesis(tokens, start, end) == end && ShouldReduceParenthesis(tokens, start, end)) {
 		return ParseExpression(tokens, start + 1, end - 1, expression);
 	}
 	
@@ -468,7 +472,9 @@ void PrintExpression(Expression expression) {
 			PrintExpression(*expression.binary.right);
 			printf(")");
 		} else if (expression.binary.operator == OperatorIndexStart) {
+			printf("(");
 			PrintExpression(*expression.binary.left);
+			printf(")");
 			PrintExpression(*expression.binary.right);
 		} else {
 			printf("(");
