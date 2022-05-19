@@ -19,7 +19,7 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeNonUniformRange,
 	RuntimeErrorCodeInvalidRangePlacement,
 	RuntimeErrorCodeInvalidForPlacement,
-	RuntimeErrorCodeInvalidForAssignment,
+	RuntimeErrorCodeMissingForAssignment,
 	RuntimeErrorCodeInvalidDimensionOperon,
 	RuntimeErrorCodeInvalidSwizzling,
 	RuntimeErrorCodeInvalidIndexDimension,
@@ -27,6 +27,7 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeIdentifierNotFunction,
 	RuntimeErrorCodeInvalidArgumentsExpression,
 	RuntimeErrorCodeIncorrectArgumentCount,
+	RuntimeErrorCodeDifferingOperonDimensions,
 	RuntimeErrorCodeNotImplemented,
 } RuntimeErrorCode;
 
@@ -50,6 +51,7 @@ typedef struct VectorArray {
 
 void PrintVectorArray(VectorArray value);
 VectorArray CopyVectorArray(VectorArray value);
+bool TruthyVectorArray(VectorArray value);
 void FreeVectorArray(VectorArray value);
 
 typedef struct Binding {

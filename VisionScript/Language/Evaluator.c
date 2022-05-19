@@ -48,6 +48,15 @@ VectorArray CopyVectorArray(VectorArray value) {
 	return result;
 }
 
+bool TruthyVectorArray(VectorArray value) {
+	for (int32_t i = 0; i < value.dimensions; i++) {
+		for (int32_t j = 0; j < value.length; j++) {
+			if (value.xyzw[i][j]) { return true; }
+		}
+	}
+	return false;
+}
+
 void FreeVectorArray(VectorArray value) {
 	for (int32_t d = 0; d < value.dimensions; d++) { free(value.xyzw[d]); }
 }
@@ -210,73 +219,82 @@ static RuntimeError EvaluateRange(Environment * environment, list(Binding) param
 }
 
 static RuntimeError EvaluateFor(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+	Expression * left, * right;
 	if (expression.type == ExpressionTypeTernary) {
-		
+		left = expression.ternary.left;
+		right = expression.ternary.middle;
+	} else {
+		left = expression.binary.left;
+		right = expression.binary.right;
 	}
-	if (expression.type == ExpressionTypeBinary) {
-		if (expression.binary.right->type != ExpressionTypeForAssignment) {
-			return (RuntimeError){ RuntimeErrorCodeInvalidForAssignment, expression.binary.right->start, expression.binary.right->end };
-		}
-		VectorArray assignment;
-		RuntimeError error = EvaluateExpression(environment, parameters, *expression.binary.right->assignment.expression, &assignment);
-		if (error.code != RuntimeErrorCodeNone) { return error; }
+	
+	if (right->type != ExpressionTypeForAssignment) { return (RuntimeError){ RuntimeErrorCodeMissingForAssignment, right->start, right->end }; }
+	VectorArray assignment;
+	RuntimeError error = EvaluateExpression(environment, parameters, *right->assignment.expression, &assignment);
+	if (error.code != RuntimeErrorCodeNone) { return error; }
+	
+	if (parameters == NULL) { parameters = ListCreate(sizeof(Binding), 1); }
+	else { parameters = ListClone(parameters); }
+	parameters = ListInsert(parameters, &(Binding){ .identifier = right->assignment.identifier }, 0);
+	
+	result->dimensions = 0;
+	result->length = 0;
+	VectorArray * values = malloc(assignment.length * sizeof(VectorArray));
+	int32_t c = 0;
+	for (int32_t i = 0; i < assignment.length; i++) {
+		parameters[0].value.length = 1;
+		parameters[0].value.dimensions = assignment.dimensions;
+		for (int32_t j = 0; j < assignment.dimensions; j++) { parameters[0].value.xyzw[j] = &assignment.xyzw[j][i]; }
 		
-		if (parameters == NULL) { parameters = ListCreate(sizeof(Binding), 1); }
-		else { parameters = ListClone(parameters); }
-		parameters = ListInsert(parameters, &(Binding){ .identifier = expression.binary.right->assignment.identifier }, 0);
-		
-		result->dimensions = 0;
-		result->length = 0;
-		VectorArray * values = malloc(assignment.length * sizeof(VectorArray));
-		for (int32_t i = 0; i < assignment.length; i++) {
-			parameters[0].value.length = 1;
-			parameters[0].value.dimensions = assignment.dimensions;
-			for (int32_t j = 0; j < assignment.dimensions; j++) { parameters[0].value.xyzw[j] = &assignment.xyzw[j][i]; }
-			
-			RuntimeError error;
-			if (expression.binary.left->type == ExpressionTypeBinary && expression.binary.left->binary.operator == OperatorRange) {
-				error = EvaluateRange(environment, parameters, *expression.binary.left, &values[i]);
-			} else if (expression.binary.left->type == ExpressionTypeBinary && expression.binary.left->binary.operator == OperatorFor) {
-				error = EvaluateFor(environment, parameters, *expression.binary.left, &values[i]);
-			} else if (expression.binary.left->type == ExpressionTypeTernary && expression.binary.left->ternary.leftOperator == OperatorFor) {
-				error = EvaluateFor(environment, parameters, *expression.binary.left, &values[i]);
-			} else {
-				error = EvaluateExpression(environment, parameters, *expression.binary.left, &values[i]);
+		if (expression.type == ExpressionTypeTernary) {
+			VectorArray condition;
+			RuntimeError error = EvaluateExpression(environment, parameters, *expression.ternary.right, &condition);
+			if (error.code != RuntimeErrorCodeNone) { return error; }
+			if (!TruthyVectorArray(condition)) {
+				FreeVectorArray(condition);
+				continue;
 			}
-			if (error.code != RuntimeErrorCodeNone) { goto free; }
-			if (result->dimensions == 0) { result->dimensions = values[i].dimensions; }
-			if (values[i].dimensions != result->dimensions) {
-				error = (RuntimeError){ RuntimeErrorCodeNonUniformArray, expression.binary.left->start, expression.binary.left->end };
-				goto free;
-			}
-			if (values[i].length > 1 && !IsNestedListAllowed(*expression.binary.left)) {
-				error = (RuntimeError){ RuntimeErrorCodeArrayInsideArray, expression.binary.left->start, expression.binary.left->end };
-				goto free;
-			}
-			
-			result->length += values[i].length;
-			continue;
-		free:
-			FreeVectorArray(assignment);
-			for (int32_t j = 0; j < i; j++) { FreeVectorArray(values[j]); }
-			ListFree(parameters);
-			return error;
+			FreeVectorArray(condition);
 		}
 		
-		for (int32_t i = 0; i < result->dimensions; i++) {
-			result->xyzw[i] = malloc(result->length * sizeof(scalar_t));
-			for (int32_t j = 0, p = 0; j < assignment.length; j++) {
-				memcpy(result->xyzw[i] + p, values[j].xyzw[i], values[j].length * sizeof(scalar_t));
-				p += values[j].length;
-				free(values[j].xyzw[i]);
-			}
+		RuntimeError error;
+		if (left->type == ExpressionTypeBinary && left->binary.operator == OperatorRange) { error = EvaluateRange(environment, parameters, *left, &values[c]); }
+		else if (left->type == ExpressionTypeBinary && left->binary.operator == OperatorFor) { error = EvaluateFor(environment, parameters, *left, &values[c]); }
+		else if (left->type == ExpressionTypeTernary && left->ternary.leftOperator == OperatorFor) { error = EvaluateFor(environment, parameters, *left, &values[c]); }
+		else { error = EvaluateExpression(environment, parameters, *left, &values[c]); }
+		if (error.code != RuntimeErrorCodeNone) { goto free; }
+		if (result->dimensions == 0) { result->dimensions = values[c].dimensions; }
+		if (values[c].dimensions != result->dimensions) {
+			error = (RuntimeError){ RuntimeErrorCodeNonUniformArray, left->start, left->end };
+			goto free;
 		}
-		free(values);
+		if (values[c].length > 1 && !IsNestedListAllowed(*left)) {
+			error = (RuntimeError){ RuntimeErrorCodeArrayInsideArray, left->start, left->end };
+			goto free;
+		}
+		
+		result->length += values[c].length;
+		c++;
+		continue;
+	free:
 		FreeVectorArray(assignment);
+		for (int32_t j = 0; j < c; j++) { FreeVectorArray(values[j]); }
 		ListFree(parameters);
-		
-		return (RuntimeError){ RuntimeErrorCodeNone };
+		return error;
 	}
+	
+	for (int32_t i = 0; i < result->dimensions; i++) {
+		result->xyzw[i] = malloc(result->length * sizeof(scalar_t));
+		for (int32_t j = 0, p = 0; j < c; j++) {
+			memcpy(result->xyzw[i] + p, values[j].xyzw[i], values[j].length * sizeof(scalar_t));
+			p += values[j].length;
+			free(values[j].xyzw[i]);
+		}
+	}
+	free(values);
+	FreeVectorArray(assignment);
+	ListFree(parameters);
+	
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
@@ -484,6 +502,42 @@ static inline scalar_t ApplyBinaryArithmetic(scalar_t a, scalar_t b, Operator op
 	}
 }
 
+static RuntimeError EvaluateBinaryArithmetic(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+	VectorArray left, right;
+	RuntimeError error = EvaluateExpression(environment, parameters, *expression.binary.left, &left);
+	if (error.code != RuntimeErrorCodeNone) { return error; }
+	error = EvaluateExpression(environment, parameters, *expression.binary.right, &right);
+	if (error.code != RuntimeErrorCodeNone) {
+		FreeVectorArray(left);
+		return error;
+	}
+	if (left.dimensions != right.dimensions && left.dimensions != 1 && right.dimensions != 1) {
+		FreeVectorArray(left);
+		FreeVectorArray(right);
+		return (RuntimeError){ RuntimeErrorCodeDifferingOperonDimensions, expression.start, expression.end };
+	}
+	
+	if (left.length == 1) { result->length = right.length; }
+	else if (right.length == 1) { result->length = left.length; }
+	else { result->length = left.length < right.length ? left.length : right.length; }
+	
+	if (left.dimensions == 1) { result->dimensions = right.dimensions; }
+	else { result->dimensions = left.dimensions; }
+	
+	for (int32_t i = 0; i < result->dimensions; i++) {
+		result->xyzw[i] = malloc(sizeof(scalar_t) * result->length);
+		for (int32_t j = 0; j < result->length; j++) {
+			scalar_t a = left.xyzw[left.dimensions == 1 ? 0 : i][left.length == 1 ? 0 : j];
+			scalar_t b = right.xyzw[right.dimensions == 1 ? 0 : i][right.length == 1 ? 0 : j];
+			result->xyzw[i][j] = ApplyBinaryArithmetic(a, b, expression.binary.operator);
+		}
+	}
+	
+	FreeVectorArray(left);
+	FreeVectorArray(right);
+	return (RuntimeError){ RuntimeErrorCodeNone };
+}
+
 static RuntimeError EvaluateBinary(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
 	switch (expression.binary.operator) {
 		case OperatorRange: return (RuntimeError){ RuntimeErrorCodeInvalidRangePlacement, expression.start, expression.end };
@@ -491,12 +545,30 @@ static RuntimeError EvaluateBinary(Environment * environment, list(Binding) para
 		case OperatorDimension: return EvaluateDimension(environment, parameters, expression, result);
 		case OperatorIndexStart: return EvaluateIndex(environment, parameters, expression, result);
 		case OperatorCallStart: return EvaluateCall(environment, parameters, expression, result);
-		default: break;
+		default: return EvaluateBinaryArithmetic(environment, parameters, expression, result);
 	}
-	return (RuntimeError){ RuntimeErrorCodeNotImplemented };
+}
+
+static RuntimeError EvaluateIfElse(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+	VectorArray condition;
+	RuntimeError error = EvaluateExpression(environment, parameters, *expression.ternary.middle, &condition);
+	if (error.code != RuntimeErrorCodeNone) { return error; }
+	
+	if (TruthyVectorArray(condition)) {
+		FreeVectorArray(condition);
+		return EvaluateExpression(environment, parameters, *expression.ternary.left, result);
+	}
+	FreeVectorArray(condition);
+	return EvaluateExpression(environment, parameters, *expression.ternary.right, result);
 }
 
 static RuntimeError EvaluateTernary(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+	if (expression.ternary.leftOperator == OperatorIf && expression.ternary.rightOperator == OperatorElse) {
+		return EvaluateIfElse(environment, parameters, expression, result);
+	}
+	if (expression.ternary.leftOperator == OperatorFor && expression.ternary.rightOperator == OperatorWhen) {
+		return (RuntimeError){ RuntimeErrorCodeInvalidForPlacement, expression.start, expression.end };
+	}
 	return (RuntimeError){ RuntimeErrorCodeNotImplemented };
 }
 

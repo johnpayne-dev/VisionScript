@@ -184,7 +184,7 @@ static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end) {
 }
 
 static bool ShouldReduceParenthesis(list(Token) tokens, int32_t start, int32_t end) {
-	return FindComma(tokens, start, end) == -1 && start > 0 && tokens[start - 1].type != TokenTypeIdentifier;
+	return FindComma(tokens, start, end) == -1 && (start == 0 || tokens[start - 1].type != TokenTypeIdentifier);
 }
 
 static Operator FindOperator(list(Token) tokens, int32_t start, int32_t end, int32_t * operatorStart, int32_t * operatorEnd) {
