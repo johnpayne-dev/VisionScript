@@ -7,12 +7,14 @@
 #include "Language/Tokenizer.h"
 #include "Language/Parser.h"
 #include "Language/Evaluator.h"
+#include "Language/Builtin.h"
 
 void RunREPL(void)
 {
 	printf("VisionScript v1.0 – REPL\n");
 	
 	Environment environment = CreateEmptyEnvironment();
+	InitializeBuiltinVariables(&environment);
 	list(String) inputs = ListCreate(sizeof(String), 1);
 	while (true) {
 		// wait for input

@@ -598,7 +598,6 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, Declaration * de
 
 SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
 	*equation = (Equation){ 0 };
-	equation->dependents = ListCreate(sizeof(Equation *), 1);
 	
 	// check for any unknown tokens
 	for (int32_t i = 0; i < ListLength(tokens); i++) {
@@ -632,7 +631,6 @@ SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
 }
 
 void FreeEquation(Equation equation) {
-	ListFree(equation.dependents);
 	FreeExpression(equation.expression);
 	if (equation.type == EquationTypeVariable) {
 		StringFree(equation.declaration.identifier);

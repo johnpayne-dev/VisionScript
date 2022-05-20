@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Evaluator.h"
+#include "Builtin.h"
 
 const char * RuntimeErrorToString(RuntimeErrorCode code) {
 	switch (code) {
@@ -151,10 +152,10 @@ void InitializeEnvironmentDependents(Environment * environment) {
 		list(String) parents = ListCreate(sizeof(String), 1);
 		FindExpressionParents(*environment, environment->equations[i].expression, environment->equations[i].declaration.parameters, &parents);
 		for (int32_t j = 0; j < ListLength(parents); j++) {
-			Equation * equation = GetEnvironmentEquation(environment, parents[j]);
+			/*Equation * equation = GetEnvironmentEquation(environment, parents[j]);
 			if (equation != NULL && !ListContains(equation->dependents, &(Equation *){ environment->equations + i })) {
 				equation->dependents = ListPush(equation->dependents, &(Equation *){ environment->equations + i });
-			}
+			}*/
 		}
 		ListFree(parents);
 	}
@@ -197,6 +198,11 @@ static RuntimeError EvaluateIdentifier(Environment * environment, list(Binding) 
 		RuntimeError error = EvaluateExpression(environment, NULL, equation->expression, result);
 		if (error.code == RuntimeErrorCodeNone) { SetEnvironmentCache(environment, CreateBinding(expression.identifier, *result)); }
 		return error;
+	}
+	
+	BuiltinVariable variable = DetermineBuiltinVariable(expression.identifier);
+	if (variable != BuiltinVariableNone) {
+		return (RuntimeError){ EvaluateBuiltinVariable(*environment, variable, result), expression.start, expression.end, expression.line };
 	}
 	
 	return (RuntimeError){ RuntimeErrorCodeUndefinedIdentifier, expression.start, expression.end, expression.line };
@@ -495,9 +501,6 @@ static RuntimeError EvaluateIndex(Environment * environment, list(Binding) param
 }
 
 static RuntimeError EvaluateArguments(Environment * environment, list(Binding) parameters, Expression expression, list(String) variables, list(Binding) * arguments) {
-	if (expression.binary.right->type != ExpressionTypeArguments) {
-		return (RuntimeError){ RuntimeErrorCodeInvalidArgumentsExpression, expression.binary.right->start, expression.binary.right->end, expression.line };
-	}
 	if (ListLength(variables) != ListLength(expression.binary.right->list)) {
 		return (RuntimeError){ RuntimeErrorCodeIncorrectArgumentCount, expression.binary.right->start, expression.binary.right->end, expression.line };
 	}
@@ -518,6 +521,9 @@ static RuntimeError EvaluateCall(Environment * environment, list(Binding) parame
 	if (expression.binary.left->type != ExpressionTypeIdentifier) {
 		return (RuntimeError){ RuntimeErrorCodeUncallableExpression, expression.binary.left->start, expression.binary.left->end, expression.line };
 	}
+	if (expression.binary.right->type != ExpressionTypeArguments) {
+		return (RuntimeError){ RuntimeErrorCodeInvalidArgumentsExpression, expression.binary.right->start, expression.binary.right->end, expression.line };
+	}
 	
 	Equation * equation = GetEnvironmentEquation(environment, expression.binary.left->identifier);
 	if (equation != NULL) {
@@ -531,6 +537,33 @@ static RuntimeError EvaluateCall(Environment * environment, list(Binding) parame
 		for (int32_t j = 0; j < ListLength(arguments); j++) { FreeBinding(arguments[j]); }
 		ListFree(arguments);
 		return error;
+	}
+	
+	BuiltinFunction function = DetermineBuiltinFunction(expression.binary.left->identifier);
+	if (function != BuiltinFunctionNone) {
+		if (IsFunctionSingleArgument(function)) {
+			if (ListLength(expression.binary.right->list) != 1) {
+				return (RuntimeError){ RuntimeErrorCodeIncorrectArgumentCount, expression.binary.right->start, expression.binary.right->end, expression.line };
+			}
+			RuntimeError error = EvaluateExpression(environment, parameters, expression.binary.right->list[0], result);
+			if (error.code != RuntimeErrorCodeNone) { return error; }
+			return (RuntimeError){ EvaluateBuiltinFunction(function, NULL, result), expression.start, expression.end, expression.line };
+		} else {
+			list(VectorArray) arguments = ListCreate(sizeof(VectorArray), 1);
+			for (int32_t i = 0; i < ListLength(expression.binary.right->list); i++) {
+				arguments = ListPush(arguments, &(VectorArray){ 0 });
+				RuntimeError error = EvaluateExpression(environment, parameters, expression.binary.right->list[i], &arguments[i]);
+				if (error.code != RuntimeErrorCodeNone) {
+					for (int32_t j = 0; j < i; j++) { FreeVectorArray(arguments[j]); }
+					ListFree(arguments);
+					return error;
+				}
+			}
+			RuntimeErrorCode code = EvaluateBuiltinFunction(function, arguments, result);
+			for (int32_t j = 0; j < ListLength(expression.binary.right->list); j++) { FreeVectorArray(arguments[j]); }
+			ListFree(arguments);
+			return (RuntimeError){ code, expression.start, expression.end, expression.line };
+		}
 	}
 	
 	return (RuntimeError){ RuntimeErrorCodeUndefinedIdentifier, expression.binary.left->start, expression.binary.left->end, expression.line };

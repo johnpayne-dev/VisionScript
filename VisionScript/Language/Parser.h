@@ -137,7 +137,6 @@ typedef struct Equation {
 	EquationType type;
 	Declaration declaration;
 	Expression expression;
-	list(struct Equation *) dependents;
 } Equation;
 
 SyntaxError ParseEquation(list(Token) tokens, Equation * equation);

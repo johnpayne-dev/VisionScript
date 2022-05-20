@@ -3,8 +3,7 @@
 
 #include "Evaluator.h"
 
-typedef enum BuiltinFunction
-{
+typedef enum BuiltinFunction {
 	BuiltinFunctionSIN,
 	BuiltinFunctionCOS,
 	BuiltinFunctionTAN,
@@ -75,15 +74,10 @@ typedef enum BuiltinFunction
 } BuiltinFunction;
 
 BuiltinFunction DetermineBuiltinFunction(const char * identifier);
-
 bool IsFunctionSingleArgument(BuiltinFunction function);
-bool IsFunctionIndexable(BuiltinFunction function);
-
-RuntimeErrorCode EvaluateBuiltinFunctionSize(BuiltinFunction function, list(VectorArray) arguments, uint32_t * length, uint32_t * dimensions);
 RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
 
-typedef enum BuiltinVariable
-{
+typedef enum BuiltinVariable {
 	BuiltinVariablePI,
 	BuiltinVariableTAU,
 	BuiltinVariableE,
@@ -96,10 +90,7 @@ typedef enum BuiltinVariable
 } BuiltinVariable;
 
 BuiltinVariable DetermineBuiltinVariable(const char * identifier);
-
-void InitializeBuiltins(HashMap cache);
-
-RuntimeErrorCode EvaluateBuiltinVariableSize(HashMap cache, BuiltinVariable variable, uint32_t * length, uint32_t * dimensions);
-RuntimeErrorCode EvaluateBuiltinVariable(HashMap cache, BuiltinVariable variable, VectorArray * result);
+void InitializeBuiltinVariables(Environment * environment);
+RuntimeErrorCode EvaluateBuiltinVariable(Environment environment, BuiltinVariable variable, VectorArray * result);
 
 #endif
