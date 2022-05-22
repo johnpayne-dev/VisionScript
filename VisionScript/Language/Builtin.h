@@ -75,7 +75,7 @@ typedef enum BuiltinFunction {
 
 BuiltinFunction DetermineBuiltinFunction(const char * identifier);
 bool IsFunctionSingleArgument(BuiltinFunction function);
-RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result);
+RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, List(VectorArray) arguments, VectorArray * result);
 
 typedef enum BuiltinVariable {
 	BuiltinVariablePI,

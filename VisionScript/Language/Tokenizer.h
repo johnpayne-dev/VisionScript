@@ -51,9 +51,9 @@ typedef struct Token {
 	int32_t end;
 } Token;
 
-list(Token) TokenizeLine(String line, int32_t lineNumber);
-void FreeTokens(list(Token) token);
+List(Token) TokenizeLine(String line, int32_t lineNumber);
+void FreeTokens(List(Token) token);
 
-list(String) SplitCodeIntoLines(char * code);
+List(String) SplitCodeIntoLines(char * code);
 
 #endif

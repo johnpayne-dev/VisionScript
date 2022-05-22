@@ -81,7 +81,7 @@ static RuntimeErrorCode _atan(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _atan2(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _atan2(List(VectorArray) args, VectorArray * result) {
 	// atan2 takes two non-vector arguments
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions > 1 || args[1].dimensions > 1) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -244,7 +244,7 @@ static RuntimeErrorCode _ceil(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _corr(List(VectorArray) args, VectorArray * result) {
 	// corr takes two arguments of same dimensionality
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -279,7 +279,7 @@ static RuntimeErrorCode _corr(list(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _count(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _count(List(VectorArray) args, VectorArray * result) {
 	result->length = 1;
 	result->dimensions = 1;
 	if (ListLength(args) == 2) {
@@ -314,7 +314,7 @@ static RuntimeErrorCode _count(list(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeIncorrectArgumentCount;
 }
 
-static RuntimeErrorCode _cov(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _cov(List(VectorArray) args, VectorArray * result) {
 	// cov takes two arguments of same dimensionality
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -367,7 +367,7 @@ static RuntimeErrorCode _gamma(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _interleave(List(VectorArray) args, VectorArray * result) {
 	// takes n arguments of same dimensionality
 	result->dimensions = 0;
 	result->length = 0;
@@ -393,7 +393,7 @@ static RuntimeErrorCode _interleave(list(VectorArray) args, VectorArray * result
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _join(list(VectorArray) args, VectorArray * result)
+static RuntimeErrorCode _join(List(VectorArray) args, VectorArray * result)
 {
 	// takes n arguments of same dimensionality
 	result->dimensions = 0;
@@ -421,7 +421,7 @@ static RuntimeErrorCode _ln(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _log(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _log(List(VectorArray) args, VectorArray * result) {
 	// takes two arguments of same vector, (with exception to dimension 1)
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != args[1].dimensions && args[0].dimensions != 1 && args[1].dimensions != 1) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -458,7 +458,7 @@ static RuntimeErrorCode _log2(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _max(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _max(List(VectorArray) args, VectorArray * result) {
 	result->length = 1;
 	result->dimensions = 1;
 	for (int32_t i = 0; i < ListLength(args); i++) {
@@ -502,7 +502,7 @@ static RuntimeErrorCode _median(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _min(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _min(List(VectorArray) args, VectorArray * result) {
 	result->length = 1;
 	result->dimensions = 1;
 	for (int32_t i = 0; i < ListLength(args); i++) {
@@ -533,7 +533,7 @@ static RuntimeErrorCode _prod(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _quantile(List(VectorArray) args, VectorArray * result) {
 	// takes two arguments, second argument must not be a vector
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[1].dimensions > 1) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -554,7 +554,7 @@ static RuntimeErrorCode _quantile(list(VectorArray) args, VectorArray * result) 
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _rand(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _rand(List(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeNotImplemented;
 }
 
@@ -563,7 +563,7 @@ static RuntimeErrorCode _round(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _shuffle(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _shuffle(List(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeNotImplemented;
 }
 
@@ -572,7 +572,7 @@ static RuntimeErrorCode _sign(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _sort(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _sort(List(VectorArray) args, VectorArray * result) {
 	// if one argument is passed then sort in ascending order
 	if (ListLength(args) == 1) {
 		result->length = args[0].length;
@@ -657,7 +657,7 @@ static RuntimeErrorCode _var(VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _cross(List(VectorArray) args, VectorArray * result) {
 	// cross product works on two 3d vectors
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != 3 || args[1].dimensions != 3) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -679,7 +679,7 @@ static RuntimeErrorCode _cross(list(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _dist(List(VectorArray) args, VectorArray * result) {
 	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -703,7 +703,7 @@ static RuntimeErrorCode _dist(list(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _distsq(List(VectorArray) args, VectorArray * result) {
 	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -726,7 +726,7 @@ static RuntimeErrorCode _distsq(list(VectorArray) args, VectorArray * result) {
 	return RuntimeErrorCodeNone;
 }
 
-static RuntimeErrorCode _dot(list(VectorArray) args, VectorArray * result) {
+static RuntimeErrorCode _dot(List(VectorArray) args, VectorArray * result) {
 	// takes two arguments of the same dimension
 	if (ListLength(args) != 2) { return RuntimeErrorCodeIncorrectArgumentCount; }
 	if (args[0].dimensions != args[1].dimensions) { return RuntimeErrorCodeInvalidArgumentType; }
@@ -796,7 +796,7 @@ bool IsFunctionSingleArgument(BuiltinFunction function) {
 	return true;
 }
 
-RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, list(VectorArray) arguments, VectorArray * result) {
+RuntimeErrorCode EvaluateBuiltinFunction(BuiltinFunction function, List(VectorArray) arguments, VectorArray * result) {
 	switch (function) {
 		case BuiltinFunctionSIN: return _sin(result);
 		case BuiltinFunctionCOS: return _cos(result);

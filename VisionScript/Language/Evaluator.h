@@ -43,7 +43,7 @@ typedef struct RuntimeError {
 } RuntimeError;
 
 const char * RuntimeErrorToString(RuntimeErrorCode code);
-void PrintRuntimeError(RuntimeError error, list(String) lines);
+void PrintRuntimeError(RuntimeError error, List(String) lines);
 
 typedef float scalar_t;
 
@@ -67,8 +67,8 @@ Binding CreateBinding(const char * identifier, VectorArray value);
 void FreeBinding(Binding binding);
 
 typedef struct Environment {
-	list(Equation) equations;
-	list(Binding) cache;
+	List(Equation) equations;
+	List(Binding) cache;
 } Environment;
 
 Environment CreateEmptyEnvironment(void);
@@ -79,7 +79,7 @@ VectorArray * GetEnvironmentCache(Environment * environment, const char * identi
 void InitializeEnvironmentDependents(Environment * environment);
 void FreeEnvironment(Environment environment);
 
-RuntimeError EvaluateExpression(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result);
-void FindExpressionParents(Environment environment, Expression expression, list(String) parameters, list(String) * identifiers);
+RuntimeError EvaluateExpression(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result);
+void FindExpressionParents(Environment environment, Expression expression, List(String) parameters, List(String) * identifiers);
 
 #endif

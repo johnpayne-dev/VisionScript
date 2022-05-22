@@ -6,9 +6,9 @@
 #include "Evaluator.h"
 
 typedef struct Script {
-	list(String) lines;
+	List(String) lines;
 	Environment environment;
-	list(Equation *) needsRender;
+	List(Equation *) needsRender;
 } Script;
 
 Script LoadScript(const char * code);

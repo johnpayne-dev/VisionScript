@@ -4,38 +4,37 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define list(type) type*
-typedef void * List;
+#define List(type) type*
 
-list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity);
+List(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity);
 
-uint32_t ListLength(list(void) list);
+uint32_t ListLength(List(void) List);
 
-uint32_t ListElementSize(list(void) list);
+uint32_t ListElementSize(List(void) List);
 
-uint32_t ListCapacity(list(void) list);
+uint32_t ListCapacity(List(void) List);
 
-list(void) ListInsert(list(void) list, void * value, int32_t index);
+List(void) ListInsert(List(void) List, void * value, int32_t index);
 
-list(void) ListRemove(list(void) list, int32_t index);
+List(void) ListRemove(List(void) List, int32_t index);
 
-list(void) ListPush(list(void) list, void * value);
+List(void) ListPush(List(void) List, void * value);
 
-list(void) ListPop(list(void) list);
+List(void) ListPop(List(void) List);
 
-list(void) ListRemoveAll(list(void) list, void * value);
+List(void) ListRemoveAll(List(void) List, void * value);
 
-list(void) ListRemoveFirst(list(void) list, void * value);
+List(void) ListRemoveFirst(List(void) List, void * value);
 
-list(void) ListRemoveLast(list(void) list, void * value);
+List(void) ListRemoveLast(List(void) List, void * value);
 
-bool ListContains(list(void) list, void * value);
+bool ListContains(List(void) List, void * value);
 
-list(void) ListClear(list(void) list);
+List(void) ListClear(List(void) List);
 
-list(void) ListClone(list(void) list);
+List(void) ListClone(List(void) List);
 
-void ListFree(list(void) list);
+void ListFree(List(void) List);
 
 
 #endif

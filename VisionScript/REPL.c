@@ -15,7 +15,7 @@ void RunREPL(void)
 	
 	Environment environment = CreateEmptyEnvironment();
 	InitializeBuiltinVariables(&environment);
-	list(String) inputs = ListCreate(sizeof(String), 1);
+	List(String) inputs = ListCreate(sizeof(String), 1);
 	while (true) {
 		// wait for input
 		String input = StringCreate("");
@@ -31,7 +31,7 @@ void RunREPL(void)
 		}
 		inputs = ListPush(inputs, &input);
 		
-		list(Token) tokenLine = TokenizeLine(input, ListLength(inputs) - 1);
+		List(Token) tokenLine = TokenizeLine(input, ListLength(inputs) - 1);
 		Equation equation;
 		SyntaxError error = ParseEquation(tokenLine, &equation);
 		if (error.code != SyntaxErrorCodeNone) {

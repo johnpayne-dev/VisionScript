@@ -26,7 +26,7 @@ typedef struct SyntaxError {
 } SyntaxError;
 
 const char * SyntaxErrorCodeToString(SyntaxErrorCode code);
-void PrintSyntaxError(SyntaxError error, list(String) lines);
+void PrintSyntaxError(SyntaxError error, List(String) lines);
 
 typedef struct ForAssignment {
 	String identifier;
@@ -99,7 +99,7 @@ typedef struct Expression {
 	union {
 		double constant;
 		String identifier;
-		list(struct Expression) list;
+		List(struct Expression) list;
 		ForAssignment assignment;
 		Unary unary;
 		Binary binary;
@@ -110,7 +110,7 @@ typedef struct Expression {
 	int32_t line;
 } Expression;
 
-SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression);
+SyntaxError ParseExpression(List(Token) tokens, int32_t start, int32_t end, Expression * expression);
 void PrintExpression(Expression expression);
 void FreeExpression(Expression expression);
 
@@ -123,7 +123,7 @@ typedef enum DeclarationAttribute {
 
 typedef struct Declaration {
 	String identifier;
-	list(String) parameters;
+	List(String) parameters;
 	DeclarationAttribute attribute;
 } Declaration;
 
@@ -139,7 +139,7 @@ typedef struct Equation {
 	Expression expression;
 } Equation;
 
-SyntaxError ParseEquation(list(Token) tokens, Equation * equation);
+SyntaxError ParseEquation(List(Token) tokens, Equation * equation);
 void FreeEquation(Equation equation);
 
 #endif

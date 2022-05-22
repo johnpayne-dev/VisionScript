@@ -39,7 +39,7 @@ const char * RuntimeErrorToString(RuntimeErrorCode code) {
 	}
 }
 
-void PrintRuntimeError(RuntimeError error, list(String) lines) {
+void PrintRuntimeError(RuntimeError error, List(String) lines) {
 	printf("RuntimeError: %s", RuntimeErrorToString(error.code));
 	String snippet = StringSub(lines[error.line], error.start, error.end);
 	printf(" \"%s\"\n", snippet);
@@ -149,7 +149,7 @@ VectorArray * GetEnvironmentCache(Environment * environment, const char * identi
 
 void InitializeEnvironmentDependents(Environment * environment) {
 	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
-		list(String) parents = ListCreate(sizeof(String), 1);
+		List(String) parents = ListCreate(sizeof(String), 1);
 		FindExpressionParents(*environment, environment->equations[i].expression, environment->equations[i].declaration.parameters, &parents);
 		for (int32_t j = 0; j < ListLength(parents); j++) {
 			/*Equation * equation = GetEnvironmentEquation(environment, parents[j]);
@@ -168,7 +168,7 @@ void FreeEnvironment(Environment environment) {
 	ListFree(environment.cache);
 }
 
-static RuntimeError EvaluateConstant(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateConstant(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	result->length = 1;
 	result->dimensions = 1;
 	result->xyzw[0] = malloc(sizeof(scalar_t));
@@ -176,7 +176,7 @@ static RuntimeError EvaluateConstant(Environment * environment, list(Binding) pa
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateIdentifier(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateIdentifier(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	if (parameters != NULL) {
 		for (int32_t i = 0; i < ListLength(parameters); i++) {
 			if (StringEquals(parameters[i].identifier, expression.identifier)) {
@@ -208,7 +208,7 @@ static RuntimeError EvaluateIdentifier(Environment * environment, list(Binding) 
 	return (RuntimeError){ RuntimeErrorCodeUndefinedIdentifier, expression.start, expression.end, expression.line };
 }
 
-static RuntimeError EvaluateVectorLiteral(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateVectorLiteral(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	if (ListLength(expression.list) > 4) { return (RuntimeError){ RuntimeErrorCodeTooManyVectorElements, expression.start, expression.end, expression.line }; }
 	result->dimensions = ListLength(expression.list);
 	result->length = -1; // uint -1
@@ -242,7 +242,7 @@ static bool IsNestedListAllowed(Expression expression) {
 	return false;
 }
 
-static RuntimeError EvaluateRange(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateRange(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	VectorArray left, right;
 	RuntimeError error = EvaluateExpression(environment, parameters, *expression.binary.left, &left);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
@@ -279,7 +279,7 @@ static RuntimeError EvaluateRange(Environment * environment, list(Binding) param
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateFor(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateFor(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	Expression * left, * right;
 	if (expression.type == ExpressionTypeTernary) {
 		left = expression.ternary.left;
@@ -359,7 +359,7 @@ static RuntimeError EvaluateFor(Environment * environment, list(Binding) paramet
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateArrayLiteral(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateArrayLiteral(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	result->dimensions = 0;
 	result->length = 0;
 	
@@ -421,7 +421,7 @@ static inline scalar_t ApplyUnaryArithmetic(scalar_t value, Operator operator) {
 	}
 }
 
-static RuntimeError EvaluateUnary(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateUnary(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	RuntimeError error = EvaluateExpression(environment, parameters, *expression.unary.expression, result);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
 	for (int32_t i = 0; i < result->dimensions; i++) {
@@ -439,7 +439,7 @@ static bool IsIdentifierSwizzling(String identifier) {
 	return true;
 }
 
-static RuntimeError EvaluateDimension(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateDimension(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	if (expression.binary.right->type != ExpressionTypeIdentifier || !IsIdentifierSwizzling(expression.binary.right->identifier)) {
 		return (RuntimeError){ RuntimeErrorCodeInvalidDimensionOperon, expression.binary.right->start, expression.binary.right->end, expression.line };
 	}
@@ -473,7 +473,7 @@ static RuntimeError EvaluateDimension(Environment * environment, list(Binding) p
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateIndex(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateIndex(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	VectorArray indexed, indices;
 	RuntimeError error = EvaluateExpression(environment, parameters, *expression.binary.right, &indices);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
@@ -500,7 +500,7 @@ static RuntimeError EvaluateIndex(Environment * environment, list(Binding) param
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateArguments(Environment * environment, list(Binding) parameters, Expression expression, list(String) variables, list(Binding) * arguments) {
+static RuntimeError EvaluateArguments(Environment * environment, List(Binding) parameters, Expression expression, List(String) variables, List(Binding) * arguments) {
 	if (ListLength(variables) != ListLength(expression.binary.right->list)) {
 		return (RuntimeError){ RuntimeErrorCodeIncorrectArgumentCount, expression.binary.right->start, expression.binary.right->end, expression.line };
 	}
@@ -517,7 +517,7 @@ static RuntimeError EvaluateArguments(Environment * environment, list(Binding) p
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateCall(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateCall(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	if (expression.binary.left->type != ExpressionTypeIdentifier) {
 		return (RuntimeError){ RuntimeErrorCodeUncallableExpression, expression.binary.left->start, expression.binary.left->end, expression.line };
 	}
@@ -531,7 +531,7 @@ static RuntimeError EvaluateCall(Environment * environment, list(Binding) parame
 			return (RuntimeError){ RuntimeErrorCodeIdentifierNotFunction, expression.binary.left->start, expression.binary.left->end, expression.line };
 		}
 		
-		list(Binding) arguments = ListCreate(sizeof(Binding), 1);
+		List(Binding) arguments = ListCreate(sizeof(Binding), 1);
 		RuntimeError error = EvaluateArguments(environment, parameters, expression, equation->declaration.parameters, &arguments);
 		if (error.code == RuntimeErrorCodeNone) { error = EvaluateExpression(environment, arguments, equation->expression, result); }
 		for (int32_t j = 0; j < ListLength(arguments); j++) { FreeBinding(arguments[j]); }
@@ -549,7 +549,7 @@ static RuntimeError EvaluateCall(Environment * environment, list(Binding) parame
 			if (error.code != RuntimeErrorCodeNone) { return error; }
 			return (RuntimeError){ EvaluateBuiltinFunction(function, NULL, result), expression.start, expression.end, expression.line };
 		} else {
-			list(VectorArray) arguments = ListCreate(sizeof(VectorArray), 1);
+			List(VectorArray) arguments = ListCreate(sizeof(VectorArray), 1);
 			for (int32_t i = 0; i < ListLength(expression.binary.right->list); i++) {
 				arguments = ListPush(arguments, &(VectorArray){ 0 });
 				RuntimeError error = EvaluateExpression(environment, parameters, expression.binary.right->list[i], &arguments[i]);
@@ -587,7 +587,7 @@ static inline scalar_t ApplyBinaryArithmetic(scalar_t a, scalar_t b, Operator op
 	}
 }
 
-static RuntimeError EvaluateBinaryArithmetic(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateBinaryArithmetic(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	VectorArray left, right;
 	RuntimeError error = EvaluateExpression(environment, parameters, *expression.binary.left, &left);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
@@ -623,7 +623,7 @@ static RuntimeError EvaluateBinaryArithmetic(Environment * environment, list(Bin
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateBinary(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateBinary(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	switch (expression.binary.operator) {
 		case OperatorRange: return (RuntimeError){ RuntimeErrorCodeInvalidRangePlacement, expression.start, expression.end, expression.line };
 		case OperatorFor: return (RuntimeError){ RuntimeErrorCodeInvalidForPlacement, expression.start, expression.end, expression.line };
@@ -637,7 +637,7 @@ static RuntimeError EvaluateBinary(Environment * environment, list(Binding) para
 	}
 }
 
-static RuntimeError EvaluateIfElse(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateIfElse(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	VectorArray condition;
 	RuntimeError error = EvaluateExpression(environment, parameters, *expression.ternary.middle, &condition);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
@@ -650,7 +650,7 @@ static RuntimeError EvaluateIfElse(Environment * environment, list(Binding) para
 	return EvaluateExpression(environment, parameters, *expression.ternary.right, result);
 }
 
-static RuntimeError EvaluateTernary(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+static RuntimeError EvaluateTernary(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	if (expression.ternary.leftOperator == OperatorIf && expression.ternary.rightOperator == OperatorElse) {
 		return EvaluateIfElse(environment, parameters, expression, result);
 	}
@@ -660,7 +660,7 @@ static RuntimeError EvaluateTernary(Environment * environment, list(Binding) par
 	return (RuntimeError){ RuntimeErrorCodeNotImplemented, expression.start, expression.end, expression.line };
 }
 
-RuntimeError EvaluateExpression(Environment * environment, list(Binding) parameters, Expression expression, VectorArray * result) {
+RuntimeError EvaluateExpression(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
 	switch (expression.type) {
 		case ExpressionTypeUnknown: return (RuntimeError){ RuntimeErrorCodeInvalidExpression, expression.start, expression.end, expression.line };
 		case ExpressionTypeConstant: return EvaluateConstant(environment, parameters, expression, result);
@@ -675,7 +675,7 @@ RuntimeError EvaluateExpression(Environment * environment, list(Binding) paramet
 	}
 }
 
-void FindExpressionParents(Environment environment, Expression expression, list(String) parameters, list(String) * identifiers) {
+void FindExpressionParents(Environment environment, Expression expression, List(String) parameters, List(String) * identifiers) {
 	if (expression.type == ExpressionTypeIdentifier) {
 		if (parameters != NULL) {
 			for (int32_t i = 0; i < ListLength(parameters); i++) {

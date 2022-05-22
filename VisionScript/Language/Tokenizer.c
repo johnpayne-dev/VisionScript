@@ -102,8 +102,8 @@ static bool IsNumber(String line, int32_t start, int32_t * end) {
 	} else { return false; }
 }
 
-list(Token) TokenizeLine(String line, int32_t lineNumber) {
-	list(Token) tokens = ListCreate(sizeof(Token), 32);
+List(Token) TokenizeLine(String line, int32_t lineNumber) {
+	List(Token) tokens = ListCreate(sizeof(Token), 32);
 	int32_t i = 0;
 	while (i < StringLength(line)) {
 		int32_t end = i;
@@ -122,14 +122,14 @@ list(Token) TokenizeLine(String line, int32_t lineNumber) {
 	return tokens;
 }
 
-void FreeTokens(list(Token) tokens) {
+void FreeTokens(List(Token) tokens) {
 	for (int32_t i = 0; i < ListLength(tokens); i++) { StringFree(tokens[i].value); }
 	ListFree(tokens);
 }
 
-list(String) SplitCodeIntoLines(char * code) {
+List(String) SplitCodeIntoLines(char * code) {
 	code = StringCreate(code);
-	list(String) statements = ListCreate(sizeof(String), 16);
+	List(String) statements = ListCreate(sizeof(String), 16);
 	int32_t lastStatementStart = 0;
 	for (int32_t i = 0; i < StringLength(code); i++) {
 		if (code[i] == ';') { code[i] = '\n'; } // semicolons are treated as newlines

@@ -7,7 +7,7 @@ Script LoadScript(const char * code) {
 		.needsRender = ListCreate(sizeof(Equation), 1),
 	};
 	for (int32_t i = 0; i < ListLength(script.lines); i++) {
-		list(Token) tokens = TokenizeLine(script.lines[i], i);
+		List(Token) tokens = TokenizeLine(script.lines[i], i);
 		Equation equation;
 		SyntaxError error = ParseEquation(tokens, &equation);
 		if (error.code != SyntaxErrorCodeNone) {

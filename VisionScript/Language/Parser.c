@@ -19,7 +19,7 @@ const char * SyntaxErrorCodeToString(SyntaxErrorCode code) {
 	}
 }
 
-void PrintSyntaxError(SyntaxError error, list(String) lines) {
+void PrintSyntaxError(SyntaxError error, List(String) lines) {
 	printf("SyntaxError: %s", SyntaxErrorCodeToString(error.code));
 	String snippet = StringSub(lines[error.line], error.start, error.end);
 	printf(" \"%s\"\n", snippet);
@@ -145,7 +145,7 @@ static bool IsTokenOperable(Token token) {
 	return token.type == TokenTypeIdentifier || token.type == TokenTypeNumber || StringEquals(token.value, SYMBOL_RIGHT_PARENTHESIS) || StringEquals(token.value, SYMBOL_RIGHT_BRACKET);
 }
 
-static int32_t FindCorrespondingToken(list(Token) tokens, int32_t start, int32_t end, const char * open, const char * close, int32_t step) {
+static int32_t FindCorrespondingToken(List(Token) tokens, int32_t start, int32_t end, const char * open, const char * close, int32_t step) {
 	int32_t depth = 0;
 	for (int32_t i = step > 0 ? start : end; i != (step > 0 ? end + 1: start - 1); i += step) {
 		if (StringEquals(tokens[i].value, open)) { depth++; }
@@ -157,15 +157,15 @@ static int32_t FindCorrespondingToken(list(Token) tokens, int32_t start, int32_t
 	return -1;
 }
 
-static int32_t FindClosingParenthesis(list(Token) tokens, int32_t start, int32_t end) {
+static int32_t FindClosingParenthesis(List(Token) tokens, int32_t start, int32_t end) {
 	return FindCorrespondingToken(tokens, start, end, SYMBOL_LEFT_PARENTHESIS, SYMBOL_RIGHT_PARENTHESIS, 1);
 }
 
-static int32_t FindClosingBracket(list(Token) tokens, int32_t start, int32_t end) {
+static int32_t FindClosingBracket(List(Token) tokens, int32_t start, int32_t end) {
 	return FindCorrespondingToken(tokens, start, end, SYMBOL_LEFT_BRACKET, SYMBOL_RIGHT_BRACKET, 1);
 }
 
-static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end) {
+static int32_t FindComma(List(Token) tokens, int32_t start, int32_t end) {
 	for (int32_t i = start + 1; i <= end - 1; i++) {
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_PARENTHESIS)) {
 			i = FindClosingParenthesis(tokens, i, end);
@@ -182,11 +182,11 @@ static int32_t FindComma(list(Token) tokens, int32_t start, int32_t end) {
 	return -1;
 }
 
-static bool ShouldReduceParenthesis(list(Token) tokens, int32_t start, int32_t end) {
+static bool ShouldReduceParenthesis(List(Token) tokens, int32_t start, int32_t end) {
 	return FindComma(tokens, start, end) == -1 && (start == 0 || tokens[start - 1].type != TokenTypeIdentifier);
 }
 
-static Operator FindOperator(list(Token) tokens, int32_t start, int32_t end, int32_t * operatorStart, int32_t * operatorEnd) {
+static Operator FindOperator(List(Token) tokens, int32_t start, int32_t end, int32_t * operatorStart, int32_t * operatorEnd) {
 	for (int32_t i = start; i <= end; i++) {
 		*operatorStart = i;
 		*operatorEnd = i;
@@ -215,7 +215,7 @@ static Operator FindOperator(list(Token) tokens, int32_t start, int32_t end, int
 	return -1;
 }
 
-static list(int32_t) FindLowestPrecedenceOperators(list(Token) tokens, int32_t start, int32_t end, int32_t * lowestPrecedence) {
+static List(int32_t) FindLowestPrecedenceOperators(List(Token) tokens, int32_t start, int32_t end, int32_t * lowestPrecedence) {
 	*lowestPrecedence = OperatorCount;
 	int32_t opStart, opEnd;
 	Operator operator = FindOperator(tokens, start, end, &opStart, &opEnd);
@@ -224,7 +224,7 @@ static list(int32_t) FindLowestPrecedenceOperators(list(Token) tokens, int32_t s
 		operator = FindOperator(tokens, opEnd + 1, end, &opStart, &opEnd);
 	}
 	
-	list(int32_t) indices = ListCreate(sizeof(int32_t), 1);
+	List(int32_t) indices = ListCreate(sizeof(int32_t), 1);
 	operator = FindOperator(tokens, start, end, &opStart, &opEnd);
 	while (operator != -1) {
 		if (precedences[operator] == *lowestPrecedence) { indices = ListPush(indices, &opStart); }
@@ -233,7 +233,7 @@ static list(int32_t) FindLowestPrecedenceOperators(list(Token) tokens, int32_t s
 	return indices;
 }
 
-static SyntaxError CheckMissingBraces(list(Token) tokens, int32_t start, int32_t end) {
+static SyntaxError CheckMissingBraces(List(Token) tokens, int32_t start, int32_t end) {
 	for (int32_t i = start; i <= end; i++) {
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_PARENTHESIS)) {
 			int32_t next = FindClosingParenthesis(tokens, i, end);
@@ -257,7 +257,7 @@ static SyntaxError CheckMissingBraces(list(Token) tokens, int32_t start, int32_t
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-static ExpressionType DetermineExpressionType(list(Token) tokens, int32_t start, int32_t end) {
+static ExpressionType DetermineExpressionType(List(Token) tokens, int32_t start, int32_t end) {
 	if (start == end) {
 		if (tokens[start].type == TokenTypeNumber) { return ExpressionTypeConstant; }
 		if (tokens[start].type == TokenTypeIdentifier) { return ExpressionTypeIdentifier; }
@@ -274,7 +274,7 @@ static ExpressionType DetermineExpressionType(list(Token) tokens, int32_t start,
 	}
 	
 	int32_t precedence = 0;
-	list(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &precedence);
+	List(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &precedence);
 	if (ListLength(indices) == 0) { return ExpressionTypeUnknown; }
 	ExpressionType type = ExpressionTypeBinary;
 	
@@ -298,19 +298,19 @@ static ExpressionType DetermineExpressionType(list(Token) tokens, int32_t start,
 	return type;
 }
 
-static SyntaxError ParseConstant(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+static SyntaxError ParseConstant(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	char * endPtr = NULL;
 	expression->constant = strtod(tokens[start].value, &endPtr);
 	if (*endPtr != '\0') { return (SyntaxError){ SyntaxErrorCodeUnreadableConstant, expression->start, expression->end, expression->line }; }
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-static SyntaxError ParseIdentifier(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+static SyntaxError ParseIdentifier(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	expression->identifier = StringCreate(tokens[start].value);
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-static SyntaxError ParseList(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+static SyntaxError ParseList(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	expression->list = ListCreate(sizeof(Expression), 1);
 	int32_t index = FindComma(tokens, start, end);
 	int32_t prevIndex = start;
@@ -328,14 +328,14 @@ static SyntaxError ParseList(list(Token) tokens, int32_t start, int32_t end, Exp
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-static SyntaxError ParseForAssignment(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+static SyntaxError ParseForAssignment(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	expression->assignment.identifier = StringCreate(tokens[start].value);
 	expression->assignment.expression = calloc(1, sizeof(Expression));
 	return ParseExpression(tokens, start + 2, end, expression->assignment.expression);
 }
 
-static SyntaxError ParseUnary(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	list(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
+static SyntaxError ParseUnary(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+	List(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
 	expression->unary.expression = calloc(1, sizeof(Expression));
 	expression->unary.operator = UnaryOperatorFromSymbol(tokens[indices[0]].value);
 	
@@ -351,8 +351,8 @@ static SyntaxError ParseUnary(list(Token) tokens, int32_t start, int32_t end, Ex
 	return error;
 }
 
-static SyntaxError ParseBinary(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	list(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
+static SyntaxError ParseBinary(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+	List(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
 	int32_t opIndex = indices[ListLength(indices) - 1];
 	ListFree(indices);
 	expression->binary.left = calloc(1, sizeof(Expression));
@@ -371,8 +371,8 @@ static SyntaxError ParseBinary(list(Token) tokens, int32_t start, int32_t end, E
 	return error;
 }
 
-static SyntaxError ParseTernary(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	list(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
+static SyntaxError ParseTernary(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+	List(int32_t) indices = FindLowestPrecedenceOperators(tokens, start, end, &(int32_t){ 0 });
 	if (ListLength(indices) != 2) {
 		ListFree(indices);
 		return (SyntaxError){ SyntaxErrorCodeInvalidTernaryPlacement, expression->start, expression->end, expression->line };
@@ -394,7 +394,7 @@ static SyntaxError ParseTernary(list(Token) tokens, int32_t start, int32_t end, 
 	return error;
 }
 
-SyntaxError ParseExpression(list(Token) tokens, int32_t start, int32_t end, Expression * expression) {
+SyntaxError ParseExpression(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
 	if (end < start) { return (SyntaxError){ SyntaxErrorCodeMissingExpression, tokens[end].start, tokens[start].end, tokens[end].lineNumber }; }
 	expression->start = tokens[start].start;
 	expression->end = tokens[end].end;
@@ -537,7 +537,7 @@ static bool IsDeclarationttribute(Token token) {
 	return false;
 }
 
-static EquationType DetermineEquationType(list(Token) tokens) {
+static EquationType DetermineEquationType(List(Token) tokens) {
 	if (ListLength(tokens) == 0) { return EquationTypeNone; }
 	
 	// check if first token is a declaration attribute
@@ -560,7 +560,7 @@ static EquationType DetermineEquationType(list(Token) tokens) {
 	return EquationTypeNone;
 }
 
-static int32_t ParseDeclarationAttribute(list(Token) tokens, Declaration * declaration) {
+static int32_t ParseDeclarationAttribute(List(Token) tokens, Declaration * declaration) {
 	if (IsDeclarationttribute(tokens[0])) {
 		if (StringEquals(tokens[0].value, KEYWORD_POINTS)) { declaration->attribute = DeclarationAttributePoints; }
 		if (StringEquals(tokens[0].value, KEYWORD_PARAMETRIC)) { declaration->attribute = DeclarationAttributeParametric; }
@@ -570,14 +570,14 @@ static int32_t ParseDeclarationAttribute(list(Token) tokens, Declaration * decla
 	return 0;
 }
 
-static SyntaxError ParseVariableDeclaration(list(Token) tokens, Declaration * declaration, int32_t * end) {
+static SyntaxError ParseVariableDeclaration(List(Token) tokens, Declaration * declaration, int32_t * end) {
 	int32_t start = ParseDeclarationAttribute(tokens, declaration);
 	declaration->identifier = StringCreate(tokens[start].value);
 	*end = start + 1;
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-static SyntaxError ParseFunctionDeclaration(list(Token) tokens, Declaration * declaration, int32_t * end) {
+static SyntaxError ParseFunctionDeclaration(List(Token) tokens, Declaration * declaration, int32_t * end) {
 	int32_t start = ParseDeclarationAttribute(tokens, declaration);
 	int32_t argumentsEnd = FindClosingParenthesis(tokens, start + 1, ListLength(tokens) - 1);
 	
@@ -596,7 +596,7 @@ static SyntaxError ParseFunctionDeclaration(list(Token) tokens, Declaration * de
 	return (SyntaxError){ SyntaxErrorCodeNone };
 }
 
-SyntaxError ParseEquation(list(Token) tokens, Equation * equation) {
+SyntaxError ParseEquation(List(Token) tokens, Equation * equation) {
 	*equation = (Equation){ 0 };
 	
 	// check for any unknown tokens

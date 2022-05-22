@@ -2,15 +2,13 @@
 #include <stdlib.h>
 #include "List.h"
 
-struct ListInfo
-{
+struct ListInfo {
 	uint32_t elementSize;
 	uint32_t capacity;
 	uint32_t length;
 };
 
-list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity)
-{
+List(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity) {
 	struct ListInfo * list = malloc(sizeof(struct ListInfo) + initialCapacity * elementSize);
 	list->elementSize = elementSize;
 	list->capacity = initialCapacity;
@@ -18,27 +16,22 @@ list(void) ListCreate(uint32_t elementSize, uint32_t initialCapacity)
 	return list + 1;
 }
 
-uint32_t ListLength(list(void) list)
-{
+uint32_t ListLength(List(void) list) {
 	return ((struct ListInfo *)list - 1)->length;
 }
 
-uint32_t ListElementSize(list(void) list)
-{
+uint32_t ListElementSize(List(void) list) {
 	return ((struct ListInfo *)list - 1)->elementSize;
 }
 
-uint32_t ListCapacity(list(void) list)
-{
+uint32_t ListCapacity(List(void) list) {
 	return ((struct ListInfo *)list - 1)->capacity;
 }
 
-list(void) ListInsert(list(void) list, void * element, int32_t index)
-{
+List(void) ListInsert(List(void) list, void * element, int32_t index) {
 	struct ListInfo * info = (struct ListInfo *)list - 1;
 	info->length++;
-	if (info->length == info->capacity)
-	{
+	if (info->length == info->capacity) {
 		info->capacity *= 2;
 		info = realloc(info, sizeof(struct ListInfo) + info->capacity * info->elementSize);
 		list = info + 1;
@@ -48,16 +41,13 @@ list(void) ListInsert(list(void) list, void * element, int32_t index)
 	return list;
 }
 
-list(void) ListRemove(list(void) list, int32_t index)
-{
+List(void) ListRemove(List(void) list, int32_t index) {
 	struct ListInfo * info = (struct ListInfo *)list - 1;
-	for (uint32_t j = (index + 1) * info->elementSize; j < info->length * info->elementSize; j++)
-	{
+	for (uint32_t j = (index + 1) * info->elementSize; j < info->length * info->elementSize; j++) {
 		((uint8_t *)list)[j - info->elementSize] = ((uint8_t *)list)[j];
 	}
 	info->length--;
-	if (info->length == info->capacity / 2 - 1)
-	{
+	if (info->length == info->capacity / 2 - 1) {
 		info->capacity /= 2;
 		info = realloc(info, sizeof(struct ListInfo) + info->capacity * info->elementSize);
 		list = info + 1;
@@ -65,22 +55,17 @@ list(void) ListRemove(list(void) list, int32_t index)
 	return list;
 }
 
-list(void) ListPush(list(void) list, void * value)
-{
+List(void) ListPush(List(void) list, void * value) {
 	return ListInsert(list, value, ListLength(list));
 }
 
-list(void) ListPop(list(void) list)
-{
+List(void) ListPop(List(void) list) {
 	return ListRemove(list, ListLength(list) - 1);
 }
 
-list(void) ListRemoveAll(list(void) list, void * value)
-{
-	for (uint32_t i = 0; i < ListLength(list); i++)
-	{
-		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0)
-		{
+List(void) ListRemoveAll(List(void) list, void * value) {
+	for (uint32_t i = 0; i < ListLength(list); i++) {
+		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0) {
 			list = ListRemove(list, i);
 			i--;
 		}
@@ -88,31 +73,26 @@ list(void) ListRemoveAll(list(void) list, void * value)
 	return list;
 }
 
-bool ListContains(list(void) list, void * value)
-{
-	for (uint32_t i = 0; i < ListLength(list); i++)
-	{
+bool ListContains(List(void) list, void * value) {
+	for (uint32_t i = 0; i < ListLength(list); i++) {
 		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0) { return true; }
 	}
 	return false;
 }
 
-list(void) ListClear(list(void) list)
-{
-	list(void) newList = ListCreate(ListElementSize(list), ListCapacity(list));
+List(void) ListClear(List(void) list) {
+	List(void) newList = ListCreate(ListElementSize(list), ListCapacity(list));
 	ListFree(list);
 	return newList;
 }
 
-list(void) ListClone(list(void) list)
-{
+List(void) ListClone(List(void) list) {
 	uint64_t size = sizeof(struct ListInfo) + ListElementSize(list) * ListCapacity(list);
 	struct ListInfo * clone = malloc(size);
 	memcpy(clone, (struct ListInfo *)list - 1, size);
 	return clone + 1;
 }
 
-void ListFree(list(void) list)
-{
+void ListFree(List(void) list) {
 	free((struct ListInfo *)list - 1);
 }
