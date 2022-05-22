@@ -73,11 +73,25 @@ List(void) ListRemoveAll(List(void) list, void * value) {
 	return list;
 }
 
-bool ListContains(List(void) list, void * value) {
+void ListSet(List(void) list, int32_t index, void * element) {
+	struct ListInfo * info = (struct ListInfo *)list - 1;
+	memcpy(list + index * info->elementSize, element, info->elementSize);
+}
+
+void * ListGet(List(void) list, int32_t index) {
+	struct ListInfo * info = (struct ListInfo *)list - 1;
+	return list + index * info->elementSize;
+}
+
+int32_t ListIndexOf(List(void) list, void * value) {
 	for (uint32_t i = 0; i < ListLength(list); i++) {
-		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0) { return true; }
+		if (memcmp(list + i * ListElementSize(list), value, ListElementSize(list)) == 0) { return i; }
 	}
-	return false;
+	return -1;
+}
+
+bool ListContains(List(void) list, void * value) {
+	return ListIndexOf(list, value) >= 0;
 }
 
 List(void) ListClear(List(void) list) {
