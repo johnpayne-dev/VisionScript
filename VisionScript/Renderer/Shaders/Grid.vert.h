@@ -6,8 +6,7 @@ static const char * vert_Grid =
 
 "out vec2 uv;"
 
-"void main()"
-"{"
+"void main() {"
 "	uv = position;"
 "	gl_Position = vec4(position, 0.0, 1.0);"
 "}";

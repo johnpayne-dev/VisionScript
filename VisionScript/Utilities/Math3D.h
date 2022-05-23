@@ -97,10 +97,8 @@ static inline vec3_t vec4_to_vec3(vec4_t a) { return (vec3_t){ a.x, a.y, a.z }; 
 // mat4 operations
 typedef struct mat4 { vec4_t a, b, c, d; } mat4_t;
 
-static inline mat4_t mat4_add(mat4_t m, mat4_t n)
-{
-	return (mat4_t)
-	{
+static inline mat4_t mat4_add(mat4_t m, mat4_t n) {
+	return (mat4_t) {
 		vec4_add(m.a, n.a),
 		vec4_add(m.b, n.b),
 		vec4_add(m.c, n.c),
@@ -110,10 +108,8 @@ static inline mat4_t mat4_add(mat4_t m, mat4_t n)
 
 static inline mat4_t mat4_neg(mat4_t m) { return (mat4_t){ vec4_neg(m.a), vec4_neg(m.b), vec4_neg(m.c), vec4_neg(m.d) }; }
 
-static inline vec4_t mat4_mulv(mat4_t m, vec4_t v)
-{
-	return (vec4_t)
-	{
+static inline vec4_t mat4_mulv(mat4_t m, vec4_t v) {
+	return (vec4_t) {
 		vec4_dot((vec4_t){ m.a.x, m.b.x, m.c.x, m.d.x }, v),
 		vec4_dot((vec4_t){ m.a.y, m.b.y, m.c.y, m.d.y }, v),
 		vec4_dot((vec4_t){ m.a.z, m.b.z, m.c.z, m.d.z }, v),
@@ -121,10 +117,8 @@ static inline vec4_t mat4_mulv(mat4_t m, vec4_t v)
 	};
 }
 
-static inline mat4_t mat4_mul(mat4_t m, mat4_t n)
-{
-	return (mat4_t)
-	{
+static inline mat4_t mat4_mul(mat4_t m, mat4_t n) {
+	return (mat4_t) {
 		mat4_mulv(m, n.a),
 		mat4_mulv(m, n.b),
 		mat4_mulv(m, n.c),
@@ -133,10 +127,8 @@ static inline mat4_t mat4_mul(mat4_t m, mat4_t n)
 }
 
 // mat4 transformations
-static inline mat4_t mat4_translate(mat4_t m, vec3_t v)
-{
-	mat4_t n = (mat4_t)
-	{
+static inline mat4_t mat4_translate(mat4_t m, vec3_t v) {
+	mat4_t n = (mat4_t) {
 		{ 1.0f, 0.0f, 0.0f, 0.0f },
 		{ 0.0f, 1.0f, 0.0f, 0.0f },
 		{ 0.0f, 0.0f, 1.0f, 0.0f },
@@ -145,10 +137,8 @@ static inline mat4_t mat4_translate(mat4_t m, vec3_t v)
 	return mat4_mul(n, m);
 }
 
-static inline mat4_t mat4_scale(mat4_t m, vec3_t v)
-{
-	mat4_t n = (mat4_t)
-	{
+static inline mat4_t mat4_scale(mat4_t m, vec3_t v) {
+	mat4_t n = (mat4_t) {
 		{ v.x,  0.0f, 0.0f, 0.0f },
 		{ 0.0f, v.y,  0.0f, 0.0f },
 		{ 0.0f, 0.0f, v.z,  0.0f },
@@ -157,11 +147,9 @@ static inline mat4_t mat4_scale(mat4_t m, vec3_t v)
 	return mat4_mul(n, m);
 }
 
-static inline mat4_t mat4_rotate_x(mat4_t m, float a)
-{
+static inline mat4_t mat4_rotate_x(mat4_t m, float a) {
 	float c = cosf(a), s = sinf(a);
-	mat4_t n = (mat4_t)
-	{
+	mat4_t n = (mat4_t) {
 		{ 1.0f,  0.0f,  0.0f, 0.0f },
 		{ 0.0f,  c,    -s,    0.0f },
 		{ 0.0f, -s,     c,    0.0f },
@@ -170,11 +158,9 @@ static inline mat4_t mat4_rotate_x(mat4_t m, float a)
 	return mat4_mul(n, m);
 };
 
-static inline mat4_t mat4_rotate_y(mat4_t m, float a)
-{
+static inline mat4_t mat4_rotate_y(mat4_t m, float a) {
 	float c = cosf(a), s = sinf(a);
-	mat4_t n = (mat4_t)
-	{
+	mat4_t n = (mat4_t) {
 		{ c,    0.0f, -s,    0.0f },
 		{ 0.0f, 1.0f,  0.0f, 0.0f },
 		{ s,    0.0f,  c,    0.0f },
@@ -183,11 +169,9 @@ static inline mat4_t mat4_rotate_y(mat4_t m, float a)
 	return mat4_mul(n, m);
 }
 
-static inline mat4_t mat4_rotate_z(mat4_t m, float a)
-{
+static inline mat4_t mat4_rotate_z(mat4_t m, float a) {
 	float c = cosf(a), s = sinf(a);
-	mat4_t n = (mat4_t)
-	{
+	mat4_t n = (mat4_t) {
 		{  c,    s,    0.0f, 0.0f },
 		{ -s,    c,    0.0f, 0.0f },
 		{  0.0f, 0.0f, 1.0f, 0.0f },
@@ -196,17 +180,14 @@ static inline mat4_t mat4_rotate_z(mat4_t m, float a)
 	return mat4_mul(n, m);
 }
 
-static inline mat4_t mat4_rotate_euler(mat4_t m, vec3_t v)
-{
+static inline mat4_t mat4_rotate_euler(mat4_t m, vec3_t v) {
 	return mat4_rotate_x(mat4_rotate_y(mat4_rotate_z(m, v.z), v.y), v.x);
 }
 
-static inline mat4_t mat4_rotate_axis(mat4_t m, vec3_t v, float a)
-{
+static inline mat4_t mat4_rotate_axis(mat4_t m, vec3_t v, float a) {
 	float c = cosf(a), s = sinf(a);
 	float C = 1.0f - c;
-	mat4_t n = (mat4_t)
-	{
+	mat4_t n = (mat4_t) {
 		{ c + v.x * v.x * C, v.y * v.x * C + v.z * s, v.z * v.x * C - v.y * s, 0.0f },
 		{ v.x * v.y * C - v.z * s, c + v.y * v.y * C, v.z * v.y * C + v.x * s, 0.0f },
 		{ v.x * v.z * C + v.y * s, v.y * v.z * C - v.x * s, c + v.z * v.z * C, 0.0f },
@@ -215,13 +196,11 @@ static inline mat4_t mat4_rotate_axis(mat4_t m, vec3_t v, float a)
 	return mat4_mul(n, m);
 }
 
-static inline mat4_t mat4_lookat(vec3_t pos, vec3_t at, vec3_t up)
-{
+static inline mat4_t mat4_lookat(vec3_t pos, vec3_t at, vec3_t up) {
 	vec3_t f = vec3_normalize(vec3_sub(at, pos));
 	vec3_t r = vec3_normalize(vec3_cross(up, f));
 	vec3_t u = vec3_normalize(vec3_cross(f, r));
-	return (mat4_t)
-	{
+	return (mat4_t) {
 		{ r.x, r.y, r.z, -vec3_dot(r, pos) },
 		{ u.x, u.y, u.z, -vec3_dot(u, pos) },
 		{ f.x, f.y, f.z, -vec3_dot(f, pos) },

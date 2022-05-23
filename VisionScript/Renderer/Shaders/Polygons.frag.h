@@ -6,7 +6,6 @@ static const char * frag_Polygons =
 
 "out vec4 fragColor;"
 
-"void main()"
-"{"
+"void main() {"
 "	fragColor = vertexColor;"
 "}";

@@ -4,15 +4,13 @@ static const char * frag_Grid =
 
 "in vec2 uv;"
 
-"uniform struct Camera"
-"{"
+"uniform struct Camera {"
 "	mat4 invMatrix;"
 "	vec2 scale;"
 "	vec2 dimensions;"
 "} camera;"
 
-"uniform struct Properties"
-"{"
+"uniform struct Properties {"
 "	vec4 axisColor;"
 "	vec4 majorColor;"
 "	vec4 minorColor;"
@@ -23,8 +21,7 @@ static const char * frag_Grid =
 
 "out vec4 fragColor;"
 
-"void main()"
-"{"
+"void main() {"
 "	vec2 pos = (camera.invMatrix * vec4(uv, 0.0, 1.0)).xy;"
 "	vec2 spacing = pow(vec2(2.0), floor(log2(camera.scale)));"
 "	vec2 majorLine = round(pos * 4.0 * spacing) / (4.0 * spacing);"

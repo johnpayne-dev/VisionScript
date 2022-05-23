@@ -6,8 +6,7 @@ static const char * vert_Points =
 "layout (location = 1) in vec4 color;"
 "layout (location = 2) in float size;"
 
-"uniform struct Camera"
-"{"
+"uniform struct Camera {"
 "	mat4 matrix;"
 "	vec2 dimensions;"
 "} camera;"
@@ -15,8 +14,7 @@ static const char * vert_Points =
 "out vec4 vertexColor;"
 "out float vertexSize;"
 
-"void main()"
-"{"
+"void main() {"
 "	vertexColor = color;"
 "	gl_Position = camera.matrix * vec4(point, 0.0, 1.0);"
 "	gl_PointSize = size;"
