@@ -9,8 +9,7 @@
 #include "Language/Evaluator.h"
 #include "Language/Builtin.h"
 
-void RunREPL(void)
-{
+void RunREPL(void) {
 	printf("VisionScript v1.0 – REPL\n");
 	
 	Environment environment = CreateEmptyEnvironment();

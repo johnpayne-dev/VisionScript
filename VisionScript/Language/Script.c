@@ -1,4 +1,5 @@
 #include "Script.h"
+#include "Builtin.h"
 
 Script LoadScript(const char * code) {
 	Script script = {
@@ -6,6 +7,7 @@ Script LoadScript(const char * code) {
 		.environment = CreateEmptyEnvironment(),
 		.needsRender = ListCreate(sizeof(Equation), 1),
 	};
+	InitializeBuiltinVariables(&script.environment);
 	for (int32_t i = 0; i < ListLength(script.lines); i++) {
 		List(Token) tokens = TokenizeLine(script.lines[i], i);
 		Equation equation;
@@ -34,8 +36,10 @@ void RemoveFromRenderList(Script * script, Equation equation) {
 
 void InvalidateDependents(Script * script, const char * identifer) {
 	List(String) * dependents = HashMapGet(script->environment.dependents, identifer);
+	if (dependents == NULL) { return; }
 	for (int32_t i = 0; i < ListLength(*dependents); i++) {
 		Equation * dependent = HashMapGet(script->environment.equations, (*dependents)[i]);
+		if (dependent == NULL) { continue; }
 		if (dependent->type == EquationTypeVariable) {
 			VectorArray * cache = HashMapGet(script->environment.cache, (*dependents)[i]);
 			if (cache != NULL) { FreeVectorArray(*cache); }

@@ -8,36 +8,34 @@
 #include "Utilities/Threads.h"
 #include "Camera.h"
 
-typedef struct vertex
-{
+typedef struct vertex {
 	vec2_t position;
 	vec4_t color;
 	float size;
 	vec2_t pair;
 } vertex_t;
 
-typedef struct RenderObject
-{
-	Statement * statement;
+typedef struct RenderObject {
+	Equation equation;
 	GLuint buffer;
 	vertex_t * vertices;
 	uint64_t vertexCount;
 	bool needsUpload;
 } RenderObject;
 
-extern struct Renderer
-{
-	Script * script;
+extern struct Renderer {
+	Script script;
 	Camera camera;
 	bool testMode;
-	int32_t width, height;
+	int32_t width;
+	int32_t height;
 	GLuint layout;
 	GLuint quad;
-	list(RenderObject) objects;
+	List(RenderObject) objects;
 	bool samplerRunning;
 	pthread_t samplerThread;
 } renderer;
 
-sapp_desc RenderScript(Script * script, bool testMode);
+sapp_desc RenderScript(Script script, bool testMode);
 
 #endif

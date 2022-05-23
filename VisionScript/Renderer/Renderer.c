@@ -8,24 +8,21 @@
 
 struct Renderer renderer = { 0 };
 
-static struct Shaders
-{
+static struct Shaders {
 	GLuint polygons;
 	GLuint grid;
 	GLuint points;
 	GLuint parametric;
 } shaders;
 
-static GLuint CreateShaderProgram(const char * vs, const char * fs)
-{
+static GLuint CreateShaderProgram(const char * vs, const char * fs) {
 	GLint success;
 	char info[512];
 	GLuint vert = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vert, 1, &vs, NULL);
 	glCompileShader(vert);
 	glGetShaderiv(vert, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
+	if (!success) {
 		glGetShaderInfoLog(vert, 512, NULL, info);
 		printf("%s\n", info);
 		abort();
@@ -35,8 +32,7 @@ static GLuint CreateShaderProgram(const char * vs, const char * fs)
 	glShaderSource(frag, 1, &fs, NULL);
 	glCompileShader(frag);
 	glGetShaderiv(frag, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
+	if (!success) {
 		glGetShaderInfoLog(frag, 512, NULL, info);
 		printf("%s\n", info);
 		abort();
@@ -47,8 +43,7 @@ static GLuint CreateShaderProgram(const char * vs, const char * fs)
 	glAttachShader(program, frag);
 	glLinkProgram(program);
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
-	if(!success)
-	{
+	if(!success) {
 		glGetProgramInfoLog(program, 512, NULL, info);
 		printf("%s\n", info);
 		abort();
@@ -59,8 +54,7 @@ static GLuint CreateShaderProgram(const char * vs, const char * fs)
 	return program;
 }
 
-static void CreateShaders()
-{	
+static void CreateShaders() {
 #include "Shaders/Grid.vert.h"
 #include "Shaders/Grid.frag.h"
 	shaders.grid = CreateShaderProgram(vert_Grid, frag_Grid);
@@ -75,8 +69,7 @@ static void CreateShaders()
 	shaders.polygons = CreateShaderProgram(vert_Polygons, frag_Polygons);
 }
 
-static void UpdateUniforms()
-{
+static void UpdateUniforms() {
 	mat4_t matrix = CameraMatrix(renderer.camera);
 	mat4_t invMatrix = CameraInverseMatrix(renderer.camera);
 	
@@ -103,8 +96,7 @@ static void UpdateUniforms()
 	glUniformMatrix4fv(glGetUniformLocation(shaders.polygons, "camera.matrix"), 1, false, (float *)&matrix);
 }
 
-static void BindLayout()
-{
+static void BindLayout() {
 	glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(vertex_t), (void *)0);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(vertex_t), (void *)8);
@@ -115,117 +107,78 @@ static void BindLayout()
 	glEnableVertexAttribArray(3);
 }
 
-static void UpdateBuiltins(float dt)
-{
-	((VectorArray *)HashMapGet(renderer.script->cache, "time"))->xyzw[0][0] += dt;
-	InvalidateCachedDependents(renderer.script, "time");
-	InvalidateDependentRenders(renderer.script, "time");
+static void UpdateBuiltins(float dt) {
+	GetEnvironmentCache(&renderer.script.environment, "time")->xyzw[0][0] += dt;
+	InvalidateDependents(&renderer.script, "time");
 	
-	Statement * statement = HashMapGet(renderer.script->identifiers, "position");
-	if (statement != NULL)
-	{
+	Equation * equation = GetEnvironmentEquation(&renderer.script.environment, "position");
+	if (equation != NULL) {
 		VectorArray result;
-		if (EvaluateExpression(renderer.script->identifiers, renderer.script->cache, NULL, statement->expression, &result).code == RuntimeErrorNone)
-		{
+		if (EvaluateExpression(&renderer.script.environment, NULL, equation->expression, &result).code == RuntimeErrorCodeNone) {
 			renderer.camera.position.x = result.xyzw[0][0];
 			renderer.camera.position.y = result.xyzw[1][0];
 		}
-	}
-	else
-	{
-		VectorArray * position = HashMapGet(renderer.script->cache, "position");
-		if (position->xyzw[0][0] != renderer.camera.position.x || position->xyzw[1][0] != renderer.camera.position.y)
-		{
+	} else {
+		VectorArray * position = GetEnvironmentCache(&renderer.script.environment, "position");
+		if (position->xyzw[0][0] != renderer.camera.position.x || position->xyzw[1][0] != renderer.camera.position.y) {
 			position->xyzw[0][0] = renderer.camera.position.x;
 			position->xyzw[1][0] = renderer.camera.position.y;
-			InvalidateCachedDependents(renderer.script, "position");
-			InvalidateDependentRenders(renderer.script, "position");
-			InvalidateParametricRenders(renderer.script);
+			InvalidateDependents(&renderer.script, "time");
 		}
 	}
-	statement = HashMapGet(renderer.script->identifiers, "scale");
-	if (statement != NULL)
-	{
+	equation = GetEnvironmentEquation(&renderer.script.environment, "scale");
+	if (equation != NULL) {
 		VectorArray result;
-		if (EvaluateExpression(renderer.script->identifiers, renderer.script->cache, NULL, statement->expression, &result).code == RuntimeErrorNone)
-		{
+		if (EvaluateExpression(&renderer.script.environment, NULL, equation->expression, &result).code == RuntimeErrorCodeNone) {
 			renderer.camera.scale.x = result.xyzw[0][0];
 			renderer.camera.scale.y = result.xyzw[1][0];
 		}
-	}
-	else
-	{
-		VectorArray * scale = HashMapGet(renderer.script->cache, "scale");
-		if (scale->xyzw[0][0] != renderer.camera.scale.x || scale->xyzw[1][0] != renderer.camera.scale.y)
-		{
+	} else {
+		VectorArray * scale = GetEnvironmentCache(&renderer.script.environment, "scale");
+		if (scale->xyzw[0][0] != renderer.camera.scale.x || scale->xyzw[1][0] != renderer.camera.scale.y) {
 			scale->xyzw[0][0] = renderer.camera.scale.x;
 			scale->xyzw[1][0] = renderer.camera.scale.y;
-			InvalidateCachedDependents(renderer.script, "scale");
-			InvalidateDependentRenders(renderer.script, "scale");
-			InvalidateParametricRenders(renderer.script);
+			InvalidateDependents(&renderer.script, "scale");
 		}
 	}
-	statement = HashMapGet(renderer.script->identifiers, "rotation");
-	if (statement != NULL)
-	{
+	equation = GetEnvironmentEquation(&renderer.script.environment, "rotation");
+	if (equation != NULL) {
 		VectorArray result;
-		if (EvaluateExpression(renderer.script->identifiers, renderer.script->cache, NULL, statement->expression, &result).code == RuntimeErrorNone)
-		{
+		if (EvaluateExpression(&renderer.script.environment, NULL, equation->expression, &result).code == RuntimeErrorCodeNone) {
 			renderer.camera.angle = result.xyzw[0][0];
 		}
-	}
-	else
-	{
-		VectorArray * rotation = HashMapGet(renderer.script->cache, "rotation");
-		if (rotation->xyzw[0][0] != renderer.camera.angle)
-		{
+	} else {
+		VectorArray * rotation = GetEnvironmentCache(&renderer.script.environment, "position");
+		if (rotation->xyzw[0][0] != renderer.camera.angle) {
 			rotation->xyzw[0][0] = renderer.camera.angle;
-			InvalidateCachedDependents(renderer.script, "rotation");
-			InvalidateDependentRenders(renderer.script, "rotation");
-			InvalidateParametricRenders(renderer.script);
+			InvalidateDependents(&renderer.script, "rotation");
 		}
 	}
 }
 
-static void UpdateSamples()
-{
-	// update samples
+static void UpdateSamples() {
 	Camera camera = renderer.camera;
-	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
-	{
-		if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
-		{
-			RuntimeError error = { RuntimeErrorNone };
-			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePoints)
-			{
-				error = SamplePoints(renderer.script, renderer.script->renderList[i], &renderer.objects[i]);
+	for (int32_t i = 0; i < ListLength(renderer.objects); i++) {
+		if (ListContains(renderer.script.needsRender, &renderer.objects[i].equation)) {
+			RuntimeError error = { RuntimeErrorCodeNone };
+			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePoints) {
+				//error = SamplePoints(renderer.script, renderer.script->needsRender[i], &renderer.objects[i]);
 			}
-			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypePolygons)
-			{
-				error = SamplePolygons(renderer.script, renderer.script->renderList[i], &renderer.objects[i]);
+			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePolygons) {
+				//error = SamplePolygons(renderer.script, renderer.script->needsRender[i], &renderer.objects[i]);
 			}
-			if (renderer.objects[i].statement->declaration.render.type == StatementRenderTypeParametric)
-			{
-				error = SampleParametric(renderer.script, renderer.script->renderList[i], 0, 1, camera, &renderer.objects[i]);
+			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributeParametric) {
+				//error = SampleParametric(renderer.script, renderer.script->needsRender[i], 0, 1, camera, &renderer.objects[i]);
 			}
-			if (ListContains(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement }))
-			{
-				renderer.script->dirtyRenders = ListRemoveAll(renderer.script->dirtyRenders, &(Statement *){ renderer.objects[i].statement });
-			}
-			if (error.code != RuntimeErrorNone)
-			{
-				PrintRuntimeError(error, renderer.objects[i].statement);
-				return;
-			}
+			RemoveFromRenderList(&renderer.script, renderer.objects[i].equation);
+			if (error.code != RuntimeErrorCodeNone) { PrintRuntimeError(error, renderer.script.lines); }
 		}
 	}
 }
 
-static void * UpdateThread(void * arg)
-{
+static void * UpdateThread(void * arg) {
 	clock_t start = clock();
-	while (renderer.samplerRunning)
-	{
+	while (renderer.samplerRunning) {
 		UpdateBuiltins((clock() - start) / (float)CLOCKS_PER_SEC);
 		start = clock();
 		UpdateSamples();
@@ -233,8 +186,7 @@ static void * UpdateThread(void * arg)
 	return NULL;
 }
 
-static void Startup()
-{
+static void Startup() {
 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -244,8 +196,7 @@ static void Startup()
 	
 	glGenBuffers(1, &renderer.quad);
 	glBindBuffer(GL_ARRAY_BUFFER, renderer.quad);
-	vertex_t vertices[6] =
-	{
+	vertex_t vertices[6] = {
 		{ .position = { -1.0, -1.0 } },
 		{ .position = { 1.0, 1.0 } },
 		{ .position = { -1.0, 1.0 } },
@@ -256,9 +207,8 @@ static void Startup()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	renderer.objects = ListCreate(sizeof(RenderObject), 1);
-	for (int32_t i = 0; i < ListLength(renderer.script->renderList); i++)
-	{
-		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .statement = renderer.script->renderList[i] });
+	for (int32_t i = 0; i < ListLength(renderer.script.needsRender); i++) {
+		renderer.objects = ListPush(renderer.objects, &(RenderObject){ .equation = renderer.script.needsRender[i] });
 		glGenBuffers(1, &renderer.objects[i].buffer);
 	}
 	
@@ -268,44 +218,41 @@ static void Startup()
 	pthread_create(&renderer.samplerThread, NULL, UpdateThread, NULL);
 }
 
-static void Frame()
-{	
+static void Frame() {
 	UpdateUniforms();
 	
 	glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 	
-	if (renderer.testMode)
-	{
+	if (renderer.testMode) {
 		glUseProgram(shaders.grid);
 		glBindBuffer(GL_ARRAY_BUFFER, renderer.quad);
 		BindLayout();
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
 	
-	for (int32_t i = 0; i < ListLength(renderer.objects); i++)
-	{
+	for (int32_t i = 0; i < ListLength(renderer.objects); i++) {
 		GLenum mode;
-		switch (renderer.objects[i].statement->declaration.render.type)
-		{
-			case StatementRenderTypePoints:
+		switch (renderer.objects[i].equation.declaration.attribute) {
+			case DeclarationAttributePoints:
 				glUseProgram(shaders.points);
 				mode = GL_POINTS;
 				break;
-			case StatementRenderTypeParametric:
+			case DeclarationAttributeParametric:
 				glUseProgram(shaders.parametric);
 				mode = GL_TRIANGLES;
 				break;
-			case StatementRenderTypePolygons:
+			case DeclarationAttributePolygons:
 				mode = GL_TRIANGLES;
 				glUseProgram(shaders.polygons);
 				break;
+			default:
+				mode = GL_TRIANGLES;
+				break;
 		}
-		if (renderer.objects[i].vertexCount > 0)
-		{
+		if (renderer.objects[i].vertexCount > 0) {
 			glBindBuffer(GL_ARRAY_BUFFER, renderer.objects[i].buffer);
-			if (renderer.objects[i].needsUpload)
-			{
+			if (renderer.objects[i].needsUpload) {
 				glBufferData(GL_ARRAY_BUFFER, renderer.objects[i].vertexCount * sizeof(vertex_t), renderer.objects[i].vertices, GL_DYNAMIC_DRAW);
 				renderer.objects[i].needsUpload = false;
 			}
@@ -315,23 +262,20 @@ static void Frame()
 	}
 }
 
-static void Resize(int32_t width, int32_t height)
-{
+static void Resize(int32_t width, int32_t height) {
 	renderer.width = width;
 	renderer.height = height;
 	renderer.camera.aspectRatio = (float)width / height;
 	glViewport(0, 0, width, height);
 }
 
-static void MouseDragged(float x, float y, float dx, float dy)
-{
-	vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera.angle), (vec4_t){ dx, -dy, 0.0, 1.0 });
+static void MouseDragged(float x, float y, float dx, float dy) {
+	vec4_t dir = mat4_mulv(mat4_rotate_z(mat4_identity, -renderer.camera.angle), (vec4_t){ dx, dy, 0.0, 1.0 });
 	renderer.camera.position.x -= dir.x / (renderer.width * renderer.camera.scale.x) * renderer.camera.aspectRatio;
-	renderer.camera.position.y -= dir.y / (renderer.height * renderer.camera.scale.y);
+	renderer.camera.position.y -= -dir.y / (renderer.height * renderer.camera.scale.y);
 }
 
-static void ScrollWheel(float x, float y, float ds)
-{
+static void ScrollWheel(float x, float y, float ds) {
 	x /= sapp_dpi_scale();
 	y /= sapp_dpi_scale();
 	renderer.camera.scale.x *= 1.0 + ds / SCROLL_ZOOM_FACTOR;
@@ -344,8 +288,7 @@ static void ScrollWheel(float x, float y, float ds)
 
 static bool mouseDown = false;
 
-static void Event(const sapp_event * event)
-{
+static void Event(const sapp_event * event) {
 	if (event->type == SAPP_EVENTTYPE_RESIZED) { Resize(event->window_width, event->window_height); }
 	if (event->type == SAPP_EVENTTYPE_MOUSE_DOWN) { mouseDown = true; }
 	if (event->type == SAPP_EVENTTYPE_MOUSE_UP) { mouseDown = false; }
@@ -353,22 +296,19 @@ static void Event(const sapp_event * event)
 	if (event->type == SAPP_EVENTTYPE_MOUSE_SCROLL) { ScrollWheel(event->mouse_x, event->mouse_y, event->scroll_y); }
 }
 
-static void Shutdown()
-{
+static void Shutdown() {
 	renderer.samplerRunning = false;
 	pthread_join(renderer.samplerThread, NULL);
 }
 
-sapp_desc RenderScript(Script * script, bool testMode)
-{
+sapp_desc RenderScript(Script script, bool testMode) {
 	renderer.script = script;
 	renderer.testMode = testMode;
 	renderer.width = 1080;
 	renderer.height = 720;
 	renderer.camera = (Camera){ .scale = vec2_one, .aspectRatio = (float)renderer.width / renderer.height };
 	
-	return (sapp_desc)
-	{
+	return (sapp_desc) {
 		.width = renderer.width,
 		.height = renderer.height,
 		.window_title = "VisionScript",

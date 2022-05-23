@@ -63,7 +63,7 @@ sapp_desc sokol_main(int argc, char * argv[])
 		"parametric w*f(S, (2*t - 1)*s) + (1 - w)*(S, (2*t - 1)*s)\n";
 	
 	//"parametric (t*cos(1000*pi*t),t*sin(1000*pi*t))"
-	Script * script = LoadScript(code2);
+	Script script = LoadScript(code2);
 	return RenderScript(script, true);
 }
 
