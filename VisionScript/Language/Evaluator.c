@@ -135,12 +135,12 @@ void InitializeEnvironmentDependents(Environment * environment) {
 		List(String) parents = ListCreate(sizeof(String), 1);
 		FindExpressionParents(*environment, equation->expression, equation->declaration.parameters, &parents);
 		for (int32_t j = 0; j < ListLength(parents); j++) {
-			List(String) * dependents = HashMapGet(environment->dependents, parents[j]);
+			List(Equation) * dependents = HashMapGet(environment->dependents, parents[j]);
 			if (dependents == NULL) {
-				dependents = &(List(String)){ ListCreate(sizeof(String), 1) };
-				HashMapSet(environment->dependents, parents[j], dependents);
+				HashMapSet(environment->dependents, parents[j], &(List(Equation)){ ListCreate(sizeof(Equation), 1) });
+				dependents = HashMapGet(environment->dependents, parents[j]);
 			}
-			if (!ListContains(*dependents, &equation)) { *dependents = ListPush(*dependents, &equation); }
+			if (!ListContains(*dependents, equation)) { *dependents = ListPush(*dependents, equation); }
 		}
 		ListFree(parents);
 	}

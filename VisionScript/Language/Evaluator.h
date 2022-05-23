@@ -32,6 +32,7 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeIncorrectArgumentCount,
 	RuntimeErrorCodeDifferingOperonDimensions,
 	RuntimeErrorCodeInvalidArgumentType,
+	RuntimeErrorCodeInvalidRenderDimensionality,
 	RuntimeErrorCodeNotImplemented,
 } RuntimeErrorCode;
 

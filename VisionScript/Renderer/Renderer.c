@@ -162,13 +162,13 @@ static void UpdateSamples() {
 		if (ListContains(renderer.script.needsRender, &renderer.objects[i].equation)) {
 			RuntimeError error = { RuntimeErrorCodeNone };
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePoints) {
-				//error = SamplePoints(renderer.script, renderer.script->needsRender[i], &renderer.objects[i]);
+				error = SamplePoints(&renderer.script, renderer.script.needsRender[i], &renderer.objects[i]);
 			}
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePolygons) {
-				//error = SamplePolygons(renderer.script, renderer.script->needsRender[i], &renderer.objects[i]);
+				error = SamplePolygons(&renderer.script, renderer.script.needsRender[i], &renderer.objects[i]);
 			}
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributeParametric) {
-				//error = SampleParametric(renderer.script, renderer.script->needsRender[i], 0, 1, camera, &renderer.objects[i]);
+				error = SampleParametric(&renderer.script, renderer.script.needsRender[i], 0, 1, camera, &renderer.objects[i]);
 			}
 			RemoveFromRenderList(&renderer.script, renderer.objects[i].equation);
 			if (error.code != RuntimeErrorCodeNone) { PrintRuntimeError(error, renderer.script.lines); }

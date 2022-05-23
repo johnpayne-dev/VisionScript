@@ -18,10 +18,9 @@ sapp_desc sokol_main(int argc, char * argv[])
 	printf("%s %s\n", argv[0], argv[1]);
 	
 	char * code =
-		"n = [1...1000]^2\n"
-		"a = (time / 10) % 3 + 1\n"
-		"P(t) = sum((cos(n*t), sin(n*t))/n)\n"
-		"parametric P(2*pi*t)";
+		"n = [1 ~ 1000]^2\n"
+		"parametric P(t) = sum((cos(n*t), sin(n*t))/n)\n"
+		"P:range = [0,1]";
 	
 	char * code2 =
 		"f(x,y) = sin(x) * cos(y)\n"
@@ -33,14 +32,14 @@ sapp_desc sokol_main(int argc, char * argv[])
 		"Cs = -sin(Cro)\n"
 		"Cc = cos(Cro)\n"
 		"Cp = (Cr*cos(Ca.y)*cos(Ca.x),Cr*cos(Ca.y)*sin(Ca.x),Cr*sin(Ca.y))\n"
-		"parametric 2*[(0,t), (t,1), (t,0), (1,t)] - 1\n"
+		"parametric border = 2*[(0,t), (t,1), (t,0), (1,t)] - 1\n"
 		"Tx(p) = dot(p.xy - Cp.xy, (Cc.x,-Cs.x))\n"
 		"Ty(p) = dot(p.yx - Cp.yx, (Cc.x,Cs.x))*Cc.y + (p.z - Cp.z)*Cs.y\n"
 		"Tz(p) = (p.z - Cp.z)*Cc.y - dot(p.yx - Cp.yx, (Cc.x,Cs.x))*Cs.y\n"
 		"T(p) = (Tx(p),Tz(p))/Ty(p)\n"
-		"S = (s/n)*[-n...n]\n"
-		"t = (s/n)*[(i,j) for i = [-n...n] for j = [-n...n]]\n"
-		"points T((t.x,t.y,f(t.x,t.y)))\n";
+		"S = (s/n)*[-n ~ n]\n"
+		"t = (s/n)*[(-n,-n) ~ (n,n)]\n"
+		"points graph = T((t.x,t.y,f(t.x,t.y)))";
 		//"parametric T(((2*t-1)*s,S,f((2*t-1)*s,S)))\n"
 		//"parametric T((S,(2*t-1)*s,f(S,(2*t-1)*s)))";
 	
@@ -63,7 +62,7 @@ sapp_desc sokol_main(int argc, char * argv[])
 		"parametric w*f(S, (2*t - 1)*s) + (1 - w)*(S, (2*t - 1)*s)\n";
 	
 	//"parametric (t*cos(1000*pi*t),t*sin(1000*pi*t))"
-	Script script = LoadScript(code2);
+	Script script = LoadScript(code);
 	return RenderScript(script, true);
 }
 

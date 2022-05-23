@@ -6,10 +6,10 @@
 #include "Renderer.h"
 #include "Camera.h"
 
-RuntimeError SamplePolygons(Script * script, Statement * statement, RenderObject * object);
+RuntimeError SamplePolygons(Script * script, Equation equation, RenderObject * object);
 
-RuntimeError SamplePoints(Script * script, Statement * statement, RenderObject * object);
+RuntimeError SamplePoints(Script * script, Equation equation, RenderObject * object);
 
-RuntimeError SampleParametric(Script * script, Statement * statement, float lower, float upper, Camera camera, RenderObject * object);
+RuntimeError SampleParametric(Script * script, Equation equation, float lower, float upper, Camera camera, RenderObject * object);
 
 #endif

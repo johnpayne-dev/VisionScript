@@ -35,15 +35,15 @@ void RemoveFromRenderList(Script * script, Equation equation) {
 }
 
 void InvalidateDependents(Script * script, const char * identifer) {
-	List(String) * dependents = HashMapGet(script->environment.dependents, identifer);
+	List(Equation) * dependents = HashMapGet(script->environment.dependents, identifer);
 	if (dependents == NULL) { return; }
 	for (int32_t i = 0; i < ListLength(*dependents); i++) {
-		Equation * dependent = HashMapGet(script->environment.equations, (*dependents)[i]);
+		Equation * dependent = HashMapGet(script->environment.equations, (*dependents)[i].declaration.identifier);
 		if (dependent == NULL) { continue; }
 		if (dependent->type == EquationTypeVariable) {
-			VectorArray * cache = HashMapGet(script->environment.cache, (*dependents)[i]);
+			VectorArray * cache = HashMapGet(script->environment.cache, (*dependents)[i].declaration.identifier);
 			if (cache != NULL) { FreeVectorArray(*cache); }
-			HashMapSet(script->environment.cache, (*dependents)[i], NULL);
+			HashMapSet(script->environment.cache, (*dependents)[i].declaration.identifier, NULL);
 		}
 		if (dependent->declaration.attribute != DeclarationAttributeNone) { AddToScriptRenderList(script, *dependent); }
 	}
