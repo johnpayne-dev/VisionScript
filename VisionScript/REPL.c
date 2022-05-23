@@ -56,8 +56,8 @@ void RunREPL(void)
 			}
 			
 			if (equation.type == EquationTypeVariable) {
-				SetEnvironmentEquation(&environment, equation);
-				SetEnvironmentCache(&environment, CreateBinding(equation.declaration.identifier, result));
+				AddEnvironmentEquation(&environment, equation);
+				SetEnvironmentCache(&environment, equation.declaration.identifier, CopyVectorArray(result));
 			}
 			else {
 				PrintVectorArray(result);
@@ -72,7 +72,7 @@ void RunREPL(void)
 		}
 		
 		if (equation.type == EquationTypeFunction) {
-			SetEnvironmentEquation(&environment, equation);
+			AddEnvironmentEquation(&environment, equation);
 		}
 	}
 	FreeEnvironment(environment);

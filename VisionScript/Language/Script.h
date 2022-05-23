@@ -8,7 +8,7 @@
 typedef struct Script {
 	List(String) lines;
 	Environment environment;
-	List(Equation *) needsRender;
+	List(Equation) needsRender;
 } Script;
 
 Script LoadScript(const char * code);
@@ -17,7 +17,7 @@ void AddToScriptRenderList(Script * script, Equation equation);
 
 void RemoveFromRenderList(Script * script, Equation equation);
 
-void InvalidateDependents(String * script, String identifer);
+void InvalidateDependents(Script * script, const char * identifer);
 
 void FreeScript(Script script);
 

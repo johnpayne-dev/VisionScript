@@ -67,13 +67,14 @@ Binding CreateBinding(const char * identifier, VectorArray value);
 void FreeBinding(Binding binding);
 
 typedef struct Environment {
-	List(Equation) equations;
-	List(Binding) cache;
+	HashMap(Equation) equations;
+	HashMap(VectorArray) cache;
+	HashMap(List(Equation)) dependents;
 } Environment;
 
 Environment CreateEmptyEnvironment(void);
-void SetEnvironmentEquation(Environment * environment, Equation equation);
-void SetEnvironmentCache(Environment * environment, Binding binding);
+void AddEnvironmentEquation(Environment * environment, Equation equation);
+void SetEnvironmentCache(Environment * environment, const char * identifier, VectorArray value);
 Equation * GetEnvironmentEquation(Environment * environment, const char * identifier);
 VectorArray * GetEnvironmentCache(Environment * environment, const char * identifier);
 void InitializeEnvironmentDependents(Environment * environment);

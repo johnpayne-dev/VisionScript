@@ -101,71 +101,71 @@ void FreeBinding(Binding binding) {
 }
 
 Environment CreateEmptyEnvironment() {
-	return (Environment){
-		.equations = ListCreate(sizeof(Equation), 1),
-		.cache = ListCreate(sizeof(Binding), 1),
+	return (Environment) {
+		.equations = HashMapCreate(sizeof(Equation)),
+		.cache = HashMapCreate(sizeof(VectorArray)),
+		.dependents = HashMapCreate(sizeof(List(String))),
 	};
 }
 
-void SetEnvironmentEquation(Environment * environment, Equation equation) {
-	bool replaced = false;
-	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
-		if (StringEquals(equation.declaration.identifier, environment->equations[i].declaration.identifier)) {
-			FreeEquation(environment->equations[i]);
-			environment->equations[i] = equation;
-			replaced = true;
-			break;
-		}
-	}
-	if (!replaced) { environment->equations = ListPush(environment->equations, &equation); }
+void AddEnvironmentEquation(Environment * environment, Equation equation) {
+	Equation * oldEquation = HashMapGet(environment->equations, equation.declaration.identifier);
+	if (oldEquation != NULL) { FreeEquation(*oldEquation); }
+	HashMapSet(environment->equations, equation.declaration.identifier, &equation);
 }
 
 Equation * GetEnvironmentEquation(Environment * environment, const char * identifier) {
-	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
-		if (StringEquals(environment->equations[i].declaration.identifier, identifier)) { return &environment->equations[i]; }
-	}
-	return NULL;
+	return HashMapGet(environment->equations, identifier);
 }
 
-void SetEnvironmentCache(Environment * environment, Binding binding) {
-	bool replaced = false;
-	for (int32_t i = 0; i < ListLength(environment->cache); i++) {
-		if (StringEquals(binding.identifier, environment->cache[i].identifier)) {
-			FreeBinding(environment->cache[i]);
-			environment->cache[i] = binding;
-			replaced = true;
-			break;
-		}
-	}
-	if (!replaced) { environment->cache = ListPush(environment->cache, &binding); }
+void SetEnvironmentCache(Environment * environment, const char * identifier, VectorArray value) {
+	VectorArray * oldCache = HashMapGet(environment->cache, identifier);
+	if (oldCache != NULL) { FreeVectorArray(*oldCache); }
+	HashMapSet(environment->cache, identifier, &value);
 }
 
 VectorArray * GetEnvironmentCache(Environment * environment, const char * identifier) {
-	for (int32_t i = 0; i < ListLength(environment->cache); i++) {
-		if (StringEquals(environment->cache[i].identifier, identifier)) { return &environment->cache[i].value; }
-	}
-	return NULL;
+	return HashMapGet(environment->cache, identifier);
 }
 
 void InitializeEnvironmentDependents(Environment * environment) {
-	for (int32_t i = 0; i < ListLength(environment->equations); i++) {
+	List(String) keys = HashMapKeys(environment->equations);
+	for (int32_t i = 0; i < ListLength(keys); i++) {
+		Equation * equation = HashMapGet(environment->equations, keys[i]);
 		List(String) parents = ListCreate(sizeof(String), 1);
-		FindExpressionParents(*environment, environment->equations[i].expression, environment->equations[i].declaration.parameters, &parents);
+		FindExpressionParents(*environment, equation->expression, equation->declaration.parameters, &parents);
 		for (int32_t j = 0; j < ListLength(parents); j++) {
-			/*Equation * equation = GetEnvironmentEquation(environment, parents[j]);
-			if (equation != NULL && !ListContains(equation->dependents, &(Equation *){ environment->equations + i })) {
-				equation->dependents = ListPush(equation->dependents, &(Equation *){ environment->equations + i });
-			}*/
+			List(String) * dependents = HashMapGet(environment->dependents, parents[j]);
+			if (dependents == NULL) {
+				dependents = &(List(String)){ ListCreate(sizeof(String), 1) };
+				HashMapSet(environment->dependents, parents[j], dependents);
+			}
+			if (!ListContains(*dependents, &equation)) { *dependents = ListPush(*dependents, &equation); }
 		}
 		ListFree(parents);
 	}
+	ListFree(keys);
 }
 
 void FreeEnvironment(Environment environment) {
-	for (int32_t i = 0; i < ListLength(environment.equations); i++) { FreeEquation(environment.equations[i]); }
-	ListFree(environment.equations);
-	for (int32_t i = 0; i < ListLength(environment.cache); i++) { FreeBinding(environment.cache[i]); }
-	ListFree(environment.cache);
+	List(String) keys = HashMapKeys(environment.equations);
+	for (int32_t i = 0; i < ListLength(keys); i++) { FreeEquation(*(Equation *)HashMapGet(environment.equations, keys[i])); }
+	ListFree(keys);
+	HashMapFree(environment.equations);
+	
+	keys = HashMapKeys(environment.cache);
+	for (int32_t i = 0; i < ListLength(keys); i++) { FreeVectorArray(*(VectorArray *)HashMapGet(environment.cache, keys[i])); }
+	ListFree(keys);
+	HashMapFree(environment.cache);
+	
+	keys = HashMapKeys(environment.dependents);
+	for (int32_t i = 0; i < ListLength(keys); i++) {
+		List(String) * identifiers = HashMapGet(environment.dependents, keys[i]);
+		for (int32_t j = 0; j < ListLength(*identifiers); j++) { StringFree((*identifiers)[j]); }
+		ListFree(*identifiers);
+ 	}
+	ListFree(keys);
+	HashMapFree(environment.dependents);
 }
 
 static RuntimeError EvaluateConstant(Environment * environment, List(Binding) parameters, Expression expression, VectorArray * result) {
@@ -196,7 +196,7 @@ static RuntimeError EvaluateIdentifier(Environment * environment, List(Binding) 
 	if (equation != NULL) {
 		if (equation->type == EquationTypeFunction) { return (RuntimeError){ RuntimeErrorCodeIdentifierNotVariable, expression.start, expression.end, expression.line }; }
 		RuntimeError error = EvaluateExpression(environment, NULL, equation->expression, result);
-		if (error.code == RuntimeErrorCodeNone) { SetEnvironmentCache(environment, CreateBinding(expression.identifier, *result)); }
+		if (error.code == RuntimeErrorCodeNone) { SetEnvironmentCache(environment, expression.identifier, CopyVectorArray(*result)); }
 		return error;
 	}
 	

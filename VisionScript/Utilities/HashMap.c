@@ -22,7 +22,7 @@ HashMap(void) HashMapCreate(uint32_t elementSize) {
 	HashSlot * map = malloc(HASH_MAP_CAPCITY * sizeof(HashSlot));
 	for (int32_t i = 0; i < HASH_MAP_CAPCITY; i++) {
 		map[i] = (HashSlot) {
-			.keys = ListCreate(sizeof(const char *), 1),
+			.keys = ListCreate(sizeof(String), 1),
 			.values = ListCreate(elementSize, 1),
 		};
 	}
@@ -32,8 +32,9 @@ HashMap(void) HashMapCreate(uint32_t elementSize) {
 void HashMapSet(HashMap(void) map, const char * key, void * value) {
 	HashSlot * slot = &map[Hash(key) % HASH_MAP_CAPCITY];
 	for (int32_t i = 0; i < ListLength(slot->keys); i++) {
-		if (strcmp(slot->keys[i], key) == 0) {
+		if (StringEquals(slot->keys[i], key)) {
 			if (value == NULL) {
+				StringFree(slot->keys[i]);
 				slot->keys = ListRemove(slot->keys, i);
 				slot->values = ListRemove(slot->values, i);
 			} else {
@@ -43,7 +44,7 @@ void HashMapSet(HashMap(void) map, const char * key, void * value) {
 		}
 	}
 	if (value != NULL) {
-		slot->keys = ListPush(slot->keys, &key);
+		slot->keys = ListPush(slot->keys, &(String){ StringCreate(key) });
 		slot->values = ListPush(slot->values, value);
 	}
 }
@@ -51,13 +52,24 @@ void HashMapSet(HashMap(void) map, const char * key, void * value) {
 void * HashMapGet(HashMap(void) map, const char * key) {
 	HashSlot * slot = &map[Hash(key) % HASH_MAP_CAPCITY];
 	for (int32_t i = 0; i < ListLength(slot->keys); i++) {
-		if (strcmp(slot->keys[i], key)) { return ListGet(slot->values, i); }
+		if (StringEquals(slot->keys[i], key)) { return ListGet(slot->values, i); }
 	}
 	return NULL;
 }
 
+List(String) HashMapKeys(HashMap(void) map) {
+	List(String) keys = ListCreate(sizeof(const char *), 1);
+	for (int32_t i = 0; i < HASH_MAP_CAPCITY; i++) {
+		for (int32_t j = 0; j < ListLength(map[i].keys); j++) {
+			keys = ListPush(keys, ListGet(map[i].keys, j));
+		}
+	}
+	return keys;
+}
+
 void HashMapFree(HashMap(void) map) {
 	for (int32_t i = 0; i < HASH_MAP_CAPCITY; i++) {
+		for (int32_t j = 0; j < ListLength(map[i].keys); j++) { StringFree(map[i].keys[j]); }
 		ListFree(map[i].keys);
 		ListFree(map[i].values);
 	}

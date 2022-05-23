@@ -15,7 +15,7 @@ Script LoadScript(const char * code) {
 			continue;
 		}
 		if (equation.type == EquationTypeNone) { continue; }
-		SetEnvironmentEquation(&script.environment, equation);
+		AddEnvironmentEquation(&script.environment, equation);
 		AddToScriptRenderList(&script, equation);
 	}
 	InitializeEnvironmentDependents(&script.environment);
@@ -23,15 +23,26 @@ Script LoadScript(const char * code) {
 }
 
 void AddToScriptRenderList(Script * script, Equation equation) {
-	if (equation.declaration.attribute != DeclarationAttributeNone) {
-		Equation * envEquation = GetEnvironmentEquation(&script->environment, equation.declaration.identifier);
-		if (envEquation != NULL && !ListContains(script->needsRender, &envEquation)) { script->needsRender = ListPush(script->needsRender, &envEquation); }
+	if (equation.type != EquationTypeNone && equation.declaration.attribute != DeclarationAttributeNone) {
+		if (!ListContains(script->needsRender, &equation)) { script->needsRender = ListPush(script->needsRender, &equation); }
 	}
 }
 
 void RemoveFromRenderList(Script * script, Equation equation) {
-	Equation * envEquation = GetEnvironmentEquation(&script->environment, equation.declaration.identifier);
-	script->needsRender = ListRemoveAll(script->needsRender, &envEquation);
+	script->needsRender = ListRemoveAll(script->needsRender, &equation);
+}
+
+void InvalidateDependents(Script * script, const char * identifer) {
+	List(String) * dependents = HashMapGet(script->environment.dependents, identifer);
+	for (int32_t i = 0; i < ListLength(*dependents); i++) {
+		Equation * dependent = HashMapGet(script->environment.equations, (*dependents)[i]);
+		if (dependent->type == EquationTypeVariable) {
+			VectorArray * cache = HashMapGet(script->environment.cache, (*dependents)[i]);
+			if (cache != NULL) { FreeVectorArray(*cache); }
+			HashMapSet(script->environment.cache, (*dependents)[i], NULL);
+		}
+		if (dependent->declaration.attribute != DeclarationAttributeNone) { AddToScriptRenderList(script, *dependent); }
+	}
 }
 
 void FreeScript(Script script) {

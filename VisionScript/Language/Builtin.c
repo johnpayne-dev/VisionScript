@@ -889,37 +889,37 @@ BuiltinVariable DetermineBuiltinVariable(const char * identifier) {
 void InitializeBuiltinVariables(Environment * environment) {
 	VectorArray pi = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
 	pi.xyzw[0][0] = M_PI;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("pi"), .value = pi });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariablePI], pi);
 	
 	VectorArray tau = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
 	tau.xyzw[0][0] = 2 * M_PI;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("tau"), .value = tau });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariableTAU], tau);
 	
 	VectorArray e = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
 	e.xyzw[0][0] = M_E;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("e"), .value = e });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariableE], e);
 	
 	VectorArray inf = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
 	inf.xyzw[0][0] = INFINITY;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("inf"), .value = inf });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariableINF], inf);
 	
 	VectorArray position = (VectorArray){ .length = 1, .dimensions = 2, .xyzw = { malloc(sizeof(scalar_t)), malloc(sizeof(scalar_t)) } };
 	position.xyzw[0][0] = 0;
 	position.xyzw[1][0] = 0;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("position"), .value = position });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariablePOSITION], position);
 	
 	VectorArray scale = (VectorArray){ .length = 1, .dimensions = 2, .xyzw = { malloc(sizeof(scalar_t)), malloc(sizeof(scalar_t)) } };
 	scale.xyzw[0][0] = 1;
 	scale.xyzw[1][0] = 1;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("scale"), .value = scale });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariableSCALE], scale);
 	
 	VectorArray rotation = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
 	rotation.xyzw[0][0] = 0.0;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("rotation"), .value = rotation });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariableROTATION], rotation);
 	
 	VectorArray time = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = malloc(sizeof(scalar_t)) };
 	time.xyzw[0][0] = 0.0;
-	SetEnvironmentCache(environment, (Binding){ .identifier = StringCreate("time"), .value = time });
+	SetEnvironmentCache(environment, builtinVariables[BuiltinVariableTIME], time);
 }
 
 RuntimeErrorCode EvaluateBuiltinVariable(Environment environment, BuiltinVariable variable, VectorArray * result) {
