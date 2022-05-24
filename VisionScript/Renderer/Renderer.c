@@ -123,7 +123,8 @@ static void UpdateBuiltins(float dt) {
 		if (position->xyzw[0][0] != renderer.camera.position.x || position->xyzw[1][0] != renderer.camera.position.y) {
 			position->xyzw[0][0] = renderer.camera.position.x;
 			position->xyzw[1][0] = renderer.camera.position.y;
-			InvalidateDependents(&renderer.script, "time");
+			InvalidateDependents(&renderer.script, "position");
+			InvalidateParametrics(&renderer.script);
 		}
 	}
 	equation = GetEnvironmentEquation(&renderer.script.environment, "scale");
@@ -139,6 +140,7 @@ static void UpdateBuiltins(float dt) {
 			scale->xyzw[0][0] = renderer.camera.scale.x;
 			scale->xyzw[1][0] = renderer.camera.scale.y;
 			InvalidateDependents(&renderer.script, "scale");
+			InvalidateParametrics(&renderer.script);
 		}
 	}
 	equation = GetEnvironmentEquation(&renderer.script.environment, "rotation");
@@ -162,13 +164,13 @@ static void UpdateSamples() {
 		if (ListContains(renderer.script.needsRender, &renderer.objects[i].equation)) {
 			RuntimeError error = { RuntimeErrorCodeNone };
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePoints) {
-				error = SamplePoints(&renderer.script, renderer.script.needsRender[i], &renderer.objects[i]);
+				error = SamplePoints(&renderer.script, renderer.objects[i].equation, &renderer.objects[i]);
 			}
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePolygons) {
-				error = SamplePolygons(&renderer.script, renderer.script.needsRender[i], &renderer.objects[i]);
+				error = SamplePolygons(&renderer.script, renderer.objects[i].equation, &renderer.objects[i]);
 			}
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributeParametric) {
-				error = SampleParametric(&renderer.script, renderer.script.needsRender[i], 0, 1, camera, &renderer.objects[i]);
+				error = SampleParametric(&renderer.script, renderer.objects[i].equation, 0, 1, camera, &renderer.objects[i]);
 			}
 			RemoveFromRenderList(&renderer.script, renderer.objects[i].equation);
 			if (error.code != RuntimeErrorCodeNone) { PrintRuntimeError(error, renderer.script.lines); }

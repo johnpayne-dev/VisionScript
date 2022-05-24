@@ -1,5 +1,6 @@
 #include "Script.h"
 #include "Builtin.h"
+#include <stdio.h>
 
 Script LoadScript(const char * code) {
 	Script script = {
@@ -46,6 +47,14 @@ void InvalidateDependents(Script * script, const char * identifer) {
 			HashMapSet(script->environment.cache, (*dependents)[i].declaration.identifier, NULL);
 		}
 		if (dependent->declaration.attribute != DeclarationAttributeNone) { AddToScriptRenderList(script, *dependent); }
+	}
+}
+
+void InvalidateParametrics(Script * script) {
+	List(String) keys = HashMapKeys(script->environment.equations);
+	for (int32_t i = 0; i < ListLength(keys); i++) {
+		Equation * equation = HashMapGet(script->environment.equations, keys[i]);
+		if (equation->declaration.attribute == DeclarationAttributeParametric) { AddToScriptRenderList(script, *equation); }
 	}
 }
 

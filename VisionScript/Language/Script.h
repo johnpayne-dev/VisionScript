@@ -19,6 +19,8 @@ void RemoveFromRenderList(Script * script, Equation equation);
 
 void InvalidateDependents(Script * script, const char * identifer);
 
+void InvalidateParametrics(Script * script);
+
 void FreeScript(Script script);
 
 #endif

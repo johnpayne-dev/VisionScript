@@ -8,10 +8,8 @@
 #define SOKOL_GLCORE33
 #include <sokol_app.h>
 
-sapp_desc sokol_main(int argc, char * argv[])
-{
-	if (argc < 2)
-	{
+sapp_desc sokol_main(int argc, char * argv[]) {
+	if (argc < 2) {
 		RunREPL();
 		exit(0);
 	}
@@ -19,8 +17,8 @@ sapp_desc sokol_main(int argc, char * argv[])
 	
 	char * code =
 		"n = [1 ~ 1000]^2\n"
-		"parametric P(t) = sum((cos(n*t), sin(n*t))/n)\n"
-		"P:range = [0,1]";
+		"parametric P(t) = sum((cos(2*pi*n*t), sin(2*pi*n*t))/n)\n"
+		"P:range = [0,2*pi]";
 	
 	char * code2 =
 		"f(x,y) = sin(x) * cos(y)\n"
@@ -39,30 +37,30 @@ sapp_desc sokol_main(int argc, char * argv[])
 		"T(p) = (Tx(p),Tz(p))/Ty(p)\n"
 		"S = (s/n)*[-n ~ n]\n"
 		"t = (s/n)*[(-n,-n) ~ (n,n)]\n"
-		"points graph = T((t.x,t.y,f(t.x,t.y)))";
-		//"parametric T(((2*t-1)*s,S,f((2*t-1)*s,S)))\n"
-		//"parametric T((S,(2*t-1)*s,f(S,(2*t-1)*s)))";
+		//"points graph = T((t.x,t.y,f(t.x,t.y)))";
+		"parametric L1(t) = T(((2*t-1)*s,S,f((2*t-1)*s,S)))\n"
+		"parametric L2(t) = T((S,(2*t-1)*s,f(S,(2*t-1)*s)))";
 	
 	char * code3 =
 		"f(x,y) = (cos(x - y - time), sin(x + y + time * 0.9))\n"
 		"s = pi\n"
 		"n = 40\n"
-		"A = (s/n)*[(i,j) for i = [-n...n] for j = [-n...n]]\n"
+		"A = (s/n)*[(-n,-n) ~ (n,n)]\n"
 		"B = A + (s/n)*f(A.x,A.y)\n"
-		"parametric (B - A)*t + A\n";
+		"parametric P(t) = (B - A)*t + A\n";
 	
 	char * code4 =
 		"M(a,b) = (a.x*b.x - a.y*b.y, a.x*b.y + b.x*a.y)\n"
-		"f(x,y) = M((x,y), (x,y) + 1)\n"
+		"f(x,y) = M((x,y), (x,y))\n"
 		"n = 32\n"
 		"s = 1\n"
-		"S = (s/n)*[-n...n]\n"
+		"S = (s/n)*[-n ~ n]\n"
 		"w = 1\n"
-		"parametric w*f((2*t - 1)*s, S) + (1 - w)*((2*t - 1)*s, S)\n"
-		"parametric w*f(S, (2*t - 1)*s) + (1 - w)*(S, (2*t - 1)*s)\n";
+		"parametric L1(t) = w*f((2*t - 1)*s, S) + (1 - w)*((2*t - 1)*s, S)\n"
+		"parametric L2(t) = w*f(S, (2*t - 1)*s) + (1 - w)*(S, (2*t - 1)*s)\n";
 	
-	//"parametric (t*cos(1000*pi*t),t*sin(1000*pi*t))"
-	Script script = LoadScript(code);
+	//"parametric p(t) = (t*cos(1000*pi*t),t*sin(1000*pi*t))"
+	Script script = LoadScript(code3);
 	return RenderScript(script, true);
 }
 
