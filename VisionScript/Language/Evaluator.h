@@ -4,6 +4,8 @@
 #include "Parser.h"
 #include "Utilities/HashMap.h"
 
+#define EVALUATOR_MAX_DEPTH 1024
+
 typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeNone,
 	RuntimeErrorCodeInvalidExpression,
@@ -12,9 +14,7 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeIdentifierNotVariable,
 	RuntimeErrorCodeUndefinedIdentifier,
 	RuntimeErrorCodeTooManyVectorElements,
-	RuntimeErrorCodeVectorInsideVector,
 	RuntimeErrorCodeNonUniformArray,
-	RuntimeErrorCodeArrayInsideArray,
 	RuntimeErrorCodeInvalidRangeOperon,
 	RuntimeErrorCodeNonUniformRange,
 	RuntimeErrorCodeInvalidRangePlacement,
@@ -37,6 +37,7 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeInvalidParametricDomain,
 	RuntimeErrorCodeInvalidColorDimension,
 	RuntimeErrorCodeInvalidSizeDimension,
+	RuntimeErrorCodeReachedDepthLimit,
 	RuntimeErrorCodeNotImplemented,
 } RuntimeErrorCode;
 
