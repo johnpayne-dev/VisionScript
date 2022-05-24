@@ -11,15 +11,21 @@ Script LoadScript(const char * code) {
 	InitializeBuiltinVariables(&script.environment);
 	for (int32_t i = 0; i < ListLength(script.lines); i++) {
 		List(Token) tokens = TokenizeLine(script.lines[i], i);
+		if (ListLength(tokens) == 0) {
+			FreeTokens(tokens);
+			continue;
+		}
 		Equation equation;
 		SyntaxError error = ParseEquation(tokens, &equation);
 		if (error.code != SyntaxErrorCodeNone) {
+			FreeTokens(tokens);
 			PrintSyntaxError(error, script.lines);
 			continue;
 		}
 		if (equation.type == EquationTypeNone) { continue; }
 		AddEnvironmentEquation(&script.environment, equation);
 		AddToScriptRenderList(&script, equation);
+		FreeTokens(tokens);
 	}
 	InitializeEnvironmentDependents(&script.environment);
 	return script;

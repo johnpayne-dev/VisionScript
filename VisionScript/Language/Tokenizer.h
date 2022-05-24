@@ -46,7 +46,7 @@ typedef enum TokenType {
 typedef struct Token {
 	TokenType type;
 	String value;
-	int32_t lineNumber;
+	int32_t line;
 	int32_t start;
 	int32_t end;
 } Token;

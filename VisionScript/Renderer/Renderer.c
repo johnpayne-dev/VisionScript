@@ -170,7 +170,7 @@ static void UpdateSamples() {
 				error = SamplePolygons(&renderer.script, renderer.objects[i].equation, &renderer.objects[i]);
 			}
 			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributeParametric) {
-				error = SampleParametric(&renderer.script, renderer.objects[i].equation, 0, 1, camera, &renderer.objects[i]);
+				error = SampleParametric(&renderer.script, renderer.objects[i].equation, camera, &renderer.objects[i]);
 			}
 			RemoveFromRenderList(&renderer.script, renderer.objects[i].equation);
 			if (error.code != RuntimeErrorCodeNone) { PrintRuntimeError(error, renderer.script.lines); }

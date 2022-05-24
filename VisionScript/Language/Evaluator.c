@@ -35,6 +35,8 @@ const char * RuntimeErrorToString(RuntimeErrorCode code) {
 		case RuntimeErrorCodeIncorrectArgumentCount: return "incorrect argument count";
 		case RuntimeErrorCodeDifferingOperonDimensions: return "unable to perform arithmetic on differing dimensionality";
 		case RuntimeErrorCodeInvalidRenderDimensionality: return "render equation is of invalid dimensionality";
+		case RuntimeErrorCodeInvalidParametricEquation: return "invalid parametric equation, must be function of one parameter";
+		case RuntimeErrorCodeInvalidParametricDomain: return "invalid parametric domain";
 		case RuntimeErrorCodeNotImplemented: return "not implemented";
 		default: return "unknown error";
 	}

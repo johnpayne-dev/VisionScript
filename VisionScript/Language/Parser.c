@@ -237,21 +237,21 @@ static SyntaxError CheckMissingBraces(List(Token) tokens, int32_t start, int32_t
 	for (int32_t i = start; i <= end; i++) {
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_PARENTHESIS)) {
 			int32_t next = FindClosingParenthesis(tokens, i, end);
-			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, tokens[i].start, tokens[end].end, tokens[i].lineNumber }; }
+			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, tokens[i].start, tokens[end].end, tokens[i].line }; }
 			i = next;
 			continue;
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_RIGHT_PARENTHESIS)) {
-			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, tokens[start].start, tokens[i].end, tokens[start].lineNumber };
+			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, tokens[start].start, tokens[i].end, tokens[start].line };
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_LEFT_BRACKET)) {
 			int32_t next = FindClosingBracket(tokens, i, end);
-			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, tokens[i].start, tokens[end].end, tokens[i].lineNumber }; }
+			if (next == -1) { return (SyntaxError){ SyntaxErrorCodeMissingClosingBrace, tokens[i].start, tokens[end].end, tokens[i].line }; }
 			i = next;
 			continue;
 		}
 		if (StringEquals(tokens[i].value, SYMBOL_RIGHT_BRACKET)) {
-			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, tokens[start].start, tokens[i].end, tokens[start].lineNumber };
+			return (SyntaxError){ SyntaxErrorCodeMissingOpeningBrace, tokens[start].start, tokens[i].end, tokens[start].line };
 		}
 	}
 	return (SyntaxError){ SyntaxErrorCodeNone };
@@ -395,10 +395,10 @@ static SyntaxError ParseTernary(List(Token) tokens, int32_t start, int32_t end, 
 }
 
 SyntaxError ParseExpression(List(Token) tokens, int32_t start, int32_t end, Expression * expression) {
-	if (end < start) { return (SyntaxError){ SyntaxErrorCodeMissingExpression, tokens[end].start, tokens[start].end, tokens[end].lineNumber }; }
+	if (end < start) { return (SyntaxError){ SyntaxErrorCodeMissingExpression, tokens[end].start, tokens[start].end, tokens[end].line }; }
 	expression->start = tokens[start].start;
 	expression->end = tokens[end].end;
-	expression->line = tokens[start].lineNumber;
+	expression->line = tokens[start].line;
 	
 	SyntaxError error = CheckMissingBraces(tokens, start, end);
 	if (error.code != SyntaxErrorCodeNone) { return error; }
@@ -584,11 +584,11 @@ static SyntaxError ParseFunctionDeclaration(List(Token) tokens, Declaration * de
 	// go through each identifier and add it to the argument list
 	declaration->parameters = ListCreate(sizeof(String), 4);
 	for (int32_t i = start + 2; i < argumentsEnd; i++) {
-		if (tokens[i].type != TokenTypeIdentifier) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, tokens[i].start, tokens[i].end, tokens[i].lineNumber }; }
+		if (tokens[i].type != TokenTypeIdentifier) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, tokens[i].start, tokens[i].end, tokens[i].line }; }
 		declaration->parameters = ListPush(declaration->parameters, &(String){ StringCreate(tokens[i].value) });
 		i++;
 		if (i == argumentsEnd) { break; }
-		if (!StringEquals(tokens[i].value, SYMBOL_COMMA)) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, tokens[i].start, tokens[i].end, tokens[i].lineNumber }; }
+		if (!StringEquals(tokens[i].value, SYMBOL_COMMA)) { return (SyntaxError){ SyntaxErrorCodeInvalidFunctionDeclaration, tokens[i].start, tokens[i].end, tokens[i].line }; }
 	}
 	
 	declaration->identifier = StringCreate(tokens[start].value);
@@ -597,11 +597,11 @@ static SyntaxError ParseFunctionDeclaration(List(Token) tokens, Declaration * de
 }
 
 SyntaxError ParseEquation(List(Token) tokens, Equation * equation) {
-	*equation = (Equation){ 0 };
+	*equation = (Equation){ .end = tokens[ListLength(tokens) - 1].end, .line = tokens[0].line };
 	
 	// check for any unknown tokens
 	for (int32_t i = 0; i < ListLength(tokens); i++) {
-		if (tokens[i].type == TokenTypeUnknown) { return (SyntaxError){ SyntaxErrorCodeUnknownToken, tokens[i].start, tokens[i].end, tokens[i].lineNumber }; }
+		if (tokens[i].type == TokenTypeUnknown) { return (SyntaxError){ SyntaxErrorCodeUnknownToken, tokens[i].start, tokens[i].end, tokens[i].line }; }
 	}
 	
 	// parse statement declaration

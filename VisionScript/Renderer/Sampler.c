@@ -9,7 +9,7 @@ RuntimeError SamplePolygons(Script * script, Equation equation, RenderObject * o
 	VectorArray result;
 	RuntimeError error = EvaluateExpression(&script->environment, NULL, equation.expression, &result);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
-	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, equation.expression.start, equation.expression.end, equation.expression.line }; }
+	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, 0, equation.end, equation.line }; }
 	
 	if (!object->needsUpload) {
 		if (result.length > object->vertexCount) {
@@ -34,7 +34,7 @@ RuntimeError SamplePoints(Script * script, Equation equation, RenderObject * obj
 	VectorArray result;
 	RuntimeError error = EvaluateExpression(&script->environment, NULL, equation.expression, &result);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
-	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, equation.expression.start, equation.expression.end, equation.expression.line }; }
+	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, 0, equation.end, equation.line }; }
 	
 	if (!object->needsUpload) {
 		if (result.length > object->vertexCount) {
@@ -66,6 +66,29 @@ typedef struct ParametricSample {
 	float thickness;
 	int32_t next;
 } ParametricSample;
+
+static RuntimeError EvaluateParametricDomain(Environment * environment, Equation equation, float * lower, float * upper) {
+	String identifier = StringCreate(equation.declaration.identifier);
+	StringConcat(&identifier, ":domain");
+	Equation * domain = GetEnvironmentEquation(environment, identifier);
+	if (domain == NULL) {
+		*lower = 0.0;
+		*upper = 1.0;
+	} else {
+		VectorArray value;
+		RuntimeError error = EvaluateExpression(environment, NULL, domain->expression, &value);
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		if (value.length != 2 || value.dimensions != 1) {
+			FreeVectorArray(value);
+			return (RuntimeError){ RuntimeErrorCodeInvalidParametricDomain, domain->expression.start, domain->expression.end, domain->expression.line };
+		} else {
+			*lower = value.xyzw[0][0];
+			*upper = value.xyzw[0][1];
+			FreeVectorArray(value);
+		}
+	}
+	return (RuntimeError){ RuntimeErrorCodeNone };
+}
 
 static RuntimeError EvaluateParametric(Script * script, Expression expression, List(Binding) parameters, float t, float dt, Camera camera, int32_t index, ParametricSample * samples) {
 	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1 };
@@ -129,14 +152,21 @@ static bool SegmentCircleIntersection(vec2_t p1, vec2_t p2, float r) {
 	return vec2_len(d) <= r;
 }
 
-RuntimeError SampleParametric(Script * script, Equation equation, float lower, float upper, Camera camera, RenderObject * object) {
+RuntimeError SampleParametric(Script * script, Equation equation, Camera camera, RenderObject * object) {
+	if (equation.type != EquationTypeFunction || ListLength(equation.declaration.parameters) != 1) {
+		return (RuntimeError){ RuntimeErrorCodeInvalidParametricEquation, 0, equation.end, equation.line };
+	}
+	
+	float lower, upper;
+	RuntimeError error = EvaluateParametricDomain(&script->environment, equation, &lower, &upper);
+	if (error.code != RuntimeErrorCodeNone) { return error; }
+	
 	List(Binding) parameters = ListPush(ListCreate(sizeof(Binding), 1), &(Binding){ 0 });
-	parameters[0].identifier = StringCreate("t");
-	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1 };
+	parameters[0].identifier = equation.declaration.parameters[0];
+	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1, .xyzw[0] = &lower };
 	
 	VectorArray initial;
-	parameters[0].value.xyzw[0] = &lower;
-	RuntimeError error = EvaluateExpression(&script->environment, parameters, equation.expression, &initial);
+	error = EvaluateExpression(&script->environment, parameters, equation.expression, &initial);
 	if (error.code != RuntimeErrorCodeNone) {
 		ListFree(parameters);
 		return error;

@@ -137,6 +137,8 @@ typedef struct Equation {
 	EquationType type;
 	Declaration declaration;
 	Expression expression;
+	int32_t end;
+	int32_t line;
 } Equation;
 
 SyntaxError ParseEquation(List(Token) tokens, Equation * equation);

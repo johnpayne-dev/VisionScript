@@ -116,7 +116,7 @@ List(Token) TokenizeLine(String line, int32_t lineNumber) {
 			i++;
 			continue;
 		}
-		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .lineNumber = lineNumber, .start = i, .end = end });
+		tokens = ListPush(tokens, &(Token){ .type = tokenType, .value = StringSub(line, i, end), .line = lineNumber, .start = i, .end = end });
 		i = end + 1;
 	}
 	return tokens;

@@ -10,6 +10,6 @@ RuntimeError SamplePolygons(Script * script, Equation equation, RenderObject * o
 
 RuntimeError SamplePoints(Script * script, Equation equation, RenderObject * object);
 
-RuntimeError SampleParametric(Script * script, Equation equation, float lower, float upper, Camera camera, RenderObject * object);
+RuntimeError SampleParametric(Script * script, Equation equation, Camera camera, RenderObject * object);
 
 #endif
