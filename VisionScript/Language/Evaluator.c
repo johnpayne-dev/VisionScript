@@ -34,9 +34,11 @@ const char * RuntimeErrorToString(RuntimeErrorCode code) {
 		case RuntimeErrorCodeInvalidArgumentsExpression: return "trying to evaluate invalid arguments";
 		case RuntimeErrorCodeIncorrectArgumentCount: return "incorrect argument count";
 		case RuntimeErrorCodeDifferingOperonDimensions: return "unable to perform arithmetic on differing dimensionality";
-		case RuntimeErrorCodeInvalidRenderDimensionality: return "render equation is of invalid dimensionality";
+		case RuntimeErrorCodeInvalidRenderDimension: return "render equation is of invalid dimension";
 		case RuntimeErrorCodeInvalidParametricEquation: return "invalid parametric equation, must be function of one parameter";
 		case RuntimeErrorCodeInvalidParametricDomain: return "invalid parametric domain";
+		case RuntimeErrorCodeInvalidColorDimension: return "invalid color dimension";
+		case RuntimeErrorCodeInvalidSizeDimension: return "invalid size dimension";
 		case RuntimeErrorCodeNotImplemented: return "not implemented";
 		default: return "unknown error";
 	}

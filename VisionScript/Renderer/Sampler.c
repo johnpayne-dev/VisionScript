@@ -5,54 +5,113 @@
 
 #define MAX_PARAMETRIC_VERTICES 1048576
 
-RuntimeError SamplePolygons(Script * script, Equation equation, RenderObject * object) {
-	VectorArray result;
-	RuntimeError error = EvaluateExpression(&script->environment, NULL, equation.expression, &result);
+static RuntimeError SamplePositions(Environment * environment, Equation equation, RenderObject * object) {
+	VectorArray positions;
+	RuntimeError error = EvaluateExpression(environment, NULL, equation.expression, &positions);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
-	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, 0, equation.end, equation.line }; }
+	if (positions.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimension, 0, equation.end, equation.line }; }
 	
-	if (!object->needsUpload) {
-		if (result.length > object->vertexCount) {
-			if (object->vertexCount == 0) { object->vertices = malloc(result.length * sizeof(vertex_t)); }
-			else { object->vertices = realloc(object->vertices, result.length * sizeof(vertex_t)); }
+	if (positions.length > object->vertexCount) {
+		if (object->vertexCount == 0) { object->vertices = malloc(positions.length * sizeof(vertex_t)); }
+		else { object->vertices = realloc(object->vertices, positions.length * sizeof(vertex_t)); }
+	}
+	for (int32_t i = 0; i < positions.length; i++) {
+		object->vertices[i] = (vertex_t) {
+			.position = { positions.xyzw[0][i], positions.xyzw[1][i] },
+			.color = { 0.0, 0.0, 0.0, 1.0 },
+		};
+	}
+	object->vertexCount = positions.length;
+	object->needsUpload = true;
+	
+	FreeVectorArray(positions);
+	return (RuntimeError){ RuntimeErrorCodeNone };
+}
+
+static RuntimeError SampleColor(Environment * environment, Equation equation, RenderObject * object) {
+	String identifier = StringCreate(equation.declaration.identifier);
+	StringConcat(&identifier, ":color");
+	Equation * color = GetEnvironmentEquation(environment, identifier);
+	if (color == NULL) {
+		for (int32_t i = 0; i < object->vertexCount; i++) {
+			object->vertices[i].color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 };
 		}
-		for (int32_t i = 0; i < result.length; i++) {
-			object->vertices[i] = (vertex_t) {
-				.position = { result.xyzw[0][i], result.xyzw[1][i] },
-				.color = { 0.0, 0.0, 0.0, 1.0 },
+	} else {
+		VectorArray colors;
+		RuntimeError error = EvaluateExpression(environment, NULL, color->expression, &colors);
+		if (error.code != RuntimeErrorCodeNone) {
+			StringFree(identifier);
+			return error;
+		}
+		if (colors.dimensions != 3 && colors.dimensions != 4) {
+			StringFree(identifier);
+			FreeVectorArray(colors);
+			return (RuntimeError){ RuntimeErrorCodeInvalidColorDimension, color->expression.start, color->expression.end, color->line };
+		}
+		for (int32_t i = 0; i < object->vertexCount; i++) {
+			int32_t index = i < colors.length ? i : colors.length - 1;
+			object->vertices[i].color = (vec4_t){
+				colors.xyzw[0][index],
+				colors.xyzw[1][index],
+				colors.xyzw[2][index],
+				colors.dimensions == 4 ? colors.xyzw[3][index] : 1.0,
 			};
 		}
-		object->vertexCount = result.length;
-		object->needsUpload = true;
+		FreeVectorArray(colors);
 	}
-	
-	FreeVectorArray(result);
+	StringFree(identifier);
+	return (RuntimeError){ RuntimeErrorCodeNone };
+}
+
+static RuntimeError SampleSize(Environment * environment, Equation equation, RenderObject * object) {
+	String identifier = StringCreate(equation.declaration.identifier);
+	StringConcat(&identifier, ":size");
+	Equation * size = GetEnvironmentEquation(environment, identifier);
+	if (size == NULL) {
+		for (int32_t i = 0; i < object->vertexCount; i++) {
+			object->vertices[i].size = 8.0;
+		}
+	} else {
+		VectorArray sizes;
+		RuntimeError error = EvaluateExpression(environment, NULL, size->expression, &sizes);
+		if (error.code != RuntimeErrorCodeNone) {
+			StringFree(identifier);
+			return error;
+		}
+		if (sizes.dimensions != 1) {
+			StringFree(identifier);
+			FreeVectorArray(sizes);
+			return (RuntimeError){ RuntimeErrorCodeInvalidSizeDimension, size->expression.start, size->expression.end, size->line };
+		}
+		for (int32_t i = 0; i < object->vertexCount; i++) {
+			int32_t index = i < sizes.length ? i : sizes.length - 1;
+			object->vertices[i].size = sizes.xyzw[0][index];
+		}
+		FreeVectorArray(sizes);
+	}
+	StringFree(identifier);
+	return (RuntimeError){ RuntimeErrorCodeNone };
+}
+
+RuntimeError SamplePolygons(Script * script, Equation equation, RenderObject * object) {
+	if (!object->needsUpload) {
+		RuntimeError error = SamplePositions(&script->environment, equation, object);
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		error = SampleColor(&script->environment, equation, object);
+		return error;
+	}
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
 RuntimeError SamplePoints(Script * script, Equation equation, RenderObject * object) {
-	VectorArray result;
-	RuntimeError error = EvaluateExpression(&script->environment, NULL, equation.expression, &result);
-	if (error.code != RuntimeErrorCodeNone) { return error; }
-	if (result.dimensions != 2) { return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, 0, equation.end, equation.line }; }
-	
 	if (!object->needsUpload) {
-		if (result.length > object->vertexCount) {
-			if (object->vertexCount == 0) { object->vertices = malloc(result.length * sizeof(vertex_t)); }
-			else { object->vertices = realloc(object->vertices, result.length * sizeof(vertex_t)); }
-		}
-		for (int32_t i = 0; i < result.length; i++) {
-			object->vertices[i] = (vertex_t) {
-				.position = { result.xyzw[0][i], result.xyzw[1][i] },
-				.color = { 0.0, 0.0, 0.0, 1.0 },
-				.size = 16.0,
-			};
-		}
-		object->vertexCount = result.length;
-		object->needsUpload = true;
+		RuntimeError error = SamplePositions(&script->environment, equation, object);
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		error = SampleColor(&script->environment, equation, object);
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		error = SampleSize(&script->environment, equation, object);
+		return error;
 	}
-	
-	FreeVectorArray(result);
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
@@ -77,8 +136,12 @@ static RuntimeError EvaluateParametricDomain(Environment * environment, Equation
 	} else {
 		VectorArray value;
 		RuntimeError error = EvaluateExpression(environment, NULL, domain->expression, &value);
-		if (error.code != RuntimeErrorCodeNone) { return error; }
+		if (error.code != RuntimeErrorCodeNone) {
+			StringFree(identifier);
+			return error;
+		}
 		if (value.length != 2 || value.dimensions != 1) {
+			StringFree(identifier);
 			FreeVectorArray(value);
 			return (RuntimeError){ RuntimeErrorCodeInvalidParametricDomain, domain->expression.start, domain->expression.end, domain->expression.line };
 		} else {
@@ -87,6 +150,7 @@ static RuntimeError EvaluateParametricDomain(Environment * environment, Equation
 			FreeVectorArray(value);
 		}
 	}
+	StringFree(identifier);
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
@@ -107,7 +171,7 @@ static RuntimeError EvaluateParametric(Script * script, Expression expression, L
 	if (result.dimensions != 2 || resultdt.dimensions != 2) {
 		FreeVectorArray(result);
 		FreeVectorArray(resultdt);
-		return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimensionality, expression.start, expression.end, expression.line };
+		return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimension, expression.start, expression.end, expression.line };
 	}
 	
 	if (index < 0) {
@@ -223,44 +287,42 @@ RuntimeError SampleParametric(Script * script, Equation equation, Camera camera,
 		totalSampleCount += sampleCount;
 	}
 	
-	if (!object->needsUpload) {
-		if (6 * totalSampleCount > object->vertexCount) {
-			if (object->vertexCount == 0) { object->vertices = malloc(6 * totalSampleCount* sizeof(vertex_t)); }
-			else { object->vertices = realloc(object->vertices, 6 * totalSampleCount * sizeof(vertex_t)); }
-		}
-		
-		int32_t c = 0;
-		for (int32_t i = 0; i < initial.length; i++) {
-			ParametricSample sample = samples[i][0];
-			ParametricSample prevSample = sample;
-			while (true) {
-				if (vec2_dist(sample.screenPosition, prevSample.screenPosition) > 10) { prevSample = sample; }
-				vertex_t v1 = (vertex_t) {
-					.position = sample.position,
-					.color = sample.color,
-					.size = sample.thickness,
-					.pair = prevSample.position,
-				};
-				vertex_t v2 = (vertex_t) {
-					.position = prevSample.position,
-					.color = prevSample.color,
-					.size = prevSample.thickness,
-					.pair = sample.position,
-				};
-				object->vertices[c++] = v1;
-				object->vertices[c++] = v1;
-				object->vertices[c++] = v2;
-				object->vertices[c++] = v2;
-				object->vertices[c++] = v2;
-				object->vertices[c++] = v1;
-				if (sample.next == 0) { break; }
-				prevSample = sample;
-				sample = samples[i][sample.next];
-			}
-		}
-		object->vertexCount = 6 * totalSampleCount;
-		object->needsUpload = true;
+	if (6 * totalSampleCount > object->vertexCount) {
+		if (object->vertexCount == 0) { object->vertices = malloc(6 * totalSampleCount* sizeof(vertex_t)); }
+		else { object->vertices = realloc(object->vertices, 6 * totalSampleCount * sizeof(vertex_t)); }
 	}
+	
+	int32_t c = 0;
+	for (int32_t i = 0; i < initial.length; i++) {
+		ParametricSample sample = samples[i][0];
+		ParametricSample prevSample = sample;
+		while (true) {
+			if (vec2_dist(sample.screenPosition, prevSample.screenPosition) > 10) { prevSample = sample; }
+			vertex_t v1 = (vertex_t) {
+				.position = sample.position,
+				.color = sample.color,
+				.size = sample.thickness,
+				.pair = prevSample.position,
+			};
+			vertex_t v2 = (vertex_t) {
+				.position = prevSample.position,
+				.color = prevSample.color,
+				.size = prevSample.thickness,
+				.pair = sample.position,
+			};
+			object->vertices[c++] = v1;
+			object->vertices[c++] = v1;
+			object->vertices[c++] = v2;
+			object->vertices[c++] = v2;
+			object->vertices[c++] = v2;
+			object->vertices[c++] = v1;
+			if (sample.next == 0) { break; }
+			prevSample = sample;
+			sample = samples[i][sample.next];
+		}
+	}
+	object->vertexCount = 6 * totalSampleCount;
+	object->needsUpload = true;
 	
 free:
 	ListFree(parameters);

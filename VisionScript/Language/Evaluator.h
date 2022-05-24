@@ -32,9 +32,11 @@ typedef enum RuntimeErrorCode {
 	RuntimeErrorCodeIncorrectArgumentCount,
 	RuntimeErrorCodeDifferingOperonDimensions,
 	RuntimeErrorCodeInvalidArgumentType,
-	RuntimeErrorCodeInvalidRenderDimensionality,
+	RuntimeErrorCodeInvalidRenderDimension,
 	RuntimeErrorCodeInvalidParametricEquation,
 	RuntimeErrorCodeInvalidParametricDomain,
+	RuntimeErrorCodeInvalidColorDimension,
+	RuntimeErrorCodeInvalidSizeDimension,
 	RuntimeErrorCodeNotImplemented,
 } RuntimeErrorCode;
 
