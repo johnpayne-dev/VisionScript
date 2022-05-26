@@ -161,19 +161,21 @@ static void UpdateBuiltins(float dt) {
 static void UpdateSamples() {
 	Camera camera = renderer.camera;
 	for (int32_t i = 0; i < ListLength(renderer.objects); i++) {
-		if (ListContains(renderer.script.needsRender, &renderer.objects[i].equation)) {
+		RenderObject object = renderer.objects[i];
+		if (ListContains(renderer.script.needsRender, &object.equation)) {
 			RuntimeError error = { RuntimeErrorCodeNone };
-			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePoints) {
-				error = SamplePoints(&renderer.script, renderer.objects[i].equation, &renderer.objects[i]);
+			if (object.equation.declaration.attribute == DeclarationAttributePoints) {
+				error = SamplePoints(&renderer.script, object.equation, &object);
 			}
-			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributePolygons) {
-				error = SamplePolygons(&renderer.script, renderer.objects[i].equation, &renderer.objects[i]);
+			if (object.equation.declaration.attribute == DeclarationAttributePolygons) {
+				error = SamplePolygons(&renderer.script, object.equation, &object);
 			}
-			if (renderer.objects[i].equation.declaration.attribute == DeclarationAttributeParametric) {
-				error = SampleParametric(&renderer.script, renderer.objects[i].equation, camera, &renderer.objects[i]);
+			if (object.equation.declaration.attribute == DeclarationAttributeParametric) {
+				error = SampleParametric(&renderer.script, object.equation, camera, &object);
 			}
-			RemoveFromRenderList(&renderer.script, renderer.objects[i].equation);
+			RemoveFromRenderList(&renderer.script, object.equation);
 			if (error.code != RuntimeErrorCodeNone) { PrintRuntimeError(error, renderer.script.lines); }
+			renderer.objects[i] = object;
 		}
 	}
 }

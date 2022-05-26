@@ -82,6 +82,15 @@ VectorArray CopyVectorArray(VectorArray value) {
 	return result;
 }
 
+VectorArray VectorArrayAtIndex(VectorArray value, int32_t index) {
+	VectorArray indexed = { .length = 1, .dimensions = value.dimensions };
+	for (int32_t i = 0; i < value.dimensions; i++) {
+		indexed.xyzw[i] = malloc(sizeof(scalar_t));
+		indexed.xyzw[i][0] = value.xyzw[i][index];
+	}
+	return indexed;
+}
+
 bool TruthyVectorArray(VectorArray value) {
 	for (int32_t i = 0; i < value.dimensions; i++) {
 		for (int32_t j = 0; j < value.length; j++) {

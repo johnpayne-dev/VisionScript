@@ -22,7 +22,6 @@ static RuntimeError SamplePositions(Environment * environment, Equation equation
 		};
 	}
 	object->vertexCount = positions.length;
-	object->needsUpload = true;
 	
 	FreeVectorArray(positions);
 	return (RuntimeError){ RuntimeErrorCodeNone };
@@ -32,6 +31,7 @@ static RuntimeError SampleColor(Environment * environment, Equation equation, Re
 	String identifier = StringCreate(equation.declaration.identifier);
 	StringConcat(&identifier, ":color");
 	Equation * color = GetEnvironmentEquation(environment, identifier);
+	StringFree(identifier);
 	if (color == NULL) {
 		for (int32_t i = 0; i < object->vertexCount; i++) {
 			object->vertices[i].color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 };
@@ -39,12 +39,8 @@ static RuntimeError SampleColor(Environment * environment, Equation equation, Re
 	} else {
 		VectorArray colors;
 		RuntimeError error = EvaluateExpression(environment, NULL, color->expression, &colors);
-		if (error.code != RuntimeErrorCodeNone) {
-			StringFree(identifier);
-			return error;
-		}
+		if (error.code != RuntimeErrorCodeNone) { return error; }
 		if (colors.dimensions != 3 && colors.dimensions != 4) {
-			StringFree(identifier);
 			FreeVectorArray(colors);
 			return (RuntimeError){ RuntimeErrorCodeInvalidColorDimension, color->expression.start, color->expression.end, color->line };
 		}
@@ -59,7 +55,6 @@ static RuntimeError SampleColor(Environment * environment, Equation equation, Re
 		}
 		FreeVectorArray(colors);
 	}
-	StringFree(identifier);
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
@@ -67,6 +62,7 @@ static RuntimeError SampleSize(Environment * environment, Equation equation, Ren
 	String identifier = StringCreate(equation.declaration.identifier);
 	StringConcat(&identifier, ":size");
 	Equation * size = GetEnvironmentEquation(environment, identifier);
+	StringFree(identifier);
 	if (size == NULL) {
 		for (int32_t i = 0; i < object->vertexCount; i++) {
 			object->vertices[i].size = 8.0;
@@ -74,12 +70,8 @@ static RuntimeError SampleSize(Environment * environment, Equation equation, Ren
 	} else {
 		VectorArray sizes;
 		RuntimeError error = EvaluateExpression(environment, NULL, size->expression, &sizes);
-		if (error.code != RuntimeErrorCodeNone) {
-			StringFree(identifier);
-			return error;
-		}
+		if (error.code != RuntimeErrorCodeNone) { return error; }
 		if (sizes.dimensions != 1) {
-			StringFree(identifier);
 			FreeVectorArray(sizes);
 			return (RuntimeError){ RuntimeErrorCodeInvalidSizeDimension, size->expression.start, size->expression.end, size->line };
 		}
@@ -89,7 +81,6 @@ static RuntimeError SampleSize(Environment * environment, Equation equation, Ren
 		}
 		FreeVectorArray(sizes);
 	}
-	StringFree(identifier);
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
@@ -98,7 +89,8 @@ RuntimeError SamplePolygons(Script * script, Equation equation, RenderObject * o
 		RuntimeError error = SamplePositions(&script->environment, equation, object);
 		if (error.code != RuntimeErrorCodeNone) { return error; }
 		error = SampleColor(&script->environment, equation, object);
-		return error;
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		object->needsUpload = true;
 	}
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
@@ -110,7 +102,8 @@ RuntimeError SamplePoints(Script * script, Equation equation, RenderObject * obj
 		error = SampleColor(&script->environment, equation, object);
 		if (error.code != RuntimeErrorCodeNone) { return error; }
 		error = SampleSize(&script->environment, equation, object);
-		return error;
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		object->needsUpload = true;
 	}
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
@@ -120,28 +113,24 @@ typedef struct ParametricSample {
 	vec2_t position;
 	vec2_t screenPosition;
 	vec2_t tangent;
-	vec2_t concavity;
 	vec4_t color;
 	float thickness;
 	int32_t next;
 } ParametricSample;
 
-static RuntimeError EvaluateParametricDomain(Environment * environment, Equation equation, float * lower, float * upper) {
+static RuntimeError SampleParametricDomain(Environment * environment, Equation equation, float * lower, float * upper) {
 	String identifier = StringCreate(equation.declaration.identifier);
 	StringConcat(&identifier, ":domain");
 	Equation * domain = GetEnvironmentEquation(environment, identifier);
+	StringFree(identifier);
 	if (domain == NULL) {
 		*lower = 0.0;
 		*upper = 1.0;
 	} else {
 		VectorArray value;
 		RuntimeError error = EvaluateExpression(environment, NULL, domain->expression, &value);
-		if (error.code != RuntimeErrorCodeNone) {
-			StringFree(identifier);
-			return error;
-		}
+		if (error.code != RuntimeErrorCodeNone) { return error; }
 		if (value.length != 2 || value.dimensions != 1) {
-			StringFree(identifier);
 			FreeVectorArray(value);
 			return (RuntimeError){ RuntimeErrorCodeInvalidParametricDomain, domain->expression.start, domain->expression.end, domain->expression.line };
 		} else {
@@ -150,20 +139,16 @@ static RuntimeError EvaluateParametricDomain(Environment * environment, Equation
 			FreeVectorArray(value);
 		}
 	}
-	StringFree(identifier);
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
-static RuntimeError EvaluateParametric(Script * script, Expression expression, List(Binding) parameters, float t, float dt, Camera camera, int32_t index, ParametricSample * samples) {
-	parameters[0].value = (VectorArray){ .length = 1, .dimensions = 1 };
-	
+static RuntimeError SampleParametricPosition(Environment * environment, Equation equation, List(Binding) parameters, float t, float dt, Camera camera, int32_t index, ParametricSample * samples) {
 	VectorArray result, resultdt;
-	parameters[0].value.xyzw[0] = &(float){ t };
-	RuntimeError error = EvaluateExpression(&script->environment, parameters, expression, &result);
+	parameters[0].value.xyzw[0] = &t;
+	RuntimeError error = EvaluateExpression(environment, parameters, equation.expression, &result);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
-	
 	parameters[0].value.xyzw[0] = &(float){ t + dt };
-	error = EvaluateExpression(&script->environment, parameters, expression, &resultdt);
+	error = EvaluateExpression(environment, parameters, equation.expression, &resultdt);
 	if (error.code != RuntimeErrorCodeNone) {
 		FreeVectorArray(result);
 		return error;
@@ -171,37 +156,66 @@ static RuntimeError EvaluateParametric(Script * script, Expression expression, L
 	if (result.dimensions != 2 || resultdt.dimensions != 2) {
 		FreeVectorArray(result);
 		FreeVectorArray(resultdt);
-		return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimension, expression.start, expression.end, expression.line };
+		return (RuntimeError){ RuntimeErrorCodeInvalidRenderDimension, equation.expression.start, equation.expression.end, equation.line };
 	}
 	
-	if (index < 0) {
-		for (int32_t i = 0; i < result.length; i++) {
-			vec2_t pos = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] };
-			vec2_t posdt = (vec2_t){ resultdt.xyzw[0][i], resultdt.xyzw[1][i] };
-			samples[i] = (ParametricSample) {
-				.position = pos,
-				.tangent = vec2_normalize(vec2_sub(posdt, pos)),
-				.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
-				.thickness = 6.0,
-				.t = t,
-			};
-			samples[i].screenPosition = vec2_mul(CameraTransformPoint(camera, samples[i].position), (vec2_t){ camera.aspectRatio, 1.0 });
-		}
-	} else {
-		vec2_t pos = (vec2_t){ result.xyzw[0][index], result.xyzw[1][index] };
-		vec2_t posdt = (vec2_t){ resultdt.xyzw[0][index], resultdt.xyzw[1][index] };
-		samples[0] = (ParametricSample) {
+	if (index >= 0) {
+		VectorArray old = result;
+		result = VectorArrayAtIndex(old, index);
+		FreeVectorArray(old);
+		old = resultdt;
+		resultdt = VectorArrayAtIndex(old, index);
+		FreeVectorArray(old);
+	}
+	
+	for (int32_t i = 0; i < result.length; i++) {
+		vec2_t pos = (vec2_t){ result.xyzw[0][i], result.xyzw[1][i] };
+		vec2_t posdt = (vec2_t){ resultdt.xyzw[0][i], resultdt.xyzw[1][i] };
+		samples[i] = (ParametricSample) {
 			.position = pos,
 			.tangent = vec2_normalize(vec2_sub(posdt, pos)),
-			.color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 },
 			.thickness = 6.0,
 			.t = t,
 		};
-		samples[0].screenPosition = vec2_mul(CameraTransformPoint(camera, samples[0].position), (vec2_t){ camera.aspectRatio, 1.0 });
+		samples[i].screenPosition = vec2_mul(CameraTransformPoint(camera, samples[i].position), (vec2_t){ camera.aspectRatio, 1.0 });
 	}
 	
 	FreeVectorArray(result);
 	FreeVectorArray(resultdt);
+	return (RuntimeError){ RuntimeErrorCodeNone };
+}
+
+static RuntimeError SampleParametricColor(Environment * environment, Equation equation, List(Binding) parameters, float t, int32_t index, int32_t sampleCount, ParametricSample * samples) {
+	String identifier = StringCreate(equation.declaration.identifier);
+	StringConcat(&identifier, ":color");
+	Equation * color = GetEnvironmentEquation(environment, identifier);
+	StringFree(identifier);
+	if (color == NULL) {
+		for (int32_t i = 0; i < sampleCount; i++) {
+			samples[i].color = (vec4_t){ 0.0, 0.0, 0.0, 1.0 };
+		}
+	} else  {
+		VectorArray colors;
+		parameters[0].value.xyzw[0] = &t;
+		RuntimeError error = EvaluateExpression(environment, parameters, color->expression, &colors);
+		if (error.code != RuntimeErrorCodeNone) { return error; }
+		if (colors.dimensions != 3 && colors.dimensions != 4) {
+			FreeVectorArray(colors);
+			return (RuntimeError){ RuntimeErrorCodeInvalidColorDimension, color->expression.start, color->expression.end, color->line };
+		}
+		
+		for (int32_t i = 0; i < sampleCount; i++) {
+			int32_t c = index >= 0 ? index : i;
+			if (c > colors.length) { c = colors.length - 1; }
+			samples[i].color = (vec4_t){
+				colors.xyzw[0][c],
+				colors.xyzw[1][c],
+				colors.xyzw[2][c],
+				colors.dimensions == 4 ? colors.xyzw[3][c] : 1.0,
+			};
+		}
+		FreeVectorArray(colors);
+	}
 	return (RuntimeError){ RuntimeErrorCodeNone };
 }
 
@@ -222,7 +236,7 @@ RuntimeError SampleParametric(Script * script, Equation equation, Camera camera,
 	}
 	
 	float lower, upper;
-	RuntimeError error = EvaluateParametricDomain(&script->environment, equation, &lower, &upper);
+	RuntimeError error = SampleParametricDomain(&script->environment, equation, &lower, &upper);
 	if (error.code != RuntimeErrorCodeNone) { return error; }
 	
 	List(Binding) parameters = ListPush(ListCreate(sizeof(Binding), 1), &(Binding){ 0 });
@@ -246,7 +260,12 @@ RuntimeError SampleParametric(Script * script, Equation equation, Camera camera,
 	for (int32_t j = 0; j <= baseSampleCount; j++) {
 		float t = (upper - lower) * ((float)j / baseSampleCount) + lower;
 		ParametricSample * baseSamples = malloc(initial.length * sizeof(ParametricSample));
-		error = EvaluateParametric(script, equation.expression, parameters, t, 0.5 / baseSampleCount, camera, -1, baseSamples);
+		error = SampleParametricPosition(&script->environment, equation, parameters, t, 0.5 / baseSampleCount, camera, -1, baseSamples);
+		if (error.code != RuntimeErrorCodeNone) {
+			free(baseSamples);
+			goto free;
+		}
+		error = SampleParametricColor(&script->environment, equation, parameters, t, -1, initial.length, baseSamples);
 		if (error.code != RuntimeErrorCodeNone) {
 			free(baseSamples);
 			goto free;
@@ -275,7 +294,9 @@ RuntimeError SampleParametric(Script * script, Equation equation, Camera camera,
 			if (segmentLength > innerDetail && SegmentCircleIntersection(left.screenPosition, right.screenPosition, radius)) {
 				if (vec2_dot(left.tangent, right.tangent) > 1.0 - 1e-4 / segmentLength) { continue; }
 				ParametricSample sample;
-				error = EvaluateParametric(script, equation.expression, parameters, (left.t + right.t) / 2.0, fabsf(right.t - left.t) / 4.0, camera, i, &sample);
+				error = SampleParametricPosition(&script->environment, equation, parameters, (left.t + right.t) / 2.0, fabsf(right.t - left.t) / 4.0, camera, i, &sample);
+				if (error.code != RuntimeErrorCodeNone) { goto free; }
+				error = SampleParametricColor(&script->environment, equation, parameters, (left.t + right.t) / 2.0, i, 1, &sample);
 				if (error.code != RuntimeErrorCodeNone) { goto free; }
 				sample.next = left.next;
 				samples[i][j].next = ListLength(samples[i]);

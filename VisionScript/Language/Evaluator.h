@@ -61,6 +61,7 @@ typedef struct VectorArray {
 
 void PrintVectorArray(VectorArray value);
 VectorArray CopyVectorArray(VectorArray value);
+VectorArray VectorArrayAtIndex(VectorArray value, int32_t index);
 bool TruthyVectorArray(VectorArray value);
 void FreeVectorArray(VectorArray value);
 
